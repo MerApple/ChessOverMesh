@@ -177,14 +177,21 @@ public sealed class DeviceTabPage : ContentPage
         }
     }
 
-    // Requests the device's noise floor, then — if no value has arrived after a short wait — marks it "not
-    // reported" so the row doesn't sit on "(requesting…)" forever on firmware that doesn't report noise_floor.
+    // Requests the device's noise floor, retrying a few times, then — if still no value — marks it "not reported" so
+    // the row doesn't sit on "(requesting…)" forever on firmware that doesn't report noise_floor.
+    // A request fired the instant sync completes (especially over BLE, where the link is still settling) often gets
+    // no reply and used to look like "not supported"; so we wait a moment after sync, then retry before giving up.
     async Task RequestNoiseFloorAsync()
     {
         _noiseTimedOut = false;
         Refresh();
-        try { await _main.RequestNoiseFloorAsync(_main.MyNodeNum); } catch { /* best effort */ }
-        await Task.Delay(TimeSpan.FromSeconds(8));
+        // Let a freshly-synced link settle before the first request.
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        for (int attempt = 0; attempt < 3 && _main.IsConnected && _main.DeviceNoiseFloor is null; attempt++)
+        {
+            try { await _main.RequestNoiseFloorAsync(_main.MyNodeNum); } catch { /* best effort */ }
+            await Task.Delay(TimeSpan.FromSeconds(5));   // wait for the reply before retrying
+        }
         if (_main.IsConnected && _main.DeviceNoiseFloor is null) { _noiseTimedOut = true; Refresh(); }
     }
 
