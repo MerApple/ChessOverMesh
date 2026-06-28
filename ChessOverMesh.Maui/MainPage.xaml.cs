@@ -1563,6 +1563,8 @@ public partial class MainPage : ContentPage
                 if (resent) body = body.Substring(ProtocolMessage.ChatResendPrefix.Length);
                 string detail = $"{Stamp()}{chan}{sig}".Trim();   // dim metadata line under the message
                 if (resent) detail = detail.Length > 0 ? detail + "  · resent" : "resent";
+                // Note when the device got this off MQTT rather than over the air (shown regardless of the signal toggle).
+                if (msg.ViaMqtt) detail = detail.Length > 0 ? detail + "  · via MQTT" : "via MQTT";
                 // If this is a reply, quote what it answers so it's clear it's replying to (one of) your messages.
                 string replyRef = ReplyRefFor(msg.ReplyId);
                 if (replyRef.Length > 0) detail = detail.Length > 0 ? $"{replyRef}  ·  {detail}" : replyRef;

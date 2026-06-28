@@ -25,7 +25,7 @@ namespace ChessOverMesh.Mesh;
 public readonly record struct MeshTextMessage(
     uint FromNode, uint Channel, string Text, uint PacketId, uint RxTime, bool DecryptFailed = false,
     int RxRssi = 0, float RxSnr = 0, int HopLimit = 0, int HopStart = 0, byte RelayNode = 0, uint ToNode = 0,
-    uint ReplyId = 0, bool IsReaction = false)
+    uint ReplyId = 0, bool IsReaction = false, bool ViaMqtt = false)
 {
     /// <summary>Hops the packet travelled (HopStart − HopLimit), or null when HopStart is unknown
     /// (older sender firmware) so we can't tell direct from relayed.</summary>
@@ -1363,7 +1363,7 @@ public sealed class MeshtasticHttpClient : IDisposable
 
             messages.Add(new MeshTextMessage(pkt.From, pkt.Channel, text, pkt.Id, pkt.RxTime, decryptFailed,
                 pkt.RxRssi, pkt.RxSnr, (int)pkt.HopLimit, (int)ReadVarintField(pkt, 15), (byte)ReadVarintField(pkt, 19),
-                pkt.To, decoded.ReplyId, decoded.Emoji != 0));
+                pkt.To, decoded.ReplyId, decoded.Emoji != 0, ReadVarintField(pkt, 14) != 0));   // via_mqtt = field 14
             }
             catch { /* skip a single packet we couldn't process; keep draining the rest of the batch */ }
         }
