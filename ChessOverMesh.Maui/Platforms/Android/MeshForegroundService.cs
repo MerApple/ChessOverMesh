@@ -70,7 +70,29 @@ public sealed class MeshForegroundService : Service
             }
         }
 
-        return StartCommandResult.Sticky;   // restart if the OS reclaims us
+        return StartCommandResult.Sticky;   // restart if the OS reclaims us (while backgrounded, not closed)
+    }
+
+    // The user swiped the app away. The foreground service keeps the process alive a moment longer, so use that
+    // window to close the BLE link cleanly (awaits the GATT disconnect) — otherwise the Android Bluetooth stack
+    // keeps the connection and the device can't be found/connected again until the phone is rebooted. Then drop the
+    // service + its ongoing notification so it doesn't linger showing "connected" with no real connection.
+    public override async void OnTaskRemoved(Intent? rootIntent)
+    {
+        try
+        {
+            var cleanup = BackgroundConnection.CleanupOnAppClose;
+            // Give the clean disconnect a bounded window, then stop regardless so a hung BLE stack can't keep the
+            // service (and its notification) alive.
+            if (cleanup != null) await Task.WhenAny(cleanup(), Task.Delay(TimeSpan.FromSeconds(4))).ConfigureAwait(false);
+        }
+        catch (System.Exception) { /* best effort — we're shutting down */ }
+        finally
+        {
+            try { StopForeground(StopForegroundFlags.Remove); } catch (System.Exception) { }
+            try { StopSelf(); } catch (System.Exception) { }
+            base.OnTaskRemoved(rootIntent);
+        }
     }
 
     public static void Start(string label)

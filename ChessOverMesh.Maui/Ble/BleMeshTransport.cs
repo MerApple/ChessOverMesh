@@ -16,7 +16,7 @@ namespace ChessOverMesh.Maui;
 /// SPIKE: compiles and integrates, but is unverified on a physical radio. Real devices typically require BLE
 /// bonding with a PIN (default 123456) — that surfaces as the OS pairing dialog on first connect.
 /// </summary>
-public sealed class BleMeshTransport : IMeshTransport
+public sealed class BleMeshTransport : IMeshTransport, IAsyncDisposable
 {
     // Meshtastic BLE GATT UUIDs (firmware: src/mesh/api/.. / the documented BLE service).
     public static readonly Guid ServiceUuid   = Guid.Parse("6ba1b218-15a8-461f-9fa8-5dcae273eafd");
@@ -116,6 +116,20 @@ public sealed class BleMeshTransport : IMeshTransport
         _adapter.DeviceDisconnected -= OnDeviceDropped;
         _adapter.DeviceConnectionLost -= OnDeviceConnectionLost;
         try { _ = _adapter.DisconnectDeviceAsync(_device); } catch { /* ignore */ }
+        _gate.Dispose();
+    }
+
+    /// <summary>Closes the link and AWAITS the GATT disconnect — used when the app is closing (the user swiped it
+    /// away). Unlike <see cref="Dispose"/> (fire-and-forget, fine while the app keeps running), this makes sure the
+    /// native GATT is actually disconnected/closed before the process goes away; otherwise the Android Bluetooth
+    /// stack keeps the connection and the device can't be found again until the phone is rebooted.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) { _gate.Dispose(); return; }
+        _disposed = true;
+        _adapter.DeviceDisconnected -= OnDeviceDropped;
+        _adapter.DeviceConnectionLost -= OnDeviceConnectionLost;
+        try { await _adapter.DisconnectDeviceAsync(_device).ConfigureAwait(false); } catch { /* ignore */ }
         _gate.Dispose();
     }
 }

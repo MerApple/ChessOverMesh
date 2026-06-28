@@ -524,6 +524,12 @@ public partial class MainPage : ContentPage
             // notification permission so we can alert on new messages in the background. WiFi/HTTP also needs a
             // WiFi + CPU wake lock (isIp) to keep polling; BLE wakes on packets without one.
             BackgroundConnection.Start(label, keepWifiAwake: isIp);
+            // If the user swipes the app away, close the link cleanly first (matters for BLE — see CleanupOnAppClose).
+            BackgroundConnection.CleanupOnAppClose = async () =>
+            {
+                var m = _mesh; _mesh = null;
+                if (m != null) { try { await m.CloseAsync(); } catch { /* shutting down */ } }
+            };
             _ = BackgroundConnection.EnsureNotificationPermissionAsync();
             _ = RunSyncAsync();
         }
@@ -548,6 +554,7 @@ public partial class MainPage : ContentPage
 
     void Disconnect(string statusMessage)
     {
+        BackgroundConnection.CleanupOnAppClose = null;   // no live link to clean up on app close anymore
         BackgroundConnection.Stop();   // drop the keep-alive foreground service + its ongoing notification
         _pollTimer!.Stop();
         _mesh?.Dispose();

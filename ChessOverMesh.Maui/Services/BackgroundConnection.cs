@@ -7,6 +7,11 @@ namespace ChessOverMesh.Maui;
 /// </summary>
 public static class BackgroundConnection
 {
+    /// <summary>Set by the app while connected: a clean shutdown (awaits the BLE GATT disconnect) run when the user
+    /// swipes the app away, so the link doesn't leak and the device can be found again without a reboot. Null when
+    /// not connected. Invoked by the Android foreground service's OnTaskRemoved.</summary>
+    public static Func<Task>? CleanupOnAppClose;
+
     /// <summary>Start the keep-alive foreground service (shows the ongoing "connected" notification). When
     /// <paramref name="keepWifiAwake"/> (an HTTP/WiFi connection), also hold a WiFi + CPU wake lock so the poll
     /// keeps running through sleep — BLE doesn't need this (the radio wakes us on packets). Best-effort: this is

@@ -2002,4 +2002,12 @@ public sealed class MeshtasticHttpClient : IDisposable
     }
 
     public void Dispose() => _transport.Dispose();
+
+    /// <summary>Closes the link, awaiting the transport's clean shutdown when it supports one (e.g. BLE awaits the
+    /// GATT disconnect). Used on app close so a Bluetooth link doesn't leak its GATT. Falls back to <see cref="Dispose"/>.</summary>
+    public async Task CloseAsync()
+    {
+        if (_transport is IAsyncDisposable ad) await ad.DisposeAsync().ConfigureAwait(false);
+        else _transport.Dispose();
+    }
 }
