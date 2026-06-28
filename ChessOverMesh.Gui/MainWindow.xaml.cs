@@ -622,6 +622,14 @@ public partial class MainWindow : Window
                 "Host required", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+
+        // Proxy: "proxy://host[:port]" connects (TLS) to a Meshtastic.Proxy that shares one device with several apps.
+        if (host.StartsWith("proxy://", StringComparison.OrdinalIgnoreCase))
+        {
+            await ConnectViaProxyAsync(host);
+            return;
+        }
+
         if (!host.StartsWith("http", StringComparison.OrdinalIgnoreCase))
             host = "http://" + host;
 
@@ -691,6 +699,53 @@ public partial class MainWindow : Window
     private static int SafePort(string url, int fallback)
     {
         try { var p = new Uri(url).Port; return p > 0 ? p : fallback; } catch { return fallback; }
+    }
+
+    // Connects to a Meshtastic.Proxy over TLS ("proxy://host[:port]"). The proxy multiplexes one device to several
+    // apps; from here it's an ordinary client connection over an encrypted stream, so the shared handshake runs.
+    private async Task ConnectViaProxyAsync(string proxyUrl)
+    {
+        string rest = proxyUrl.Substring("proxy://".Length).Trim('/');
+        string ph = rest;
+        int pp = TcpStreamMeshTransport.DefaultPort;
+        int colon = rest.LastIndexOf(':');
+        if (colon > 0 && int.TryParse(rest[(colon + 1)..], out var pv)) { ph = rest[..colon]; pp = pv; }
+        if (ph.Length == 0)
+        {
+            MessageBox.Show(this, "Enter the proxy address, e.g. proxy://192.168.1.50:4403",
+                "Proxy address required", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _connecting = true;
+        _lastPollOkUtc = DateTime.UtcNow; _probeFailures = 0;
+        ApplyConnectionState();
+        Status($"Connecting to proxy {ph}:{pp} (TLS, timeout {ConnectTimeout.TotalSeconds:0}s)...");
+
+        TcpStreamMeshTransport? proxy = null;
+        try
+        {
+            proxy = await TcpStreamMeshTransport.ConnectTlsAsync(ph, pp, TimeSpan.FromSeconds(8));
+            await FinishConnectAsync(new MeshtasticHttpClient(proxy), proxyUrl, ph, pp);
+            proxy = null;   // ownership handed off to the client
+        }
+        catch (OperationCanceledException)
+        {
+            Status($"Proxy connection timed out after {ConnectTimeout.TotalSeconds:0}s. You can try again.");
+        }
+        catch (Exception ex)
+        {
+            Status($"Could not reach the proxy at {ph}:{pp}.");
+            if (!_autoReconnecting)
+                MessageBox.Show(this, $"Could not reach the proxy:\n{ex.Message}\n\nCheck Meshtastic.Proxy is running " +
+                    "and reachable, then Connect again.", "Proxy connection failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            proxy?.Dispose();
+            _connecting = false;
+            ApplyConnectionState();
+        }
     }
 
     // Runs the want-config handshake on a freshly-built client (over TCP or HTTP), then arms state + the

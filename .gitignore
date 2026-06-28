@@ -17,6 +17,7 @@ bld/
 publish/
 publish-single/
 publish-apk/
+publish-proxy/
 artifacts/
 *.apk
 *.aab

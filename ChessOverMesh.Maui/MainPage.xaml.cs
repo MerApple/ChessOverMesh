@@ -408,6 +408,12 @@ public partial class MainPage : ContentPage
         string host = (hostInput ?? "").Trim();
         if (host.Length == 0 || host == "http://")
             return "Enter the device's address, e.g. http://192.168.1.50";
+
+        // Proxy: "proxy://host[:port]" connects (TLS) to a Meshtastic.Proxy that shares one device with several
+        // apps. The proxy speaks the same framed protocol, so from here it's an ordinary client connection.
+        if (host.StartsWith("proxy://", StringComparison.OrdinalIgnoreCase))
+            return await ConnectViaProxyAsync(host);
+
         if (!host.StartsWith("http", StringComparison.OrdinalIgnoreCase)) host = "http://" + host;
 
         string ipHost;
@@ -436,6 +442,27 @@ public partial class MainPage : ContentPage
     static int SafePort(string url, int fallback)
     {
         try { var p = new Uri(url).Port; return p > 0 ? p : fallback; } catch { return fallback; }
+    }
+
+    // Connects to a Meshtastic.Proxy over TLS ("proxy://host[:port]"). The proxy multiplexes one device to several
+    // apps, so this is just an ordinary client connection over an encrypted stream — the rest of the flow is shared.
+    async Task<string> ConnectViaProxyAsync(string proxyUrl)
+    {
+        string rest = proxyUrl.Substring("proxy://".Length).Trim('/');
+        string ph = rest;
+        int pp = TcpStreamMeshTransport.DefaultPort;
+        int colon = rest.LastIndexOf(':');
+        if (colon > 0 && int.TryParse(rest[(colon + 1)..], out var pv)) { ph = rest[..colon]; pp = pv; }
+        if (ph.Length == 0) return "Enter the proxy address, e.g. proxy://192.168.1.50:4403";
+
+        TcpStreamMeshTransport proxy;
+        try { proxy = await TcpStreamMeshTransport.ConnectTlsAsync(ph, pp, TimeSpan.FromSeconds(8)); }
+        catch (Exception ex) { return $"Couldn't reach the proxy at {ph}:{pp} — {ex.Message}"; }
+
+        _reconnectBle = null;
+        _probeHost = ph; _probePort = pp;
+        return await ConnectCoreAsync(() => new MeshtasticHttpClient(proxy), proxyUrl, $"proxy {ph}:{pp}",
+            isIp: true, "Check the proxy is running and reachable.");
     }
 
     /// <summary>Connect over an already-established BLE link (the Device tab handles scan + GATT connect, then

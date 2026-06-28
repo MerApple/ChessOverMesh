@@ -38,13 +38,22 @@ $root      = $PSScriptRoot
 $propsPath = Join-Path $root 'Directory.Build.props'
 $apk       = Join-Path $root 'publish-apk\chessovermesh.apk'
 $exe       = Join-Path $root 'publish-single\ChessOverMesh.Gui.exe'
+$proxyExe  = Join-Path $root 'publish-proxy\Meshtastic.Proxy.exe'
 $tag       = "v$Version"
 
 function Fail($msg) { throw $msg }
 # Named Invoke-Git (not "Git") so it doesn't shadow the git executable — PowerShell is case-insensitive, so a
 # function called "Git" calling "git" would recurse into itself. Uses the automatic $args (no declared param) so
-# git flags like -A/-q/-m aren't mistaken for the function's own parameters.
-function Invoke-Git { & git -C $root @args; if ($LASTEXITCODE -ne 0) { Fail "git $($args -join ' ') failed (exit $LASTEXITCODE)." } }
+# git flags like -A/-q/-m aren't mistaken for the function's own parameters. ErrorActionPreference is set to
+# Continue around the call because PowerShell 5.1 otherwise turns git's harmless stderr (e.g. the "LF -> CRLF"
+# warning) into a terminating error; real failures are detected via the exit code instead.
+function Invoke-Git {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    & git -C $root @args 2>&1 | Out-Host
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($code -ne 0) { Fail "git $($args -join ' ') failed (exit $code)." }
+}
 
 # ---- Validate ----
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { Fail "Version must be MAJOR.MINOR.PATCH (e.g. 1.0.3), got '$Version'." }
@@ -63,10 +72,11 @@ $props = $props -replace '<AppVersionCode>\d+</AppVersionCode>', "<AppVersionCod
 Set-Content -Path $propsPath -Value $props -NoNewline -Encoding UTF8
 Write-Host "Bumped Directory.Build.props to $Version / $VersionCode" -ForegroundColor DarkGray
 
-# ---- Build both artifacts (publish.ps1 throws on failure) ----
+# ---- Build all artifacts (publish.ps1 throws on failure) ----
 & (Join-Path $root 'publish.ps1')
-if (-not (Test-Path $apk)) { Fail "APK not produced: $apk" }
-if (-not (Test-Path $exe)) { Fail "EXE not produced: $exe" }
+if (-not (Test-Path $apk))      { Fail "APK not produced: $apk" }
+if (-not (Test-Path $exe))      { Fail "GUI exe not produced: $exe" }
+if (-not (Test-Path $proxyExe)) { Fail "Proxy exe not produced: $proxyExe" }
 
 if ($DryRun) {
     Write-Host "DryRun: built $tag but did NOT commit/push/release. Revert with: git checkout Directory.Build.props" -ForegroundColor Yellow
@@ -85,7 +95,7 @@ $notesArgs = if ($NotesFile) { @('--notes-file', $NotesFile) }
              elseif ($Notes)  { $tmp = Join-Path $env:TEMP "release-$tag.md"; Set-Content -Path $tmp -Value $Notes -Encoding UTF8; @('--notes-file', $tmp) }
              else             { @('--generate-notes') }
 
-& gh release create $tag $apk $exe --title "ChessOverMesh $tag" @notesArgs
+& gh release create $tag $apk $exe $proxyExe --title "ChessOverMesh $tag" @notesArgs
 if ($LASTEXITCODE -ne 0) { Fail "gh release create failed (exit $LASTEXITCODE)." }
 
 Write-Host "`n=== Released $tag ===" -ForegroundColor Green

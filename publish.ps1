@@ -35,6 +35,7 @@ param(
     [string]$Rid           = 'win-x64',
     [switch]$SkipGui,
     [switch]$SkipApk,
+    [switch]$SkipProxy,
     [switch]$Clean,
 
     # Optional real APK signing (all four required together). Omit to use the debug/default key, OR let them be
@@ -53,8 +54,10 @@ $ErrorActionPreference = 'Stop'
 $root      = $PSScriptRoot
 $guiProj   = Join-Path $root 'ChessOverMesh.Gui\ChessOverMesh.Gui.csproj'
 $mauiProj  = Join-Path $root 'ChessOverMesh.Maui\ChessOverMesh.Maui.csproj'
+$proxyProj = Join-Path $root 'Meshtastic.Proxy\Meshtastic.Proxy.csproj'
 $guiOut    = Join-Path $root 'publish-single'
 $apkOut    = Join-Path $root 'publish-apk'
+$proxyOut  = Join-Path $root 'publish-proxy'
 
 # If the release key wasn't passed explicitly, load it from the signing.properties file when present.
 if (-not ($KeyStore -and $KeyAlias -and $StorePass -and $KeyPass) -and (Test-Path $SigningProperties)) {
@@ -81,8 +84,9 @@ function Invoke-Step {
 if ($Clean) {
     # Only clean a folder we're about to rebuild, so -Clean with -SkipGui/-SkipApk doesn't wipe the other artifact.
     $toClean = @()
-    if (-not $SkipGui) { $toClean += $guiOut }
-    if (-not $SkipApk) { $toClean += $apkOut }
+    if (-not $SkipGui)   { $toClean += $guiOut }
+    if (-not $SkipApk)   { $toClean += $apkOut }
+    if (-not $SkipProxy) { $toClean += $proxyOut }
     foreach ($dir in $toClean) {
         if (Test-Path $dir) { Write-Host "Cleaning $dir" -ForegroundColor DarkGray; Remove-Item $dir -Recurse -Force }
     }
@@ -99,6 +103,21 @@ if (-not $SkipGui) {
         '-p:IncludeNativeLibrariesForSelfExtract=true',
         '-p:IncludeAndroid=false',
         '-o', $guiOut,
+        '--nologo'
+    )
+}
+
+# ---- Proxy: single-file, self-contained .exe ----
+if (-not $SkipProxy) {
+    Invoke-Step 'Publishing Meshtastic.Proxy (single-file exe)' @(
+        'publish', $proxyProj,
+        '-c', $Configuration,
+        '-r', $Rid,
+        '--self-contained', 'true',
+        '-p:PublishSingleFile=true',
+        '-p:IncludeNativeLibrariesForSelfExtract=true',
+        '-p:IncludeAndroid=false',
+        '-o', $proxyOut,
         '--nologo'
     )
 }
@@ -137,7 +156,7 @@ if (-not $SkipApk) {
 
 # ---- Summary ----
 Write-Host "`n=== Done - artifacts ===" -ForegroundColor Green
-@($guiOut, $apkOut) | Where-Object { Test-Path $_ } |
+@($guiOut, $apkOut, $proxyOut) | Where-Object { Test-Path $_ } |
     Get-ChildItem -Recurse -Include *.exe, *.apk -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -notlike 'createdump*' } |
     Select-Object @{n = 'File'; e = { $_.FullName.Substring($root.Length + 1) } },

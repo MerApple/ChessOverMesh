@@ -1338,7 +1338,10 @@ public sealed class MeshtasticHttpClient : IDisposable
 
             var text = fromRadio.GetPayload<string>();
             if (text == null) continue;
-            if (MyNodeNum != 0 && pkt.From == MyNodeNum)
+            // A packet whose sender is our own node. Normally that's our own message looping back; but when several
+            // apps share one device through Meshtastic.Proxy they all share this node id, so a packet from our node
+            // that we DIDN'T send is actually a PEER client's message — let it fall through to be shown.
+            if (MyNodeNum != 0 && pkt.From == MyNodeNum && IsOwnSend(pkt.Id))
             {
                 // Our own message coming back. Only a rebroadcast by ANOTHER node proves the broadcast actually
                 // propagated — treat that as an ack so the sender sees "relayed by <node>". But the device also
@@ -1944,8 +1947,25 @@ public sealed class MeshtasticHttpClient : IDisposable
         return null;
     }
 
+    // Packet ids WE sent, so the device's loopback echo (from == MyNodeNum) can be told apart from a *peer* client's
+    // send when several apps share one device through Meshtastic.Proxy (all clients share the device's node id). Our
+    // own echo is suppressed; a peer's send falls through and is shown. Bounded so it can't grow without limit.
+    private readonly HashSet<uint> _ownSentIds = new();
+    private readonly Queue<uint> _ownSentOrder = new();
+
+    /// <summary>True if <paramref name="id"/> is one of our own recent sends (vs. a peer client's via the proxy).</summary>
+    private bool IsOwnSend(uint id) => id != 0 && _ownSentIds.Contains(id);
+
+    private void RecordOwnSend(uint id)
+    {
+        if (id == 0 || !_ownSentIds.Add(id)) return;
+        _ownSentOrder.Enqueue(id);
+        if (_ownSentOrder.Count > 512) _ownSentIds.Remove(_ownSentOrder.Dequeue());
+    }
+
     private async Task WriteToRadioAsync(ToRadio toRadio, CancellationToken ct)
     {
+        if (toRadio.Packet is { } p && p.Id != 0) RecordOwnSend(p.Id);
         _state.AddToRadio(toRadio);
         await _transport.WriteAsync(toRadio.ToByteArray(), ct).ConfigureAwait(false);
     }

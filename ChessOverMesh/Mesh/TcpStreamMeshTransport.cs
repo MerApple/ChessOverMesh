@@ -1,3 +1,4 @@
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Threading.Channels;
 
@@ -23,7 +24,7 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
     private static readonly TimeSpan PostWriteWindow = TimeSpan.FromSeconds(8);
 
     private readonly TcpClient _client;
-    private readonly NetworkStream _stream;
+    private readonly Stream _stream;   // a NetworkStream for a plain device link, or an SslStream for the TLS proxy
     private readonly Channel<byte[]> _inbox =
         Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions { SingleReader = false, SingleWriter = true });
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -42,10 +43,10 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
     /// open a competing connection to probe this single-client port — see <see cref="IMeshTransport.SelfReportsLiveness"/>.</summary>
     public bool SelfReportsLiveness => true;
 
-    private TcpStreamMeshTransport(TcpClient client)
+    private TcpStreamMeshTransport(TcpClient client, Stream stream)
     {
         _client = client;
-        _stream = client.GetStream();
+        _stream = stream;
         _ = Task.Run(() => ReadLoopAsync(_readerCts.Token));
     }
 
@@ -59,7 +60,25 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
         try { await client.ConnectAsync(host, port, cts.Token).ConfigureAwait(false); }
         catch { client.Dispose(); throw; }
         EnableKeepAlive(client.Client);
-        return new TcpStreamMeshTransport(client);
+        return new TcpStreamMeshTransport(client, client.GetStream());
+    }
+
+    /// <summary>Opens a TLS connection to a <see cref="Meshtastic.Proxy"/> that speaks the same framed stream
+    /// protocol. The proxy uses a self-signed certificate (transport encryption, not identity), so any cert is
+    /// accepted — exactly as the HTTP transport accepts the device's self-signed HTTPS.</summary>
+    public static async Task<TcpStreamMeshTransport> ConnectTlsAsync(string host, int port, TimeSpan timeout, CancellationToken ct = default)
+    {
+        var client = new TcpClient { NoDelay = true };
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
+        try { await client.ConnectAsync(host, port, cts.Token).ConfigureAwait(false); }
+        catch { client.Dispose(); throw; }
+        EnableKeepAlive(client.Client);
+        var ssl = new SslStream(client.GetStream(), leaveInnerStreamOpen: false,
+            userCertificateValidationCallback: (_, _, _, _) => true);
+        try { await ssl.AuthenticateAsClientAsync(host).ConfigureAwait(false); }
+        catch { ssl.Dispose(); client.Dispose(); throw; }
+        return new TcpStreamMeshTransport(client, ssl);
     }
 
     // Enable OS-level TCP keep-alive: the kernel sends periodic probes so a half-open connection (WiFi dropped,
