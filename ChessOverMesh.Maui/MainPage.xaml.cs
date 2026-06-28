@@ -151,6 +151,9 @@ public partial class MainPage : ContentPage
     readonly Dictionary<uint, PendingSend> _pending = new();
     bool _checkingAcks;
     readonly Dictionary<uint, ChatAckInfo> _chatAckers = new();
+    // Acks we OVERHEARD other nodes send for a message we received (keyed by that received message's packet id), so
+    // its "Message details" can list who else acknowledged it. Separate from _chatAckers, which is our own sends.
+    readonly Dictionary<uint, ChatAckInfo> _overheardAcks = new();
     readonly Dictionary<string, PendingGame> _pendingGames = new();
 
     sealed record PendingGame(string GameId, uint CreatorNode, GameColor CreatorColor, uint Channel, string SaveName);
@@ -552,6 +555,7 @@ public partial class MainPage : ContentPage
         _lastMove = null;
         _pending.Clear();
         _chatAckers.Clear();
+        _overheardAcks.Clear();
         _pendingGames.Clear();
         _joining = false; _joinGame = null; _resigning = false; _createInfo = null;
         _moveHistory.Clear();
@@ -1547,14 +1551,17 @@ public partial class MainPage : ContentPage
         bool onChess = msg.Channel == _mesh.ChannelIndex;
         bool onChat = IsReceiveChannel(msg.Channel);   // chat is received on ALL enabled channels; the RX filter chooses what shows
         bool wasDm = msg.IsDmTo(_mesh.MyNodeNum);   // a direct message addressed to us specifically
+        // A DM that OUR node sent to another node, seen by the other apps sharing this node via the proxy. Show it
+        // in that peer's DM thread as an outgoing message, so every connected app sees the same DM conversation.
+        bool sentDmFromUs = msg.FromNode == _mesh.MyNodeNum && msg.IsDirectMessage && msg.ToNode != _mesh.MyNodeNum;
         if (wasDm && _nodePrefs.GetValueOrDefault(msg.FromNode)?.Block == true) return;   // blocked node — ignore its DMs
         // An emoji reaction (tapback): attach it to the target message instead of showing it as its own chat line.
         if (msg.IsReaction)
         {
-            if (msg.ReplyId != 0 && (onChat || wasDm)) AddReaction(msg.ReplyId, msg.Text, msg.FromNode);
+            if (msg.ReplyId != 0 && (onChat || wasDm || sentDmFromUs)) AddReaction(msg.ReplyId, msg.Text, msg.FromNode);
             return;
         }
-        if (!onChess && !onChat && !wasDm) return;
+        if (!onChess && !onChat && !wasDm && !sentDmFromUs) return;
 
         _incomingRxTime = msg.RxTime;
         try
@@ -1578,12 +1585,14 @@ public partial class MainPage : ContentPage
                 else if (pm.Kind == MessageKind.Move && pm.GameId == _gameId)
                     SendControl(ProtocolMessage.EncodeEnded(pm.GameId), encrypt: false);
             }
-            else if (onChat || wasDm)
+            else if (onChat || wasDm || sentDmFromUs)
             {
-                string who = _mesh?.DescribeNode(msg.FromNode) ?? msg.FromNode.ToString();
+                bool isDm = wasDm || sentDmFromUs;
+                uint dmPeer = sentDmFromUs ? msg.ToNode : msg.FromNode;   // the conversation peer (recipient for outgoing)
+                string who = _mesh?.DescribeNode(dmPeer) ?? dmPeer.ToString();
                 string sig = _showSignal ? SignalTag(msg) : "";
-                // A DM shows a "DM ←" tag on the message; a channel message shows which channel it arrived on.
-                string chan = wasDm ? "" : $"{ChannelLabel(msg.Channel)} ";
+                // A DM shows a "DM ←"/"DM →" tag; a channel message shows which channel it arrived on.
+                string chan = isDm ? "" : $"{ChannelLabel(msg.Channel)} ";
                 // A resent chat carries a marker prefix; strip it and note "resent" in the metadata instead.
                 string body = msg.Text;
                 bool resent = body.StartsWith(ProtocolMessage.ChatResendPrefix, StringComparison.Ordinal);
@@ -1595,18 +1604,18 @@ public partial class MainPage : ContentPage
                 // If this is a reply, quote what it answers so it's clear it's replying to (one of) your messages.
                 string replyRef = ReplyRefFor(msg.ReplyId);
                 if (replyRef.Length > 0) detail = detail.Length > 0 ? $"{replyRef}  ·  {detail}" : replyRef;
-                string dmTag = wasDm ? "DM ← " : "";
+                string dmTag = sentDmFromUs ? "DM → " : (wasDm ? "DM ← " : "");
                 // The part after the "<name>: " prefix; stored on the row so it can be re-rendered with the real
                 // name once this node's info arrives (an unknown sender first shows as "!hex").
                 string bodyPart = msg.DecryptFailed ? $"{msg.Text}  ⚠ decryption failed (wrong/missing key)" : body;
                 LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : Palette.Normal, msg);
-                entry.ChatNameBody = bodyPart;
+                entry.ChatNameBody = sentDmFromUs ? null : bodyPart;   // outgoing DMs aren't re-rendered (the prefix differs)
                 entry.Channel = msg.Channel;
                 if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail);   // persist (latest 100 per channel)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
                 // instead of notifying (so a hidden conversation just shows a badge in the RX list).
-                bool shown = RouteRx(entry, wasDm, msg.FromNode, incoming: true);
-                if (shown)
+                bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
+                if (shown && !sentDmFromUs)   // an outgoing DM mirrored from a peer app isn't a new incoming alert
                 {
                     Notify();
                     NotifyBackground(wasDm ? $"DM from {who}" : who, msg.DecryptFailed ? "⚠ message (decryption failed)" : body);
@@ -1617,10 +1626,15 @@ public partial class MainPage : ContentPage
                 ConfirmChatByIncomingReply(msg.Channel);
                 // A DM from a node we hadn't DM-enabled flips its DM flag on (and lists it as a TX target) so we can reply.
                 if (wasDm) EnsureDmEnabled(msg.FromNode);
+                else if (sentDmFromUs) EnsureDmEnabled(msg.ToNode);   // list the peer so the shared DM thread is navigable
                 // Channel chat acks are per-channel (default off); a DM is routing-acked by the firmware, so we don't
                 // chat-ack it. A keyword match forces an RSSI ack even when the channel's acks are off (range-test pings).
-                bool keywordAck = !wasDm && MatchesAckTrigger(msg.Channel, msg.Text);
-                if (!wasDm && (_chatAckOn.Contains(msg.Channel) || keywordAck))
+                // Never ack a message sent by our OWN node: through Meshtastic.Proxy several apps share this node id,
+                // so a peer client's message arrives as "from us" — only one of us (the sender) should be acked, and
+                // a node acking itself is pointless airtime.
+                bool fromUs = _mesh != null && msg.FromNode == _mesh.MyNodeNum;
+                bool keywordAck = !wasDm && !fromUs && MatchesAckTrigger(msg.Channel, msg.Text);
+                if (!wasDm && !fromUs && (_chatAckOn.Contains(msg.Channel) || keywordAck))
                 {
                     string ackSignal = (keywordAck || _chatAckSignalOn.Contains(msg.Channel)) ? AckSignalText(msg) : "";
                     SendChatAck(msg.PacketId, msg.Channel, ackSignal);
@@ -1913,7 +1927,7 @@ public partial class MainPage : ContentPage
             bool match = isDm ? e.DmPeer == id : (e.DmPeer == 0 && e.Channel == id);
             if (!match) continue;
             if (isDm && _currentHost.Length > 0) DeviceCache.RemoveChat(_currentHost, e.Channel, e.CacheId, e.Text, e.Detail);
-            if (e.PacketId != 0) { _chatEntryById.Remove(e.PacketId); _pending.Remove(e.PacketId); _chatAckers.Remove(e.PacketId); }
+            if (e.PacketId != 0) { _chatEntryById.Remove(e.PacketId); _pending.Remove(e.PacketId); _chatAckers.Remove(e.PacketId); _overheardAcks.Remove(e.PacketId); }
             _chat.RemoveAt(i);
         }
         _unread.Remove((isDm, id));
@@ -2202,8 +2216,12 @@ public partial class MainPage : ContentPage
     {
         string? baseText = entry.Rx is { } msg ? MessageDetails(msg)   // received message
             : _chatAckers.Values.FirstOrDefault(i => i.Entry == entry) is { Ackers.Count: > 0 } info
-                ? BuildAckDetails(info)   // sent + ack-tracked
+                ? BuildAckDetails(info, mine: true)   // sent + ack-tracked
                 : null;
+        // For a received message, append the acks we overheard OTHER nodes send for it.
+        if (entry.Rx is not null && entry.PacketId != 0
+            && _overheardAcks.TryGetValue(entry.PacketId, out var oh) && oh.Ackers.Count > 0)
+            baseText = (baseText is null ? "" : baseText + "\n\n") + BuildAckDetails(oh, mine: false);
         // Append who reacted, if anyone has.
         string reactions = ReactionDetails(entry.PacketId);
         if (reactions.Length > 0) baseText = baseText is null ? reactions : baseText + "\n\n" + reactions;
@@ -2223,16 +2241,20 @@ public partial class MainPage : ContentPage
         return string.Join("\n", lines);
     }
 
-    string BuildAckDetails(ChatAckInfo info)
+    string BuildAckDetails(ChatAckInfo info, bool mine)
     {
-        var lines = new List<string> { $"Acknowledged by {info.Ackers.Count} node{(info.Ackers.Count == 1 ? "" : "s")}:" };
+        string header = mine
+            ? $"Acknowledged by {info.Ackers.Count} node{(info.Ackers.Count == 1 ? "" : "s")}:"
+            : $"Also acknowledged by {info.Ackers.Count} other node{(info.Ackers.Count == 1 ? "" : "s")}:";
+        string whose = mine ? "your message" : "the message";
+        var lines = new List<string> { header };
         foreach (var a in info.Ackers)
         {
             lines.Add($"  • {_mesh?.DescribeNode(a)}  (!{a:x8})");
-            // Direction 1: how the acker heard our original message (reported back inside its ack).
+            // Direction 1: how the acker heard the original message (reported back inside its ack).
             lines.Add(info.AckerSignals.TryGetValue(a, out var them) && them.Length > 0
-                ? $"      how they heard your message: {them}"
-                : "      how they heard your message: not reported (enable \"…with RSSI/SNR/hops\" on the channel to include it)");
+                ? $"      how they heard {whose}: {them}"
+                : $"      how they heard {whose}: not reported (enable \"…with RSSI/SNR/hops\" on the channel to include it)");
             // Direction 2: how our node heard their ack packet coming back.
             lines.Add(info.MyReception.TryGetValue(a, out var me) && me.Length > 0
                 ? $"      how your node heard their ack: {me}"
@@ -2279,7 +2301,14 @@ public partial class MainPage : ContentPage
             foreach (var nn in result.NewNodes)
                 AddSystem(Stamp() + $"New node heard: {(nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}")}.");
             foreach (var ni in result.NodeInfos)
-                AddSystem(Stamp() + $"Node info received from {(ni.Name.Length > 0 ? ni.Name : $"!{ni.Node:x8}")}.");
+            {
+                string who = ni.Name.Length > 0 ? ni.Name : $"!{ni.Node:x8}";
+                // want_response set = the other node is ASKING us for our info (the device auto-replies); otherwise
+                // it's an answer/announcement carrying that node's info.
+                AddSystem(Stamp() + (ni.IsRequest
+                    ? $"Node info request received from {who} — replying with ours."
+                    : $"Node info received from {who}."));
+            }
         }
         if (result.NodeInfos.Count > 0 || result.NewNodes.Count > 0)
         {
@@ -2476,14 +2505,27 @@ public partial class MainPage : ContentPage
 
     void RegisterChatAck(uint chatPacketId, uint ackerNum, string signal = "", string myReception = "")
     {
-        if (!_chatAckers.TryGetValue(chatPacketId, out var info)) return;
-        if (!info.Ackers.Add(ackerNum)) return;
-        if (!string.IsNullOrEmpty(signal)) info.AckerSignals[ackerNum] = signal;            // how they heard our message
-        if (!string.IsNullOrEmpty(myReception)) info.MyReception[ackerNum] = myReception;   // how we heard their ack packet
-        bool wasInFlight = ChatInFlight;
-        _pending.Remove(chatPacketId);
-        UpdateChatAckerText(info);
-        if (wasInFlight) ApplyConnectionState();
+        if (_chatAckers.TryGetValue(chatPacketId, out var info))
+        {
+            if (!info.Ackers.Add(ackerNum)) return;
+            if (!string.IsNullOrEmpty(signal)) info.AckerSignals[ackerNum] = signal;            // how they heard our message
+            if (!string.IsNullOrEmpty(myReception)) info.MyReception[ackerNum] = myReception;   // how we heard their ack packet
+            bool wasInFlight = ChatInFlight;
+            _pending.Remove(chatPacketId);
+            UpdateChatAckerText(info);
+            if (wasInFlight) ApplyConnectionState();
+            return;
+        }
+        // A CHATACK for a message someone ELSE sent that we also received: remember who acked it so the received
+        // message's "Message details" can list them. We don't touch the received row's text — only its details.
+        if (_chatEntryById.TryGetValue(chatPacketId, out var rxEntry) && rxEntry.Rx != null)
+        {
+            if (!_overheardAcks.TryGetValue(chatPacketId, out var oh))
+                _overheardAcks[chatPacketId] = oh = new ChatAckInfo { Entry = rxEntry };
+            if (!oh.Ackers.Add(ackerNum)) return;
+            if (!string.IsNullOrEmpty(signal)) oh.AckerSignals[ackerNum] = signal;
+            if (!string.IsNullOrEmpty(myReception)) oh.MyReception[ackerNum] = myReception;
+        }
     }
 
     void RefreshChatAckerNames()

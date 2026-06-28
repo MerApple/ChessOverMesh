@@ -8,13 +8,15 @@ const string Usage =
     "                 or http(s)://host for the HTTP API.\n" +
     "  --port,   -p   TCP port the proxy listens on for clients (TLS). Default 4403.\n" +
     "  --pfx          PFX certificate for the TLS server. Generated (self-signed) if missing.\n" +
-    "  --pfx-pass     Password for the PFX. Default 'meshtastic'.\n\n" +
+    "  --pfx-pass     Password for the PFX. Default 'meshtastic'.\n" +
+    "  --verbose, -v  Log every packet forwarded to the device and broadcast to clients (for debugging).\n\n" +
     "Clients connect with the address  proxy://<this-host>[:<port>]  using the normal Connect button.";
 
 string deviceTarget = "";
 int listenPort = 4403;
 string pfxPath = "meshtastic-proxy.pfx";
 string pfxPass = "meshtastic";
+bool verbose = false;
 
 void Log(string m) => Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {m}");
 
@@ -28,6 +30,7 @@ for (int i = 0; i < args.Length; i++)
         case "--port" or "-p" when val != null && int.TryParse(val, out var pp): listenPort = pp; i++; break;
         case "--pfx" when val != null: pfxPath = val; i++; break;
         case "--pfx-pass" when val != null: pfxPass = val; i++; break;
+        case "--verbose" or "-v": verbose = true; break;
         case "--help" or "-h": Console.WriteLine(Usage); return 0;
     }
 }
@@ -52,7 +55,7 @@ async Task<IMeshTransport> ConnectDevice(CancellationToken ct)
 }
 
 var cert = SelfSignedCert.GetOrCreate(pfxPath, pfxPass);
-var hub = new ProxyHub(ConnectDevice, cert, listenPort, Log);
+var hub = new ProxyHub(ConnectDevice, cert, listenPort, Log, verbose);
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); Log("Stopping…"); };

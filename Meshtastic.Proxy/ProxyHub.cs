@@ -32,12 +32,19 @@ internal sealed class ProxyHub
     private readonly X509Certificate2 _cert;
     private readonly int _port;
     private readonly Action<string> _log;
+    private readonly bool _verbose;
 
     private readonly object _sync = new();
     private readonly List<Client> _clients = new();
 
     private volatile IMeshTransport? _device;   // the live device link, or null while (re)connecting
     private volatile bool _deviceSynced;        // true once the current device link's config dump is cached
+    private volatile uint _myNodeNum;           // the shared device's node number (from MyInfo), for the send mirror
+
+    // Packet ids a client sent: the radio's own loopback/relay of these (from == our node) is delivered ONLY back
+    // to that sender, because the OTHER clients already got the message via the mirror — so they don't see it twice.
+    private readonly Dictionary<uint, Client> _echoSuppress = new();
+    private readonly Queue<uint> _echoOrder = new();
 
     // Cached device-config dump (raw FromRadio bytes), replayed to each new client on its want_config.
     private byte[]? _myInfo, _metadata;
@@ -46,9 +53,9 @@ internal sealed class ProxyHub
     private readonly SortedDictionary<int, byte[]> _channels = new(); // channel index -> frame
     private readonly Dictionary<uint, byte[]> _nodes = new();         // node num -> frame
 
-    public ProxyHub(Func<CancellationToken, Task<IMeshTransport>> connectDevice, X509Certificate2 cert, int port, Action<string> log)
+    public ProxyHub(Func<CancellationToken, Task<IMeshTransport>> connectDevice, X509Certificate2 cert, int port, Action<string> log, bool verbose = false)
     {
-        _connectDevice = connectDevice; _cert = cert; _port = port; _log = log;
+        _connectDevice = connectDevice; _cert = cert; _port = port; _log = log; _verbose = verbose;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -130,8 +137,31 @@ internal sealed class ProxyHub
             // The proxy's own want_config completion isn't meant for clients.
             if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId) continue;
 
+            // A packet from our own node is the radio looping back / relaying something a client sent. The other
+            // clients already got it via the mirror, so deliver this only to the original sender (for its ack/relay
+            // tracking) instead of broadcasting it to everyone again.
+            if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.Packet
+                && _myNodeNum != 0 && fr.Packet.From == _myNodeNum)
+            {
+                Client? sender;
+                lock (_sync) _echoSuppress.TryGetValue(fr.Packet.Id, out sender);
+                if (sender != null)
+                {
+                    if (_verbose) _log($"Device -> sender only: {fr.Packet.Decoded?.Portnum} id 0x{fr.Packet.Id:x8}");
+                    try { await SendFrameAsync(sender, bytes, CancellationToken.None); } catch { Remove(sender); }
+                    continue;
+                }
+            }
+
             // Keep the replay cache current (new nodes, config changes), then forward live to every client.
             CacheFrame(fr, bytes);
+            if (_verbose)
+            {
+                if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.Packet && fr.Packet.Decoded != null)
+                    _log($"Device -> clients: {fr.Packet.Decoded.Portnum} from !{fr.Packet.From:x8}");
+                else if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.NodeInfo)
+                    _log($"Device -> clients: NodeInfo !{fr.NodeInfo.Num:x8}");
+            }
             await BroadcastAsync(bytes);
         }
     }
@@ -142,7 +172,7 @@ internal sealed class ProxyHub
         {
             switch (fr.PayloadVariantCase)
             {
-                case FromRadio.PayloadVariantOneofCase.MyInfo: _myInfo = bytes; break;
+                case FromRadio.PayloadVariantOneofCase.MyInfo: _myInfo = bytes; _myNodeNum = fr.MyInfo.MyNodeNum; break;
                 case FromRadio.PayloadVariantOneofCase.Metadata: _metadata = bytes; break;
                 case FromRadio.PayloadVariantOneofCase.Config: _config[(int)fr.Config.PayloadVariantCase] = bytes; break;
                 case FromRadio.PayloadVariantOneofCase.ModuleConfig: _moduleConfig[(int)fr.ModuleConfig.PayloadVariantCase] = bytes; break;
@@ -215,10 +245,24 @@ internal sealed class ProxyHub
             await ReplayConfigAsync(client, tr.WantConfigId, ct);   // answer locally; don't disturb the device
             return;
         }
-        // A packet / heartbeat / anything else: send it to the device (if we have one). The device echoes a
-        // transmitted packet back, and the device loop broadcasts that echo to all clients.
+        // A packet / heartbeat / anything else: send it to the device (if we have one).
         var dev = _device;
-        if (dev == null) return;   // device offline — the client will be dropped by the device loop anyway
+        if (dev == null) { _log("Dropping client packet: device offline."); return; }
+
+        if (tr.PayloadVariantCase == ToRadio.PayloadVariantOneofCase.Packet && tr.Packet.Decoded != null)
+        {
+            _log($"Client -> device: {tr.Packet.Decoded.Portnum} to !{tr.Packet.To:x8} (want_response={tr.Packet.Decoded.WantResponse})");
+            // Mirror the message straight to the OTHER clients so they see it even if the radio doesn't loop a
+            // broadcast back, and remember the id so the radio's own loopback/relay goes only to this sender.
+            if (_myNodeNum != 0 && tr.Packet.Id != 0)
+            {
+                RememberEchoSender(tr.Packet.Id, client);
+                var synth = tr.Packet.Clone();
+                synth.From = _myNodeNum;                       // present it as coming from the shared device node
+                var synthBytes = new FromRadio { Packet = synth }.ToByteArray();
+                await MirrorToOthersAsync(client, synthBytes);
+            }
+        }
         try { await dev.WriteAsync(toRadioBytes, ct); }
         catch (Exception ex) { _log($"Device write failed: {ex.Message}"); }
     }
@@ -244,6 +288,30 @@ internal sealed class ProxyHub
         }
         foreach (var f in frames) await SendFrameAsync(client, f, ct);
         await SendFrameAsync(client, new FromRadio { ConfigCompleteId = wantId }.ToByteArray(), ct);
+    }
+
+    // Records which client sent a packet id, so the radio's loopback/relay of it is routed back to that sender only.
+    // Bounded so it can't grow without limit (older entries just stop being suppressed — at worst a rare duplicate).
+    private void RememberEchoSender(uint id, Client sender)
+    {
+        lock (_sync)
+        {
+            if (!_echoSuppress.ContainsKey(id)) _echoOrder.Enqueue(id);
+            _echoSuppress[id] = sender;
+            while (_echoOrder.Count > 512) _echoSuppress.Remove(_echoOrder.Dequeue());
+        }
+    }
+
+    // Sends a frame to every connected client except the one that originated it.
+    private async Task MirrorToOthersAsync(Client origin, byte[] payload)
+    {
+        Client[] others;
+        lock (_sync) others = _clients.Where(c => c != origin).ToArray();
+        foreach (var c in others)
+        {
+            try { await SendFrameAsync(c, payload, CancellationToken.None); }
+            catch { Remove(c); }
+        }
     }
 
     private async Task BroadcastAsync(byte[] payload)

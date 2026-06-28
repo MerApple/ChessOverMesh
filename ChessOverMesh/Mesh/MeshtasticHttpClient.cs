@@ -85,7 +85,7 @@ public readonly record struct MeshTraceroute(uint Node, List<uint> Route, List<i
 
 /// <summary>A node's reply to our node-info request: its number and resolved display name (empty if the
 /// reply carried no name).</summary>
-public readonly record struct MeshNodeInfoReply(uint Node, string Name);
+public readonly record struct MeshNodeInfoReply(uint Node, string Name, bool IsRequest = false);
 
 /// <summary>The latest environment telemetry heard from a node. TemperatureC is °C, RelativeHumidity is %,
 /// BarometricPressure is hPa (0 when not reported). RxTime is the device's receive time (epoch s, 0 if
@@ -1226,7 +1226,16 @@ public sealed class MeshtasticHttpClient : IDisposable
             _state.AddFromRadio(fromRadio);
 
             if (fromRadio.PayloadVariantCase != FromRadio.PayloadVariantOneofCase.Packet)
+            {
+                // A pushed NodeInfo frame is the device telling us its node DB changed (e.g. a node-info reply, or a
+                // node freshly heard). The want_config dump is drained in InitializeAsync, so anything here is a LIVE
+                // update — surface it so the UI logs it and refreshes, just like a NodeInfo packet would.
+                if (fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.NodeInfo
+                    && fromRadio.NodeInfo is { User: { } nu } ni && ni.Num != MyNodeNum
+                    && nodeInfos.All(x => x.Node != ni.Num))
+                    nodeInfos.Add(new MeshNodeInfoReply(ni.Num, NameOf(nu.LongName, nu.ShortName)));
                 continue;
+            }
 
             var pkt = fromRadio.Packet;
             var decoded = pkt.Decoded;
@@ -1287,7 +1296,9 @@ public sealed class MeshtasticHttpClient : IDisposable
                 {
                     var user = User.Parser.ParseFrom(decoded.Payload);
                     bool firstSeen = MergeNodeUser(pkt.From, user, pkt.RxTime);
-                    var reply = new MeshNodeInfoReply(pkt.From, NameOf(user.LongName, user.ShortName));
+                    // want_response set means this NodeInfo is a REQUEST ("here's me, send me yours"); otherwise it's
+                    // a reply/announcement carrying the sender's info.
+                    var reply = new MeshNodeInfoReply(pkt.From, NameOf(user.LongName, user.ShortName), decoded.WantResponse);
                     if (firstSeen) newNodes.Add(reply);
                     if (pkt.To == MyNodeNum) nodeInfos.Add(reply);
                 }
