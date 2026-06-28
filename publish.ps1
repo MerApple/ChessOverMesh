@@ -37,11 +37,16 @@ param(
     [switch]$SkipApk,
     [switch]$Clean,
 
-    # Optional real APK signing (all four required together). Omit to use the debug/default key.
+    # Optional real APK signing (all four required together). Omit to use the debug/default key, OR let them be
+    # auto-loaded from a signing.properties file (see -SigningProperties) so the release key stays off the command line.
     [string]$KeyStore,
     [string]$KeyAlias,
     [string]$StorePass,
-    [string]$KeyPass
+    [string]$KeyPass,
+
+    # A key=value file (keystore/alias/storepass/keypass) holding the release signing config, kept OUTSIDE the repo.
+    # Used automatically when the four -Key* params aren't all given. Default: ~\keys\chessovermesh\signing.properties.
+    [string]$SigningProperties = (Join-Path $env:USERPROFILE 'keys\chessovermesh\signing.properties')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,6 +55,21 @@ $guiProj   = Join-Path $root 'ChessOverMesh.Gui\ChessOverMesh.Gui.csproj'
 $mauiProj  = Join-Path $root 'ChessOverMesh.Maui\ChessOverMesh.Maui.csproj'
 $guiOut    = Join-Path $root 'publish-single'
 $apkOut    = Join-Path $root 'publish-apk'
+
+# If the release key wasn't passed explicitly, load it from the signing.properties file when present.
+if (-not ($KeyStore -and $KeyAlias -and $StorePass -and $KeyPass) -and (Test-Path $SigningProperties)) {
+    $cfg = @{}
+    Get-Content $SigningProperties | Where-Object { $_ -match '^\s*[^#].*=' } | ForEach-Object {
+        $k, $v = $_ -split '=', 2; $cfg[$k.Trim()] = $v.Trim()
+    }
+    if (-not $KeyStore)  { $KeyStore  = $cfg['keystore'] }
+    if (-not $KeyAlias)  { $KeyAlias  = $cfg['alias'] }
+    if (-not $StorePass) { $StorePass = $cfg['storepass'] }
+    if (-not $KeyPass)   { $KeyPass   = $cfg['keypass'] }
+    if ($KeyStore -and $KeyAlias -and $StorePass -and $KeyPass) {
+        Write-Host "Using release signing config from $SigningProperties" -ForegroundColor DarkGray
+    }
+}
 
 function Invoke-Step {
     param([string]$Title, [string[]]$DotnetArgs)
