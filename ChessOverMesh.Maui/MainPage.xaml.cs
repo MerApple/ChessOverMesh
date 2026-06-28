@@ -563,6 +563,13 @@ public partial class MainPage : ContentPage
             // nodes list (and aren't dropped from the saved cache when we next persist the live set).
             var cached = DeviceCache.Get(host);
             if (cached != null) _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw);
+
+            // Seed cached node positions so the map / "open in Google Maps" works immediately on reconnect, before
+            // any live position is heard again (MAUI now persists positions, matching the desktop app).
+            var pos = DeviceCache.GetPositions(host);
+            if (pos.Count > 0)
+                _mesh.SeedNodes(nodePositions: pos.ToDictionary(kv => kv.Key,
+                    kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)));
         }
 
         var available = channels.Select(c => c.Index).ToHashSet();
@@ -1560,9 +1567,11 @@ public partial class MainPage : ContentPage
                 string replyRef = ReplyRefFor(msg.ReplyId);
                 if (replyRef.Length > 0) detail = detail.Length > 0 ? $"{replyRef}  ·  {detail}" : replyRef;
                 string dmTag = wasDm ? "DM ← " : "";
-                LogEntry entry = msg.DecryptFailed
-                    ? AddChatLine($"{dmTag}{who}: {msg.Text}  ⚠ decryption failed (wrong/missing key)", detail, Palette.Warning, msg)
-                    : AddChatLine($"{dmTag}{who}: {body}", detail, Palette.Normal, msg);
+                // The part after the "<name>: " prefix; stored on the row so it can be re-rendered with the real
+                // name once this node's info arrives (an unknown sender first shows as "!hex").
+                string bodyPart = msg.DecryptFailed ? $"{msg.Text}  ⚠ decryption failed (wrong/missing key)" : body;
+                LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : Palette.Normal, msg);
+                entry.ChatNameBody = bodyPart;
                 entry.Channel = msg.Channel;
                 if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail);   // persist (latest 100 per channel)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
@@ -2216,7 +2225,12 @@ public partial class MainPage : ContentPage
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
                 AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.");
             }
-        if (result.Positions.Count > 0) NodesChanged?.Invoke();
+        if (result.Positions.Count > 0)
+        {
+            // Persist the refreshed positions so they survive a reconnect/restart (mirrors the desktop app).
+            if (_currentHost.Length > 0 && _mesh != null) DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());
+            NodesChanged?.Invoke();
+        }
         if (result.Telemetry.Count > 0)
         {
             _telemetryRefresh?.Invoke();
@@ -2238,7 +2252,29 @@ public partial class MainPage : ContentPage
             foreach (var ni in result.NodeInfos)
                 AddSystem(Stamp() + $"Node info received from {(ni.Name.Length > 0 ? ni.Name : $"!{ni.Node:x8}")}.");
         }
-        if (result.NodeInfos.Count > 0 || result.NewNodes.Count > 0) NodesChanged?.Invoke();
+        if (result.NodeInfos.Count > 0 || result.NewNodes.Count > 0)
+        {
+            // A node we'd only seen as "!hex" now has a name — re-render its existing chat rows to show it.
+            var named = result.NodeInfos.Select(n => n.Node).Concat(result.NewNodes.Select(n => n.Node)).ToHashSet();
+            RefreshChatNamesFor(named);
+            NodesChanged?.Invoke();
+        }
+    }
+
+    // Re-renders existing received chat rows from the given nodes with their current display name, so messages that
+    // first showed the sender as "!hex" update in place once that node's info (name) arrives. The body text is kept
+    // verbatim from when the row was added; only the "<name>: " prefix is recomputed.
+    void RefreshChatNamesFor(HashSet<uint> nodes)
+    {
+        if (nodes.Count == 0) return;
+        foreach (var e in _chat)
+        {
+            if (e.ChatNameBody is not { } bodyPart || e.Rx is not { } rx || rx.FromNode == 0) continue;
+            if (!nodes.Contains(rx.FromNode)) continue;
+            string who = DescribeNode(rx.FromNode);
+            string dmTag = e.DmPeer != 0 ? "DM ← " : "";
+            e.Text = $"{dmTag}{who}: {bodyPart}";
+        }
     }
 
     // ---- Per-node actions (node long-press menu on the Nodes page) ----

@@ -47,6 +47,16 @@ internal static class DeviceCache
         public DateTime ReceivedAt { get; set; }
     }
 
+    /// <summary>One node's last-known location (degrees) with the local last-heard / position timestamps (epoch s,
+    /// 0 if unknown). Lets the map and "open in Google Maps" work across reconnects. Mirrors the desktop app.</summary>
+    public sealed class CachedPosition
+    {
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+        public long LastHeard { get; set; }
+        public long PosTime { get; set; }
+    }
+
     public sealed class Entry
     {
         public uint NodeNum { get; set; }
@@ -60,6 +70,7 @@ internal static class DeviceCache
         // Per-channel chat history (channel index → latest messages, oldest first) and per-node telemetry history.
         public Dictionary<uint, List<ChatMessage>> Chat { get; set; } = new();
         public Dictionary<uint, List<TelemetryReading>> Telemetry { get; set; } = new();
+        public Dictionary<uint, CachedPosition> Positions { get; set; } = new();   // node num -> last-known position
 
         public uint? ChessChannel { get; set; }
         public List<uint> ChatListen { get; set; } = new();
@@ -125,6 +136,7 @@ internal static class DeviceCache
                 NodePrefs = existing?.NodePrefs ?? new Dictionary<uint, NodePrefs>(),   // preserve DM/Block flags
                 Chat = existing?.Chat ?? new Dictionary<uint, List<ChatMessage>>(),            // preserve chat history
                 Telemetry = existing?.Telemetry ?? new Dictionary<uint, List<TelemetryReading>>(),   // preserve telemetry
+                Positions = existing?.Positions ?? new Dictionary<uint, CachedPosition>(),     // preserve node positions
                 ChessChannel = existing?.ChessChannel,
                 ChatListen = existing?.ChatListen ?? new List<uint>(),
                 ChatTxChannel = existing?.ChatTxChannel,
@@ -235,6 +247,27 @@ internal static class DeviceCache
 
     /// <summary>Deletes the stored telemetry history for one node.</summary>
     public static void ClearTelemetry(string host, uint nodeNum) => SaveTelemetry(host, nodeNum, Array.Empty<TelemetryReading>());
+
+    // ---- Node positions (per node) ----
+
+    /// <summary>The persisted last-known positions for a device (node num → position), empty if none.</summary>
+    public static IReadOnlyDictionary<uint, CachedPosition> GetPositions(string host) =>
+        Load().GetValueOrDefault(host)?.Positions ?? new Dictionary<uint, CachedPosition>();
+
+    /// <summary>Replaces the stored node positions for a device from the live position map.</summary>
+    public static void SaveNodePositions(string host, IReadOnlyDictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)> positions)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            entry.Positions = positions.ToDictionary(kv => kv.Key,
+                kv => new CachedPosition { Lat = kv.Value.Lat, Lon = kv.Value.Lon, LastHeard = kv.Value.LastHeard, PosTime = kv.Value.PosTime });
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
 
     public static ChannelPrefs? GetChannelPrefs(string host)
     {

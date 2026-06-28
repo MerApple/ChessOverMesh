@@ -1317,13 +1317,22 @@ public sealed class MeshtasticHttpClient : IDisposable
                 continue;
             }
 
-            // Position (a node's broadcast, or a reply to our request). AddFromRadio above already merged it into the
-            // node DB; surface it too so the UI can note "position received from <node>" in the system log.
+            // Position (a node's broadcast, or a reply to our request). AddFromRadio does NOT merge a standalone
+            // POSITION_APP packet into the node DB — only NodeInfo carries a position — so we store the fix
+            // ourselves. Without this, the map / "open in Google Maps" finds nothing for any node we haven't also
+            // received NodeInfo from, even though we just logged "position received from <node>".
             if (decoded.Portnum == PortNum.PositionApp && pkt.From != MyNodeNum)
             {
                 var p = Position.Parser.ParseFrom(decoded.Payload);
                 if (p.LatitudeI != 0 || p.LongitudeI != 0)   // ignore an empty/precision-stripped position
+                {
                     positions.Add(new MeshPositionReport(pkt.From, DescribeNode(pkt.From), p.LatitudeI / 1e7, p.LongitudeI / 1e7));
+                    long lastHeard = pkt.RxTime > 0 ? (long)pkt.RxTime
+                        : (_positionCache.TryGetValue(pkt.From, out var prev) ? prev.LastHeard : 0);
+                    _positionCache[pkt.From] = (p.LatitudeI / 1e7, p.LongitudeI / 1e7, lastHeard, p.Time);   // works with no NodeInfo
+                    var node = _state.Nodes.FirstOrDefault(n => n.Num == pkt.From);
+                    if (node != null) node.Position = p;   // keep the live node DB in sync when we do know the node
+                }
                 continue;
             }
 

@@ -61,6 +61,10 @@ public sealed class LogEntry : INotifyPropertyChanged
     // For a DM row, the other node (conversation peer); 0 for channel/system rows. Used by the RX view filter.
     public uint DmPeer;
 
+    // For a received chat row: the message text shown after the "<name>: " prefix. Kept so the row can be
+    // re-rendered with the sender's real name once that node's info arrives (it first shows as "!hex"). Null otherwise.
+    public string? ChatNameBody;
+
     // Whether this row is shown (the RX filter can hide a channel/DM's rows). Notifies so the list updates live.
     private bool _visible = true;
     public bool Visible
