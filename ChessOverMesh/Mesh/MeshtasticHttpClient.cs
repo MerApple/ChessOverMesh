@@ -185,6 +185,18 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// the link is dead (which the caller can treat as a dropped connection).</summary>
     public Task SendHeartbeatAsync(CancellationToken ct = default) => _transport.WriteAsync(HeartbeatToRadio, ct);
 
+    /// <summary>Asks a <c>Meshtastic.Proxy</c> to replay every cached text message newer than
+    /// <paramref name="sinceEpoch"/> (the message rx_time), so this client catches up on what it missed while
+    /// disconnected. A side-channel frame ("MPXY") the proxy recognises. Only the app's proxy-link path calls this —
+    /// it is never sent to a real device, so direct-connection behaviour is unchanged.</summary>
+    public Task SendProxyBackfillRequestAsync(long sinceEpoch, CancellationToken ct = default)
+    {
+        var buf = new byte[13];
+        buf[0] = (byte)'M'; buf[1] = (byte)'P'; buf[2] = (byte)'X'; buf[3] = (byte)'Y'; buf[4] = 0x01;
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(buf.AsSpan(5), sinceEpoch);
+        return _transport.WriteAsync(buf, ct);
+    }
+
     /// <summary>Channel index used when sending. Change it to switch channels.</summary>
     public uint ChannelIndex { get; set; }
 

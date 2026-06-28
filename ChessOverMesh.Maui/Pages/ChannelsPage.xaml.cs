@@ -11,7 +11,7 @@ namespace ChessOverMesh.Maui;
 /// </summary>
 public partial class ChannelsPage : ContentPage
 {
-    public sealed record Result(uint ChessChannel, HashSet<uint> ChatListen, IReadOnlyList<MeshChannel> Channels);
+    public sealed record Result(uint ChessChannel, IReadOnlyList<MeshChannel> Channels);
 
     sealed record ChannelRow(uint Index, string Text);
 
@@ -20,7 +20,6 @@ public partial class ChannelsPage : ContentPage
     readonly bool _lockChess;
     IReadOnlyList<MeshChannel> _channels;
     uint _chessChannel;
-    readonly HashSet<uint> _chatListen;
     bool _busy;
     bool _settingUtility;   // guards the utility-channel picker while it's repopulated
     readonly TaskCompletionSource<Result> _tcs = new();
@@ -28,7 +27,7 @@ public partial class ChannelsPage : ContentPage
     public Task<Result> Completion => _tcs.Task;
 
     public ChannelsPage(MeshtasticHttpClient mesh, string host, IReadOnlyList<MeshChannel> cachedChannels,
-                        uint chessChannel, IEnumerable<uint> chatListen, bool lockChessChannel)
+                        uint chessChannel, bool lockChessChannel)
     {
         InitializeComponent();
         _mesh = mesh;
@@ -36,7 +35,6 @@ public partial class ChannelsPage : ContentPage
         _lockChess = lockChessChannel;
         _channels = cachedChannels ?? Array.Empty<MeshChannel>();
         _chessChannel = chessChannel;
-        _chatListen = new HashSet<uint>(chatListen);
 
         ChessPicker.IsEnabled = !_lockChess;
         ChessHint.Text = _lockChess
@@ -54,9 +52,6 @@ public partial class ChannelsPage : ContentPage
         // must be a non-zero (secondary) channel. Drop an invalid/primary selection; default to the first secondary.
         var chessChannels = enabled.Where(c => c.Index != 0).ToList();
         if (chessChannels.Count > 0 && chessChannels.All(c => c.Index != _chessChannel)) _chessChannel = chessChannels[0].Index;
-        _chatListen.RemoveWhere(i => enabled.All(c => c.Index != i));
-        if (_chatListen.Count == 0 && enabled.Count > 0)
-            _chatListen.Add(enabled.Any(c => c.Index == _chessChannel) ? _chessChannel : enabled[0].Index);
 
         ChannelList.ItemsSource = enabled
             .Select(c => new ChannelRow(c.Index, $"[{c.Index}] {c.DisplayName} — {c.Role}{(c.HasKey ? "  🔒" : "")}"))
@@ -78,18 +73,6 @@ public partial class ChannelsPage : ContentPage
         UtilityPicker.SelectedItem = utilSel;
         _settingUtility = false;
         _mesh.SetUtilityChannel(utilSel.Index == uint.MaxValue ? (uint?)null : utilSel.Index);   // apply the (possibly corrected) value live
-
-        ChatListenPanel.Children.Clear();
-        foreach (var c in enabled)
-        {
-            uint idx = c.Index;
-            var sw = new Switch { IsToggled = _chatListen.Contains(idx), VerticalOptions = LayoutOptions.Center };
-            sw.Toggled += (_, e) => { if (e.Value) _chatListen.Add(idx); else _chatListen.Remove(idx); };
-            var row = new HorizontalStackLayout { Spacing = 8 };
-            row.Add(sw);
-            row.Add(new Label { Text = $"[{idx}] {c.DisplayName}", TextColor = Color.FromArgb("#E0E0E0"), VerticalOptions = LayoutOptions.Center });
-            ChatListenPanel.Add(row);
-        }
     }
 
     async void OnFetch(object? sender, EventArgs e)
@@ -258,8 +241,7 @@ public partial class ChannelsPage : ContentPage
     async void OnDone(object? sender, EventArgs e)
     {
         if (ChessPicker.SelectedItem is ChannelRow row) _chessChannel = row.Index;
-        if (_chatListen.Count == 0) _chatListen.Add(_chessChannel);
-        _tcs.TrySetResult(new Result(_chessChannel, _chatListen, _channels));
+        _tcs.TrySetResult(new Result(_chessChannel, _channels));
         await Navigation.PopModalAsync();
     }
 
@@ -267,8 +249,7 @@ public partial class ChannelsPage : ContentPage
     {
         // Hardware/back nav also commits the current selections.
         if (ChessPicker.SelectedItem is ChannelRow row) _chessChannel = row.Index;
-        if (_chatListen.Count == 0) _chatListen.Add(_chessChannel);
-        _tcs.TrySetResult(new Result(_chessChannel, _chatListen, _channels));
+        _tcs.TrySetResult(new Result(_chessChannel, _channels));
         return base.OnBackButtonPressed();
     }
 

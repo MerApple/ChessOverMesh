@@ -33,7 +33,7 @@ public sealed class RxFilterPage : ContentPage
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 10 };
         root.Add(new Label { Text = "Show channels & DMs", TextColor = Fg, FontSize = 20, FontAttributes = FontAttributes.Bold });
-        root.Add(new Label { Text = "Choose what's shown in chat. ● marks unread messages on hidden ones. 🗑 deletes all messages on that channel/DM.", TextColor = Dim, FontSize = 12 });
+        root.Add(new Label { Text = "Choose which channels/DMs you see — and can send to. ● marks unread messages on hidden ones. 🗑 deletes all messages on that channel/DM.", TextColor = Dim, FontSize = 12 });
         root.Add(btns);
         root.Add(new BoxView { HeightRequest = 1, Color = Color.FromArgb("#3F3F46") });
         root.Add(_list);

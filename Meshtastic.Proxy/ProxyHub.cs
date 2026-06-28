@@ -46,6 +46,11 @@ internal sealed class ProxyHub
     private readonly Dictionary<uint, Client> _echoSuppress = new();
     private readonly Queue<uint> _echoOrder = new();
 
+    // RAM-only ring buffer of the latest received text messages (raw frame + the message's rx_time), so a client
+    // (re)connecting can catch up: it asks for everything newer than the newest it already has. Not persisted.
+    private const int RecentCap = 100;
+    private readonly List<(long RxTime, byte[] Frame)> _recent = new();
+
     // Cached device-config dump (raw FromRadio bytes), replayed to each new client on its want_config.
     private byte[]? _myInfo, _metadata;
     private readonly Dictionary<int, byte[]> _config = new();         // Config.PayloadVariantCase -> frame
@@ -155,6 +160,14 @@ internal sealed class ProxyHub
 
             // Keep the replay cache current (new nodes, config changes), then forward live to every client.
             CacheFrame(fr, bytes);
+            // Remember received text messages (RAM ring) so a (re)connecting client can catch up on what it missed.
+            if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.Packet
+                && fr.Packet.Decoded?.Portnum == PortNum.TextMessageApp)
+                lock (_sync)
+                {
+                    _recent.Add((fr.Packet.RxTime, bytes));
+                    if (_recent.Count > RecentCap) _recent.RemoveAt(0);
+                }
             if (_verbose)
             {
                 if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.Packet && fr.Packet.Decoded != null)
@@ -236,6 +249,19 @@ internal sealed class ProxyHub
 
     private async Task HandleClientFrameAsync(Client client, byte[] toRadioBytes, CancellationToken ct)
     {
+        // Proxy control frame (not a real ToRadio): "MPXY" + cmd + payload. cmd 0x01 = backfill request, followed by
+        // an int64 (little-endian) "since" rx_time — replay every cached text message newer than that to this client.
+        if (toRadioBytes.Length >= 13 && toRadioBytes[0] == (byte)'M' && toRadioBytes[1] == (byte)'P'
+            && toRadioBytes[2] == (byte)'X' && toRadioBytes[3] == (byte)'Y')
+        {
+            if (toRadioBytes[4] == 0x01)
+            {
+                long since = System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(toRadioBytes.AsSpan(5));
+                await ReplayRecentMessagesAsync(client, since, ct);
+            }
+            return;
+        }
+
         ToRadio tr;
         try { tr = ToRadio.Parser.ParseFrom(toRadioBytes); }
         catch { return; }
@@ -312,6 +338,16 @@ internal sealed class ProxyHub
             try { await SendFrameAsync(c, payload, CancellationToken.None); }
             catch { Remove(c); }
         }
+    }
+
+    // Replays the cached received text messages newer than the client's "since" rx_time, so it catches up on what it
+    // missed while disconnected (RAM only; bounded to the last 100 messages).
+    private async Task ReplayRecentMessagesAsync(Client client, long since, CancellationToken ct)
+    {
+        byte[][] frames;
+        lock (_sync) frames = _recent.Where(m => m.RxTime > since).Select(m => m.Frame).ToArray();
+        if (frames.Length > 0) _log($"Backfill: replaying {frames.Length} message(s) newer than {since} to a client.");
+        foreach (var f in frames) await SendFrameAsync(client, f, ct);
     }
 
     private async Task BroadcastAsync(byte[] payload)

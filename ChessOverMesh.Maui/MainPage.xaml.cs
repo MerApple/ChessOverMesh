@@ -62,6 +62,8 @@ public partial class MainPage : ContentPage
     // suggesting "Update nodes" (which re-sends want_config and re-subscribes).
     DateTime _lastRxUtc = DateTime.UtcNow;
     bool _rxStallWarned;
+    bool _isProxy;                  // connected through Meshtastic.Proxy (a proxy:// link), not directly to a device
+    DateTime _suppressAcksUntil;    // don't auto-ack until this time (covers the proxy's backfill burst after connect)
     static readonly TimeSpan ReceiveStallTimeout = TimeSpan.FromSeconds(120);
 
     static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(20);
@@ -411,6 +413,7 @@ public partial class MainPage : ContentPage
         string host = (hostInput ?? "").Trim();
         if (host.Length == 0 || host == "http://")
             return "Enter the device's address, e.g. http://192.168.1.50";
+        _isProxy = false;   // a direct device connection (the proxy:// branch below sets this back to true)
 
         // Proxy: "proxy://host[:port]" connects (TLS) to a Meshtastic.Proxy that shares one device with several
         // apps. The proxy speaks the same framed protocol, so from here it's an ordinary client connection.
@@ -464,6 +467,7 @@ public partial class MainPage : ContentPage
 
         _reconnectBle = null;
         _probeHost = ph; _probePort = pp;
+        _isProxy = true;   // a proxy link supports message catch-up (backfill); a direct device does not
         return await ConnectCoreAsync(() => new MeshtasticHttpClient(proxy), proxyUrl, $"proxy {ph}:{pp}",
             isIp: true, "Check the proxy is running and reachable.");
     }
@@ -475,6 +479,7 @@ public partial class MainPage : ContentPage
     public Task<string> ConnectViaTransportAsync(IMeshTransport transport, string label, string cacheKey,
                                                  Func<Task<IMeshTransport>>? rebuild = null)
     {
+        _isProxy = false;   // a direct BLE device connection — no proxy catch-up
         // Remember how to rebuild this BLE link so auto-reconnect can re-establish it when it drops.
         _reconnectBle = rebuild == null ? null : async () =>
         {
@@ -611,12 +616,15 @@ public partial class MainPage : ContentPage
         if (!available.Contains(chess)) chess = primary;
         if (_mesh != null) _mesh.ChannelIndex = chess;
 
+        // The selected channels = what's shown in chat AND what you can send to (chosen via the chat RX dropdown).
         _chatListen.Clear();
-        foreach (var i in prefs?.ChatListen ?? new List<uint>()) _chatListen.Add(i);
-        if (_chatListen.Count == 0) _chatListen.Add(chess);
+        if (prefs?.ChatListen is { } saved)
+            foreach (var i in saved) _chatListen.Add(i);             // a previously-saved selection (may be empty)
+        else
+            foreach (var i in ReceiveChannels()) _chatListen.Add(i);  // first connect: show + TX every enabled channel
 
         _chatTxChannel = prefs?.ChatTxChannel ?? chess;
-        if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.First();
+        if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
         RebuildChatTxPicker();
         LoadCachedChat(host);
     }
@@ -643,12 +651,21 @@ public partial class MainPage : ContentPage
     }
 
     // Caches a chat line (latest 100 per channel) for the current device; returns the stable id stamped on the row.
-    string? CacheChat(uint channel, string text, string detail)
+    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime });
         return id;
+    }
+
+    // The newest message rx_time we have cached for a device — sent to Meshtastic.Proxy so it backfills only newer.
+    static long MaxCachedRxTime(string host)
+    {
+        long max = 0;
+        foreach (var list in DeviceCache.GetChat(host).Values)
+            foreach (var m in list) if (m.RxTime > max) max = m.RxTime;
+        return max;
     }
 
     static MeshEnvironment ToEnv(DeviceCache.TelemetryReading r) => new(r.Temperature, r.Humidity, r.Pressure, r.RxTime, r.ReceivedAt);
@@ -686,13 +703,12 @@ public partial class MainPage : ContentPage
         Status("Managing channels — polling paused.");
         try
         {
-            var page = new ChannelsPage(_mesh, _currentHost, _mesh.GetAvailableChannels(), _mesh.ChannelIndex, _chatListen, _playing);
+            var page = new ChannelsPage(_mesh, _currentHost, _mesh.GetAvailableChannels(), _mesh.ChannelIndex, _playing);
             await Navigation.PushModalAsync(page);
             var result = await page.Completion;
 
             _mesh.ChannelIndex = result.ChessChannel;
-            _chatListen.Clear();
-            foreach (var i in result.ChatListen) _chatListen.Add(i);
+            // Chat channel selection now lives in the chat RX dropdown, not this page — just keep a valid TX channel.
             if (!_chatListen.Contains(_chatTxChannel))
                 _chatTxChannel = _chatListen.Contains(result.ChessChannel) ? result.ChessChannel : _chatListen.FirstOrDefault();
             RebuildChatTxPicker();
@@ -1538,6 +1554,13 @@ public partial class MainPage : ContentPage
             DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
             RefreshChatAckerNames();
             SyncDeviceClockIfAhead();   // correct a radio whose clock is set in the future (bad "last heard" stamps)
+            // On a proxy link, ask it to replay any received messages we missed while away (newer than our newest
+            // cached one). Suppress acks briefly so we don't re-ack the replayed (old) burst back onto the mesh.
+            if (_isProxy)
+            {
+                _suppressAcksUntil = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                try { await _mesh.SendProxyBackfillRequestAsync(MaxCachedRxTime(_currentHost)); } catch { }
+            }
         }
         ApplyConnectionState();
         if (_playing) UpdateTurnStatus();
@@ -1611,16 +1634,19 @@ public partial class MainPage : ContentPage
                 LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : Palette.Normal, msg);
                 entry.ChatNameBody = sentDmFromUs ? null : bodyPart;   // outgoing DMs aren't re-rendered (the prefix differs)
                 entry.Channel = msg.Channel;
-                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail);   // persist (latest 100 per channel)
+                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime);   // persist (latest 100 per channel)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
                 // instead of notifying (so a hidden conversation just shows a badge in the RX list).
                 bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
                 if (shown && !sentDmFromUs)   // an outgoing DM mirrored from a peer app isn't a new incoming alert
                 {
                     Notify();
-                    NotifyBackground(wasDm ? $"DM from {who}" : who, msg.DecryptFailed ? "⚠ message (decryption failed)" : body);
-                    PlayChatSound();
-                    (Shell.Current as AppShell)?.FlashChatTab();   // draw attention to the Chat tab if it's not open
+                    if (DateTime.UtcNow >= _suppressAcksUntil)   // stay silent during the proxy backfill burst after connect
+                    {
+                        NotifyBackground(wasDm ? $"DM from {who}" : who, msg.DecryptFailed ? "⚠ message (decryption failed)" : body);
+                        PlayChatSound();
+                        (Shell.Current as AppShell)?.FlashChatTab();   // draw attention to the Chat tab if it's not open
+                    }
                 }
                 // A reply on the channel we just sent to confirms our in-flight chat (turns it green, frees Send).
                 ConfirmChatByIncomingReply(msg.Channel);
@@ -1633,8 +1659,9 @@ public partial class MainPage : ContentPage
                 // so a peer client's message arrives as "from us" — only one of us (the sender) should be acked, and
                 // a node acking itself is pointless airtime.
                 bool fromUs = _mesh != null && msg.FromNode == _mesh.MyNodeNum;
-                bool keywordAck = !wasDm && !fromUs && MatchesAckTrigger(msg.Channel, msg.Text);
-                if (!wasDm && !fromUs && (_chatAckOn.Contains(msg.Channel) || keywordAck))
+                bool ackSuppressed = DateTime.UtcNow < _suppressAcksUntil;   // proxy backfill burst — don't re-ack old messages
+                bool keywordAck = !wasDm && !fromUs && !ackSuppressed && MatchesAckTrigger(msg.Channel, msg.Text);
+                if (!wasDm && !fromUs && !ackSuppressed && (_chatAckOn.Contains(msg.Channel) || keywordAck))
                 {
                     string ackSignal = (keywordAck || _chatAckSignalOn.Contains(msg.Channel)) ? AckSignalText(msg) : "";
                     SendChatAck(msg.PacketId, msg.Channel, ackSignal);
@@ -1843,7 +1870,9 @@ public partial class MainPage : ContentPage
         if (_mesh != null)
         {
             var nodes = _mesh.GetNodes().Where(n => !n.IsSelf).ToDictionary(n => n.Num, n => n);
-            foreach (var num in _nodePrefs.Where(kv => kv.Value.Dm && !kv.Value.Block).Select(kv => kv.Key).OrderBy(n => n))
+            // Only DMs currently shown in the RX dropdown are TX targets (you can send to what you receive).
+            foreach (var num in _nodePrefs.Where(kv => kv.Value.Dm && !kv.Value.Block && !_rxHidden.Contains((true, kv.Key)))
+                                          .Select(kv => kv.Key).OrderBy(n => n))
             {
                 string label = nodes.TryGetValue(num, out var nd) ? NodeShortLabel(nd) : $"!{num:x8}";
                 list.Add(new ChatTxTarget(true, num, $"DM → {label}"));
@@ -1878,13 +1907,24 @@ public partial class MainPage : ContentPage
     // ---- RX view filter (which channels/DMs are shown in chat) ----
     static (bool IsDm, uint Id) RxKey(LogEntry e) => e.DmPeer != 0 ? (true, e.DmPeer) : (false, e.Channel);
 
+    // Whether an RX target is shown (and so a valid TX target): a channel is shown when it's in the selected set;
+    // a DM is shown unless it's been hidden in the RX dropdown.
+    bool IsRxVisible(bool isDm, uint id) => isDm ? !_rxHidden.Contains((true, id)) : _chatListen.Contains(id);
+
+    // Persists the current channel selection (and TX channel) for this device.
+    void SaveChatSelection()
+    {
+        if (_currentHost.Length > 0 && _mesh != null)
+            DeviceCache.SaveChannelPrefs(_currentHost, _mesh.ChannelIndex, _chatListen, _chatTxChannel);
+    }
+
     // Stamps a chat row's RX target, sets whether it's shown (per the filter), and — for an incoming message on a
     // hidden target — bumps that target's unread count. Returns whether the row is shown.
     bool RouteRx(LogEntry e, bool isDm, uint peer, bool incoming)
     {
         e.DmPeer = isDm ? peer : 0;
         var key = isDm ? (true, peer) : (false, e.Channel);
-        bool shown = !_rxHidden.Contains(key);
+        bool shown = IsRxVisible(key.Item1, key.Item2);
         e.Visible = shown;
         if (incoming && !shown) { _unread[key] = _unread.GetValueOrDefault(key) + 1; StateChanged?.Invoke(); }
         return shown;
@@ -1893,24 +1933,48 @@ public partial class MainPage : ContentPage
     void RecomputeChatVisibility()
     {
         foreach (var e in _chat)
-            if (e.Channel != uint.MaxValue) e.Visible = !_rxHidden.Contains(RxKey(e));   // dividers always show
+            if (e.Channel != uint.MaxValue) { var k = RxKey(e); e.Visible = IsRxVisible(k.IsDm, k.Id); }   // dividers always show
     }
 
-    public bool IsRxHidden(bool isDm, uint id) => _rxHidden.Contains((isDm, id));
+    public bool IsRxHidden(bool isDm, uint id) => !IsRxVisible(isDm, id);
     public int RxUnread(bool isDm, uint id) => _unread.GetValueOrDefault((isDm, id));
     public int TotalUnread => _unread.Values.Sum();
 
+    // Show/hide an RX target. A channel toggles the selected-channel set (shown in chat AND a TX target, persisted);
+    // a DM toggles the runtime hidden set. Either way the TX target list is refreshed.
     public void SetRxHidden(bool isDm, uint id, bool hidden)
     {
-        var key = (isDm, id);
-        if (hidden) _rxHidden.Add(key);
-        else { _rxHidden.Remove(key); _unread.Remove(key); }   // showing a target clears its unread
+        if (isDm)
+        {
+            if (hidden) _rxHidden.Add((true, id));
+            else { _rxHidden.Remove((true, id)); _unread.Remove((true, id)); }
+        }
+        else
+        {
+            if (hidden) { _chatListen.Remove(id); _unread.Remove((false, id)); }
+            else _chatListen.Add(id);
+            if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
+            SaveChatSelection();
+        }
         RecomputeChatVisibility();
+        RebuildChatTxPicker();
         StateChanged?.Invoke();
     }
 
-    public void ShowAllRx() { _rxHidden.Clear(); _unread.Clear(); RecomputeChatVisibility(); StateChanged?.Invoke(); }
-    public void HideAllRx() { foreach (var t in RxTargets()) _rxHidden.Add((t.IsDm, t.Id)); RecomputeChatVisibility(); StateChanged?.Invoke(); }
+    public void ShowAllRx()
+    {
+        _chatListen.Clear();
+        foreach (var ch in ReceiveChannels()) _chatListen.Add(ch);
+        _rxHidden.Clear(); _unread.Clear();
+        SaveChatSelection(); RecomputeChatVisibility(); RebuildChatTxPicker(); StateChanged?.Invoke();
+    }
+
+    public void HideAllRx()
+    {
+        _chatListen.Clear();
+        foreach (var t in RxTargets().Where(t => t.IsDm)) _rxHidden.Add((true, t.Id));
+        SaveChatSelection(); RecomputeChatVisibility(); RebuildChatTxPicker(); StateChanged?.Invoke();
+    }
 
     /// <summary>Deletes all chat messages for one RX target (a channel or a DM peer) — both the rows shown in chat
     /// and the cached history for this device.</summary>

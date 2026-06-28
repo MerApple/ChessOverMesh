@@ -49,6 +49,7 @@ internal static class DeviceCache
         public string Detail { get; set; } = "";
         public DateTime Time { get; set; }
         public string? Id { get; set; }   // stable id so a single message can be removed from the cache (null for legacy entries)
+        public uint RxTime { get; set; }  // the message's device rx_time (epoch s, 0 if unknown), for proxy catch-up
     }
 
     /// <summary>A cached node position (decimal degrees), persisted so the map shows last-known locations.</summary>

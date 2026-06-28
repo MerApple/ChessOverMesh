@@ -85,10 +85,6 @@
             <Label Text="Channel used for position requests, telemetry requests, and the manual Broadcast node info / Broadcast position actions. Automatic = each node's own channel for requests, and the primary channel (0) for broadcasts — the safest choice for reaching the most nodes." TextColor="#B0B0B0" FontSize="12"/>
             <Picker x:Name="UtilityPicker" TextColor="#E0E0E0" BackgroundColor="#1E1E1E" SelectedIndexChanged="OnUtilityChanged"/>
 
-            <Label Text="Chat send channels (TX)" TextColor="#E0E0E0" FontAttributes="Bold" Margin="0,8,0,0"/>
-            <Label Text="The checked channels are the ones you can send chat on (the chat tab's TX list). Chat is received on every device channel regardless; use the RX list in the chat tab to choose which channels and DMs to see." TextColor="#B0B0B0" FontSize="12"/>
-            <VerticalStackLayout x:Name="ChatListenPanel" Spacing="2"/>
-
             <Label x:Name="StatusLabel" TextColor="#B0B0B0" FontSize="12" Margin="0,8,0,0"/>
 
             <Button x:Name="DoneBtn" Text="Done" Clicked="OnDone" HeightRequest="40" Margin="0,12,0,0"/>

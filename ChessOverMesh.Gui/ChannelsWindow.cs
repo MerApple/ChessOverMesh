@@ -34,7 +34,6 @@ internal sealed class ChannelsWindow : Window
     private readonly TextBox _pskShow = new() { Height = 24, Width = 250, IsReadOnly = true, Foreground = Dim, Background = Panel, BorderThickness = new Thickness(0) };
     private readonly ComboBox _chessCombo = new() { Height = 24, Width = 220 };
     private readonly ComboBox _utilityCombo = new() { Height = 24, Width = 220 };
-    private readonly StackPanel _chatListPanel = new();
     private readonly TextBlock _status = new() { Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
     // Shown next to the Update button while no fetch has happened this session — explains why Update is disabled.
     private readonly TextBlock _updateHint = new() { Foreground = Warn, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0), Text = "← Fetch from device to enable Update" };
@@ -59,14 +58,11 @@ internal sealed class ChannelsWindow : Window
     /// <summary>Channel index chess should use (the primary, 0, by default).</summary>
     public uint ChessChannel { get; private set; }
 
-    /// <summary>Channel indices chat should listen to.</summary>
-    public HashSet<uint> ChatListen { get; }
-
     /// <summary>The device channel set as it stood when the dialog closed.</summary>
     public IReadOnlyList<MeshChannel> Channels => _channels;
 
     public ChannelsWindow(Window owner, MeshtasticHttpClient mesh, string host,
-                          IReadOnlyList<MeshChannel> cachedChannels, uint chessChannel, IEnumerable<uint> chatListen,
+                          IReadOnlyList<MeshChannel> cachedChannels, uint chessChannel,
                           bool lockChessChannel = false, Action<uint>? onClearChat = null)
     {
         _mesh = mesh;
@@ -75,7 +71,6 @@ internal sealed class ChannelsWindow : Window
         _onClearChat = onClearChat;
         _channels = cachedChannels ?? Array.Empty<MeshChannel>();
         ChessChannel = chessChannel;
-        ChatListen = new HashSet<uint>(chatListen);
 
         Title = "Channels";
         Owner = owner;
@@ -232,17 +227,6 @@ internal sealed class ChannelsWindow : Window
         _utilityCombo.SelectionChanged += UtilityCombo_SelectionChanged;
         root.Children.Add(_utilityCombo);
 
-        // Chat send-channel set (these fill the chat box's TX dropdown)
-        root.Children.Add(Header("Chat send channels (TX)"));
-        root.Children.Add(new TextBlock
-        {
-            Text = "The checked channels are the ones you can send chat on — they fill the chat box's TX list. " +
-                   "Chat is received on every device channel regardless; use the RX list in the chat box to choose " +
-                   "which channels (and DMs) to actually see.",
-            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 4),
-        });
-        root.Children.Add(_chatListPanel);
-
         root.Children.Add(_status);
 
         var closeBtn = new Button { Content = "Done", Width = 80, Height = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
@@ -307,9 +291,6 @@ internal sealed class ChannelsWindow : Window
         // must be a non-zero (secondary) channel. Drop an invalid/primary selection; default to the first secondary.
         var chessChannels = enabled.Where(c => c.Index != 0).ToList();
         if (chessChannels.Count > 0 && chessChannels.All(c => c.Index != ChessChannel)) ChessChannel = chessChannels[0].Index;
-        ChatListen.RemoveWhere(i => enabled.All(c => c.Index != i));
-        if (ChatListen.Count == 0 && enabled.Count > 0)
-            ChatListen.Add(enabled.Any(c => c.Index == ChessChannel) ? ChessChannel : enabled[0].Index);
 
         var rows = enabled
             .Select(c => new ChannelRow(c.Index, $"[{c.Index}] {c.DisplayName} — {c.Role}{(c.HasKey ? "  🔒" : "")}"))
@@ -336,22 +317,6 @@ internal sealed class ChannelsWindow : Window
         _utilityCombo.SelectedItem = utilSel;
         _settingUtility = false;
         _mesh.SetUtilityChannel(utilSel.Index == uint.MaxValue ? (uint?)null : utilSel.Index);   // apply the (possibly corrected) value live
-
-        _chatListPanel.Children.Clear();
-        foreach (var c in enabled)
-        {
-            var cb = new CheckBox
-            {
-                Content = $"[{c.Index}] {c.DisplayName}",
-                Foreground = Fg,
-                Margin = new Thickness(0, 2, 0, 2),
-                IsChecked = ChatListen.Contains(c.Index),
-                Tag = c.Index,
-            };
-            cb.Checked += (_, _) => ChatListen.Add((uint)cb.Tag);
-            cb.Unchecked += (_, _) => ChatListen.Remove((uint)cb.Tag);
-            _chatListPanel.Children.Add(cb);
-        }
     }
 
     // Load the selected channel's saved app-level key and show its device PSK.
@@ -574,7 +539,6 @@ internal sealed class ChannelsWindow : Window
     private void Done_Click(object sender, RoutedEventArgs e)
     {
         if (_chessCombo.SelectedItem is ChannelRow row) ChessChannel = row.Index;
-        if (ChatListen.Count == 0) ChatListen.Add(ChessChannel);   // never listen to nothing
         DialogResult = true;
     }
 
