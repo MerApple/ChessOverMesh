@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- net7.0 for the desktop console/GUI (unchanged); net9.0-android adds a protobuf-only build for the
+		     MAUI phone app. The Android build excludes the serial transport (System.IO.Ports is desktop-only). -->
+		<!-- net7.0 for the desktop console/GUI; net9.0-android for the MAUI phone app. Pass
+		     /p:IncludeAndroid=false (used by the desktop publish) to drop the Android target so a
+		     RID-specific desktop publish doesn't try to restore Android runtime packs. -->
+		<TargetFrameworks Condition="'$(IncludeAndroid)' != 'false'">net7.0;net9.0-android</TargetFrameworks>
+		<TargetFrameworks Condition="'$(IncludeAndroid)' == 'false'">net7.0</TargetFrameworks>
+		<SupportedOSPlatformVersion Condition="$(TargetFramework.EndsWith('-android'))">21.0</SupportedOSPlatformVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>Meshtastic</RootNamespace>
+		<PackageIcon>logo.png</PackageIcon>
+		<RepositoryUrl>http://github.com/meshtastic/c-sharp</RepositoryUrl>
+		<Company>Meshtastic LLC</Company>
+		<Title>Meshtastic C#</Title>
+		<IncludeSymbols>True</IncludeSymbols>
+		<DebugType>embedded</DebugType>
+		<PackageLicenseFile>LICENSE</PackageLicenseFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\LICENSE">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\logo.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Include="..\README.md">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+
+	<ItemGroup>
+		<PackageReference Include="Google.Protobuf" Version="3.22.1" />
+		<PackageReference Include="Google.Protobuf.Tools" Version="3.22.1" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="7.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
+	</ItemGroup>
+
+	<!-- Serial transport is desktop-only: System.IO.Ports has no Android runtime, so exclude both the
+	     package and the Connections/ source (serial + tcp device wiring) from the Android build. -->
+	<ItemGroup Condition="!$(TargetFramework.EndsWith('-android'))">
+		<PackageReference Include="System.IO.Ports" Version="7.0.0" />
+	</ItemGroup>
+	<ItemGroup Condition="$(TargetFramework.EndsWith('-android'))">
+		<Compile Remove="Connections\**\*.cs" />
+	</ItemGroup>
+
+
+	<ItemGroup>
+		<Folder Include="Generated\" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,64 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <RootNamespace>Meshtastic.Cli</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackAsTool>True</PackAsTool>
+    <PackageIcon>logo.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>http://github.com/meshtastic/c-sharp</RepositoryUrl>
+    <Company>Meshtastic LLC</Company>
+    <Title>Meshtastic CLI</Title>
+    <IncludeSymbols>True</IncludeSymbols>
+    <DebugType>embedded</DebugType>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\logo.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.22.3" />
+    <PackageReference Include="Google.Protobuf.Tools" Version="3.22.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
+    <PackageReference Include="MQTTnet" Version="4.2.1.781" />
+    <PackageReference Include="QRCoder" Version="1.4.3" />
+    <PackageReference Include="SimpleExec" Version="11.0.0" />
+    <PackageReference Include="Spectre.Console" Version="0.46.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="System.CommandLine.Hosting" Version="0.4.0-alpha.22272.1" />
+    <PackageReference Include="System.IO.Ports" Version="7.0.0" />
+    <PackageReference Include="YamlDotNet" Version="13.1.0" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\Meshtastic\Meshtastic.csproj" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Using Include="Spectre.Console" />
+    <Using Include="System.CommandLine" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,152 @@
+{
+  "profiles": {
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    },
+    "info localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "info --host localhost --log debug"
+    },
+    "monitor": {
+      "commandName": "Project",
+      "commandLineArgs": "monitor --log debug"
+    },
+    "info": {
+      "commandName": "Project",
+      "commandLineArgs": "info"
+    },
+    "get --setting mqtt.enabled display.screenOnSecs": {
+      "commandName": "Project",
+      "commandLineArgs": "get  --setting mqtt.enabled display.screenOnSecs --log debug"
+    },
+    "get --setting mqtt.enabled display.screenOnSecs localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "get --host localhost --setting mqtt.enabled display.screenOnSecs --log debug"
+    },
+    "set --setting mqtt.address=me.myhost.org display.screenOnSecs=42069": {
+      "commandName": "Project",
+      "commandLineArgs": "set --setting mqtt.address=me.myhost.org display.screenOnSecs=42069 --log debug"
+    },
+    "set --setting mqtt.host=mqtt.myhost.org display.screenOnSecs=222 localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "set --setting mqtt.address=me.myhost.org display.screenOnSecs=42069 --host localhost --log debug"
+    },
+    "set --setting lora.region=US": {
+      "commandName": "Project",
+      "commandLineArgs": "set --setting lora.region=US --log debug"
+    },
+    "channel save localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "channel save --index 1 --name Test --role Primary --psk 12345 --uplink-enabled true --host localhost --log debug"
+    },
+    "channel save": {
+      "commandName": "Project",
+      "commandLineArgs": "channel save --index 1 --name Test --role Primary --psk 12345 --uplink-enabled true --log debug"
+    },
+    "url get": {
+      "commandName": "Project",
+      "commandLineArgs": "url get"
+    },
+    "url get localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "url get --host localhost --log debug"
+    },
+    "url set": {
+      "commandName": "Project",
+      "commandLineArgs": "url set https://meshtastic.org/e/#CjMSIK4kboySjOqKWHn8dCR2Gp7L0syIGv1_sySCrbZxneV2GgtCZW5zRnVuTGFuZCgBMAEKKRIgarYveKnCBHSGrOMkzVVStMEElngYZQir38xCiDKkj6UaBWFkbWluCisSIExfvRlaRwJWHDEvQYaUjzwUeN4FvkI_6nJX9P0ByHCOGgdQYXJ0eU9uEgoIATgBQANIAVAe --log debug"
+    },
+    "url set localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "url set https://meshtastic.org/e/#CjMSIK4kboySjOqKWHn8dCR2Gp7L0syIGv1_sySCrbZxneV2GgtCZW5zRnVuTGFuZCgBMAEKKRIgarYveKnCBHSGrOMkzVVStMEElngYZQir38xCiDKkj6UaBWFkbWluCisSIExfvRlaRwJWHDEvQYaUjzwUeN4FvkI_6nJX9P0ByHCOGgdQYXJ0eU9uEgoIATgBQANIAVAe --host localhost --log debug"
+    },
+    "reboot": {
+      "commandName": "Project",
+      "commandLineArgs": "reboot 3 --log debug"
+    },
+    "reboot localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "reboot --host localhost --log debug"
+    },
+    "metadata": {
+      "commandName": "Project",
+      "commandLineArgs": "metadata --log debug"
+    },
+    "metadata localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "metadata --host localhost --log debug"
+    },
+    "fixed-position": {
+      "commandName": "Project",
+      "commandLineArgs": "fixed-position 34.000 -90.023 123 --log debug"
+    },
+    "text": {
+      "commandName": "Project",
+      "commandLineArgs": "text \"Derp\" --log debug --select-dest"
+    },
+    "trace route": {
+      "commandName": "Project",
+      "commandLineArgs": "trace-route --log debug --select-dest"
+    },
+    "set-canned-messages localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "set-canned-messages \"I need an alpinist!|Call Me|Roger Roger|Keep Calm|On my way\" --host localhost --log debug"
+    },
+    "get-canned-messages localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "get-canned-messages --host localhost --log debug"
+    },
+    "get-canned-messages": {
+      "commandName": "Project",
+      "commandLineArgs": "get-canned-messages --log debug"
+    },
+    "set-canned-messages": {
+      "commandName": "Project",
+      "commandLineArgs": "set-canned-messages \"I need an alpinist!|Call Me|Roger Roger|Keep Calm|On my way\" --log debug"
+    },
+    "waypoint": {
+      "commandName": "Project",
+      "commandLineArgs": "waypoint 34.000 -90.023 --name Turd --icon 💩 --log debug"
+    },
+    "file": {
+      "commandName": "Project",
+      "commandLineArgs": "file /prefs/db.proto --log debug"
+    },
+    "file localhost": {
+      "commandName": "Project",
+      "commandLineArgs": "file /prefs/db.proto --host localhost --log debug"
+    },
+    "update": {
+      "commandName": "Project",
+      "commandLineArgs": "update"
+    },
+    "live": {
+      "commandName": "Project",
+      "commandLineArgs": "live"
+    },
+    "live host": {
+      "commandName": "Project",
+      "commandLineArgs": "live --host 192.168.2.186"
+    },
+    "export": {
+      "commandName": "Project",
+      "commandLineArgs": "export"
+    },
+    "export host": {
+      "commandName": "Project",
+      "commandLineArgs": "export --host 192.168.2.186"
+    },
+    "import": {
+      "commandName": "Project",
+      "commandLineArgs": "import"
+    },
+    "mqtt": {
+      "commandName": "Project",
+      "commandLineArgs": "mqtt-proxy"
+    },
+    "remove-node": {
+      "commandName": "Project",
+      "commandLineArgs": "remove-node 123456"
+    }
+  }
+}

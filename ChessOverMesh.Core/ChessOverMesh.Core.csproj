@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared chess/game/mesh logic for the MAUI Android app. Compiles the SAME source files the desktop
+       console/GUI use (no second copy), but as a plain library so the app's UI implicit-usings (Maui.Graphics
+       Color, Maui.Controls Routing, ...) don't leak in and collide with the core's own Color/Routing types. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0-android</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ChessOverMesh</RootNamespace>
+    <AssemblyName>ChessOverMesh.Core</AssemblyName>
+    <SupportedOSPlatformVersion Condition="$(TargetFramework.EndsWith('-android'))">21.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ChessOverMesh\Chess\**\*.cs" />
+    <Compile Include="..\ChessOverMesh\Game\**\*.cs" />
+    <Compile Include="..\ChessOverMesh\Mesh\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\c-sharp-master\Meshtastic\Meshtastic.csproj" />
+  </ItemGroup>
+
+</Project>

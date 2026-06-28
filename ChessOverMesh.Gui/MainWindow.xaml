@@ -1,0 +1,317 @@
+<Window x:Class="ChessOverMesh.Gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Chess over Meshtastic" Height="680" Width="1000"
+        Icon="app.ico"
+        Background="#FF1E1E1E" MinHeight="600" MinWidth="880">
+    <Window.Resources>
+        <!-- Flat, chrome-less button used for each board square (clickable + automatable). -->
+        <Style x:Key="CellButton" TargetType="Button">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <DockPanel>
+
+        <!-- Setup / connection bar -->
+        <Border DockPanel.Dock="Top" Background="#FF2D2D30" Padding="8">
+            <WrapPanel VerticalAlignment="Center">
+                <WrapPanel.Resources>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#FFE0E0E0"/>
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="Margin" Value="8,0,4,0"/>
+                    </Style>
+                </WrapPanel.Resources>
+                <Button x:Name="FindBtn" Content="Find" Width="56" Height="24" Margin="0,0,8,0" Click="FindBtn_Click"
+                        ToolTip="Find Meshtastic devices on the local network (mDNS)"/>
+                <TextBlock Text="Host:" Margin="0,0,4,0"/>
+                <TextBox x:Name="HostBox" Width="190" Height="24" Text="http://192.168.2.183"/>
+                <Button x:Name="ConnectBtn" Content="Connect" Width="92" Height="24" Margin="6,0,0,0" Click="ConnectBtn_Click"/>
+                <Button x:Name="ChannelsBtn" Content="Channels…" Width="92" Height="24" Margin="8,0,0,0"
+                        IsEnabled="False" Click="ChannelsBtn_Click"
+                        ToolTip="Create/delete channels on the radio, and choose the chess and chat channels"/>
+                <Button x:Name="StartBtn" Content="Chess" Width="70" Height="24"
+                        Margin="8,0,0,0" Click="StartBtn_Click" IsEnabled="False"/>
+                <Button x:Name="NodesBtn" Content="Nodes…" Width="70" Height="24"
+                        Margin="8,0,0,0" Click="NodesBtn_Click" IsEnabled="False"/>
+                <Button x:Name="SettingsBtn" Content="Settings…" Width="84" Height="24"
+                        Margin="8,0,0,0" Click="SettingsBtn_Click"
+                        ToolTip="Device, color and sound settings"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#FF2D2D30" Padding="8,5">
+            <TextBlock x:Name="StatusText" Foreground="#FFE0E0E0" Text="Not connected."/>
+        </Border>
+
+        <!-- Board + right panel, separated by a draggable splitter -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="320"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="RightPanelColumn" Width="360" MinWidth="170"/>
+            </Grid.ColumnDefinitions>
+
+            <Viewbox Grid.Column="0" Margin="14" Stretch="Uniform">
+                <Grid x:Name="BoardGrid" Width="480" Height="480"/>
+            </Viewbox>
+
+            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                          Background="#FF3F3F46" ResizeBehavior="PreviousAndNext"
+                          ToolTip="Drag to resize the moves / chat panel"/>
+
+            <!-- Right panel: moves + channel chat -->
+            <Border Grid.Column="2" Background="#FF252526">
+            <Grid Margin="8">
+                <!-- Three resizable sections (Moves / System / Chat), each separated by a draggable splitter. -->
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="2*" MinHeight="70"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="2*" MinHeight="60"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="3*" MinHeight="90"/>
+                </Grid.RowDefinitions>
+
+                <!-- Moves section -->
+                <Grid Grid.Row="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <TextBlock Text="Moves" Foreground="#FFB0B0B0" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button x:Name="ResendBtn" Content="Resend" HorizontalAlignment="Right" Height="22" Padding="10,0"
+                            IsEnabled="False" Click="ResendBtn_Click"
+                            ToolTip="Resend your last move — enabled once it goes unacknowledged after the auto-retries"/>
+                </Grid>
+                <ListBox x:Name="MoveList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
+                         BorderThickness="0" FontFamily="Consolas"
+                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Copy" Click="CopySelected_Click"/>
+                            <MenuItem Header="Copy all" Click="CopyAll_Click"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Grid Grid.Row="2" Margin="0,6,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="ResignBtn" Grid.Column="0" Content="Resign" Height="28"
+                            Margin="0,0,3,0" Click="ResignBtn_Click" IsEnabled="False"/>
+                    <Button x:Name="SaveBtn" Grid.Column="1" Content="Save…" Height="28"
+                            Margin="3,0,3,0" Click="SaveBtn_Click" IsEnabled="False"/>
+                    <Button x:Name="CancelBtn" Grid.Column="2" Content="Cancel" Height="28"
+                            Margin="3,0,0,0" Click="CancelBtn_Click" IsEnabled="False"/>
+                </Grid>
+                </Grid>
+                <!-- end Moves section -->
+
+                <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                              ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" Background="#FF3F3F46"
+                              ToolTip="Drag to resize the moves / system panels"/>
+
+                <!-- System section -->
+                <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="System messages" Foreground="#FFB0B0B0" FontWeight="Bold" Margin="0,0,0,4"/>
+                <ListBox x:Name="SystemList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
+                         BorderThickness="0" FontFamily="Consolas" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
+                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Copy" Click="CopySelected_Click"/>
+                            <MenuItem Header="Copy all" Click="CopyAll_Click"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}" TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                </Grid>
+                <!-- end System section -->
+
+                <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                              ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" Background="#FF3F3F46"
+                              ToolTip="Drag to resize the system / chat panels"/>
+
+                <!-- Chat section -->
+                <Grid Grid.Row="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,0,0,4">
+                    <TextBlock Text="Channel chat" Foreground="#FFB0B0B0" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <WrapPanel>
+                        <TextBlock Text="TX:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <ComboBox x:Name="ChatTxCombo" Width="150" Height="22" IsEnabled="False"
+                                  SelectionChanged="ChatTxCombo_Changed"
+                                  ToolTip="Where chat is transmitted: a channel (group broadcast) or a DM-enabled node (direct message)"/>
+                        <TextBlock Text="RX:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="12,0,4,0"/>
+                        <Button x:Name="RxButton" Content="Show ▾" MinWidth="90" Height="22" IsEnabled="False" Click="RxButton_Click"
+                                ToolTip="Choose which channels and DMs are shown in chat. A dot marks unread messages on hidden ones."/>
+                        <Popup x:Name="RxPopup" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=RxButton}" AllowsTransparency="True">
+                            <Border Background="#FF2D2D30" BorderBrush="#FF55555A" BorderThickness="1" Padding="6">
+                                <StackPanel x:Name="RxList" MinWidth="200"/>
+                            </Border>
+                        </Popup>
+                        <CheckBox x:Name="ChatAckCheck" Content="Ack" Foreground="#FFB0B0B0" IsEnabled="False"
+                                  VerticalAlignment="Center" Margin="12,0,0,0" Click="ChatAckCheck_Click"
+                                  ToolTip="Send/expect acknowledgements for chat on the selected TX channel (same setting as the channel manager's per-channel ack)."/>
+                        <CheckBox x:Name="ShowSignalCheck" Content="RSSI" Foreground="#FFB0B0B0" IsChecked="True"
+                                  VerticalAlignment="Center" Margin="12,0,0,0" Click="ShowSignalCheck_Click"
+                                  ToolTip="Show RSSI / SNR / hop count on received chat messages"/>
+                    </WrapPanel>
+                </StackPanel>
+                <ListBox x:Name="ChatList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
+                         BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
+                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Reply" Click="Reply_Click"/>
+                            <MenuItem Header="React">
+                                <MenuItem Header="👍" Click="React_Click"/>
+                                <MenuItem Header="❤️" Click="React_Click"/>
+                                <MenuItem Header="😂" Click="React_Click"/>
+                                <MenuItem Header="😮" Click="React_Click"/>
+                                <MenuItem Header="😢" Click="React_Click"/>
+                                <MenuItem Header="👎" Click="React_Click"/>
+                            </MenuItem>
+                            <MenuItem Header="DM" Click="Dm_Click"/>
+                            <MenuItem Header="Request node info" Click="RequestNodeInfo_Click"/>
+                            <MenuItem Header="Node info" Click="NodeInfo_Click"/>
+                            <MenuItem Header="Open location in Google Maps" Click="OpenMessageLocation_Click"/>
+                            <MenuItem Header="More information" Click="MessageInfo_Click"/>
+                            <MenuItem Header="Remove message" Click="RemoveMessage_Click"/>
+                            <MenuItem Header="Copy" Click="CopySelected_Click"/>
+                            <MenuItem Header="Copy all" Click="CopyAll_Click"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Style.Triggers>
+                                <!-- The RX filter hides a channel/DM's rows by setting Visible=false on them. -->
+                                <DataTrigger Binding="{Binding Visible}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <!-- Message stands out (semibold, state colour); the timestamp/channel/signal/marks
+                                 sit on a small dimmed line below so short messages stay easy to read. -->
+                            <StackPanel Margin="0,2,0,3">
+                                <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}"
+                                           FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding Detail}" Foreground="#FF8A8A8A" FontSize="10"
+                                           TextWrapping="Wrap" Margin="0,1,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Detail}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <!-- Emoji reactions (tapbacks) on this message, hidden when there are none. -->
+                                <TextBlock Text="{Binding Reactions}" FontSize="14" TextWrapping="Wrap" Margin="0,1,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Reactions}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Grid Grid.Row="2" Margin="0,6,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="ReplyBanner" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                            Background="#FF2D2D30" BorderBrush="#FF3F3F46" BorderThickness="1"
+                            Padding="6,2" Margin="0,0,0,4" Visibility="Collapsed">
+                        <DockPanel>
+                            <Button x:Name="ReplyCancelBtn" DockPanel.Dock="Right" Content="✕" Width="20" Height="18"
+                                    Padding="0" Margin="4,0,0,0" Click="ReplyCancel_Click" ToolTip="Cancel reply"/>
+                            <TextBlock x:Name="ReplyText" Foreground="#FFB0B0B0" FontSize="11"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </Border>
+                    <TextBox x:Name="ChatBox" Grid.Row="1" Grid.Column="0" MinHeight="26" IsEnabled="False"
+                             AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                             VerticalAlignment="Top" MaxHeight="96"
+                             PreviewKeyDown="ChatBox_KeyDown" TextChanged="ChatBox_TextChanged"/>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0" VerticalAlignment="Top">
+                        <Button x:Name="EmojiBtn" Content="🙂" Width="30" Height="26" IsEnabled="False"
+                                Click="EmojiBtn_Click" ToolTip="Insert a smiley"/>
+                        <Button x:Name="ChatSendBtn" Content="Send" Width="56" Height="26"
+                                Margin="4,0,0,0" IsEnabled="False" Click="ChatSendBtn_Click"/>
+                    </StackPanel>
+                    <TextBlock x:Name="CharCounter" Grid.Row="2" Grid.Column="1" Text="0 / 200"
+                               FontSize="10" Foreground="#FFB0B0B0" HorizontalAlignment="Right" Margin="0,2,2,0"
+                               ToolTip="Bytes as sent (UTF-8, or the AES base64 length when a channel key is set) / maximum"/>
+                </Grid>
+                </Grid>
+                <!-- end Chat section -->
+            </Grid>
+            </Border>
+        </Grid>
+
+    </DockPanel>
+</Window>
