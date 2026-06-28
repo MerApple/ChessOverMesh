@@ -347,6 +347,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Show the app version in the title bar (assembly version from the .csproj), e.g. "… v1.0.1".
+        Title = $"Chess over Meshtastic  v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!.ToString(3)}";
         BrushFreeze();
 
         // Pre-fill the last host we connected to.

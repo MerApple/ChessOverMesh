@@ -131,6 +131,14 @@ public sealed class DeviceTabPage : ContentPage
         stack.Add(new Label { Text = "While the phone is asleep, check the device for new messages about every 15 " +
             "minutes and notify you. Not real-time — Android limits how often this can run.", TextColor = Dim, FontSize = 12 });
 
+        // App version (the installed build), so you can confirm what's running — e.g. after an Obtainium update.
+        stack.Add(new BoxView { HeightRequest = 1, Color = Rule, Margin = new Thickness(0, 6) });
+        stack.Add(new Label
+        {
+            Text = $"ChessOverMesh v{AppInfo.Current.VersionString} (build {AppInfo.Current.BuildString})",
+            TextColor = Dim, FontSize = 12, HorizontalOptions = LayoutOptions.Center,
+        });
+
         Content = new ScrollView { Content = stack };
 
         // MainPage raises StateChanged from ApplyConnectionState (connect, disconnect, and after each sync),
