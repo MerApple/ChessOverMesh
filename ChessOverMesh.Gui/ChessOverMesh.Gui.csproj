@@ -10,7 +10,7 @@
     <RootNamespace>ChessOverMesh.Gui</RootNamespace>
     <AssemblyName>ChessOverMesh.Gui</AssemblyName>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.2</Version>
+    <!-- Version comes from Directory.Build.props (repo root). -->
   </PropertyGroup>
 
   <ItemGroup>

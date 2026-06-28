@@ -1,0 +1,26 @@
+<Project>
+
+  <!--
+    Single source of truth for the app version, imported automatically by every project under this folder.
+    Edit AppVersion / AppVersionCode here (or run release.ps1, which does it for you) and both the desktop GUI
+    and the Android (MAUI) app pick it up.
+
+      AppVersion     - display / semver version, shown in-app and used for the GitHub release tag and the
+                       .NET assembly version (GUI title bar reads it via reflection).
+      AppVersionCode - Android versionCode (integer). MUST increase on every release or Android refuses to
+                       install the update in place (and Obtainium won't offer it).
+  -->
+  <PropertyGroup>
+    <AppVersion>1.0.2</AppVersion>
+    <AppVersionCode>3</AppVersionCode>
+  </PropertyGroup>
+
+  <!-- Map the shared values onto the per-SDK version properties. ApplicationDisplayVersion/ApplicationVersion
+       are MAUI-only and harmlessly ignored by the WPF/console projects; Version applies to all. -->
+  <PropertyGroup>
+    <Version>$(AppVersion)</Version>
+    <ApplicationDisplayVersion>$(AppVersion)</ApplicationDisplayVersion>
+    <ApplicationVersion>$(AppVersionCode)</ApplicationVersion>
+  </PropertyGroup>
+
+</Project>
