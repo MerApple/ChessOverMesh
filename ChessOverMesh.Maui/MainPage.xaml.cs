@@ -2242,7 +2242,7 @@ public partial class MainPage : ContentPage
         // Noise floor replies (requested via the node info page): log them and refresh any open node page.
         foreach (var nf in result.NoiseFloors)
             AddSystem(Stamp() + $"Noise floor for {(nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}")}: {nf.NoiseFloorDbm} dBm");
-        if (result.NoiseFloors.Count > 0) { _telemetryRefresh?.Invoke(); NodesChanged?.Invoke(); }
+        if (result.NoiseFloors.Count > 0) { _telemetryRefresh?.Invoke(); NodesChanged?.Invoke(); StateChanged?.Invoke(); }   // StateChanged → Device tab noise-floor row
 
         // New-node / node-info events in the system log (optional).
         if (AppSettings.ShowNewNodeInfo)
@@ -2313,6 +2313,9 @@ public partial class MainPage : ContentPage
     public string? HardwareModel => _mesh?.HardwareModel;
     public string? FirmwareVersion => _mesh?.FirmwareVersion;
     public (int Percent, float Voltage)? DeviceBattery => _mesh?.GetDeviceBattery();
+    /// <summary>The connected device's own last-reported noise floor (dBm), or null if not requested/reported yet.
+    /// Refresh it with <see cref="RequestNoiseFloorAsync"/> passing <see cref="MyNodeNum"/>.</summary>
+    public int? DeviceNoiseFloor => _mesh is { } m ? m.GetNoiseFloor(m.MyNodeNum) : null;
     public string SyncStatus => _syncStatus;
 
     // Mesh-sync progress lives on the Device tab (via StateChanged), not the Chess status line.

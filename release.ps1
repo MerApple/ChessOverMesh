@@ -41,7 +41,10 @@ $exe       = Join-Path $root 'publish-single\ChessOverMesh.Gui.exe'
 $tag       = "v$Version"
 
 function Fail($msg) { throw $msg }
-function Git { param([Parameter(ValueFromRemainingArguments)]$a) & git -C $root @a; if ($LASTEXITCODE -ne 0) { Fail "git $($a -join ' ') failed (exit $LASTEXITCODE)." } }
+# Named Invoke-Git (not "Git") so it doesn't shadow the git executable — PowerShell is case-insensitive, so a
+# function called "Git" calling "git" would recurse into itself. Uses the automatic $args (no declared param) so
+# git flags like -A/-q/-m aren't mistaken for the function's own parameters.
+function Invoke-Git { & git -C $root @args; if ($LASTEXITCODE -ne 0) { Fail "git $($args -join ' ') failed (exit $LASTEXITCODE)." } }
 
 # ---- Validate ----
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { Fail "Version must be MAJOR.MINOR.PATCH (e.g. 1.0.3), got '$Version'." }
@@ -50,7 +53,7 @@ $props = Get-Content $propsPath -Raw
 $curCode = if ($props -match '<AppVersionCode>(\d+)</AppVersionCode>') { [int]$Matches[1] } else { 0 }
 if ($VersionCode -le 0) { $VersionCode = $curCode + 1 }
 if ($VersionCode -le $curCode) { Fail "VersionCode ($VersionCode) must be greater than the current ($curCode)." }
-if (Git tag -l $tag) { Fail "Tag $tag already exists." }
+if (Invoke-Git tag -l $tag) { Fail "Tag $tag already exists." }
 
 Write-Host "=== Release $tag  (versionCode $curCode -> $VersionCode) ===" -ForegroundColor Cyan
 
@@ -71,11 +74,11 @@ if ($DryRun) {
 }
 
 # ---- Commit + push (rebase in case the remote moved) ----
-Git add -A
-Git commit -q -m "Release $Version"
-Git fetch origin -q
-Git rebase origin/main
-Git push -q origin main
+Invoke-Git add -A
+Invoke-Git commit -q -m "Release $Version"
+Invoke-Git fetch origin -q
+Invoke-Git rebase origin/main
+Invoke-Git push -q origin main
 
 # ---- Create the GitHub release with both assets ----
 $notesArgs = if ($NotesFile) { @('--notes-file', $NotesFile) }

@@ -15,9 +15,10 @@ public sealed class DeviceTabPage : ContentPage
     readonly Entry _host;
     readonly Button _wifiBtn, _findBtn, _disconnectBtn, _scanBtn, _bleBtn, _deviceSettingsBtn;
     readonly Picker _blePicker;
-    readonly Label _status, _sync, _name, _hardware, _firmware, _battery;
+    readonly Label _status, _sync, _name, _hardware, _firmware, _battery, _noise;
     IReadOnlyList<BleDeviceInfo> _bleDevices = Array.Empty<BleDeviceInfo>();
     bool _busy;
+    bool _noiseTimedOut;   // set when a noise-floor request got no reply (e.g. firmware without LocalStats noise_floor)
 
     static readonly Color Dim = Color.FromArgb("#B0B0B0");
     static readonly Color Fg = Color.FromArgb("#E0E0E0");
@@ -37,7 +38,7 @@ public sealed class DeviceTabPage : ContentPage
         _disconnectBtn.Clicked += OnDisconnect;
 
         // ---- Connected-device info ----
-        _name = InfoValue(); _hardware = InfoValue(); _firmware = InfoValue(); _battery = InfoValue();
+        _name = InfoValue(); _hardware = InfoValue(); _firmware = InfoValue(); _battery = InfoValue(); _noise = InfoValue();
         var info = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
@@ -45,6 +46,7 @@ public sealed class DeviceTabPage : ContentPage
             {
                 new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto),
             },
             ColumnSpacing = 10, RowSpacing = 6,
         };
@@ -52,6 +54,7 @@ public sealed class DeviceTabPage : ContentPage
         AddInfoRow(info, 1, "Hardware", _hardware);
         AddInfoRow(info, 2, "Firmware", _firmware);
         AddInfoRow(info, 3, "Battery", _battery);
+        AddInfoRow(info, 4, "Noise floor", _noise);
 
         // Mesh-sync progress (moved here from the Chess status line).
         _sync = new Label { TextColor = Color.FromArgb("#7FB2E5"), FontSize = 12, IsVisible = false };
@@ -158,6 +161,21 @@ public sealed class DeviceTabPage : ContentPage
     {
         base.OnAppearing();
         Refresh();
+        // Ask the connected device for its current noise floor (its own LocalStats) so the row is fresh when this
+        // tab is opened. The reply arrives via the poll loop and refreshes the row through StateChanged.
+        if (_main.IsConnected && _main.IsSynced)
+            _ = RequestNoiseFloorAsync();
+    }
+
+    // Requests the device's noise floor, then — if no value has arrived after a short wait — marks it "not
+    // reported" so the row doesn't sit on "(requesting…)" forever on firmware that doesn't report noise_floor.
+    async Task RequestNoiseFloorAsync()
+    {
+        _noiseTimedOut = false;
+        Refresh();
+        try { await _main.RequestNoiseFloorAsync(_main.MyNodeNum); } catch { /* best effort */ }
+        await Task.Delay(TimeSpan.FromSeconds(8));
+        if (_main.IsConnected && _main.DeviceNoiseFloor is null) { _noiseTimedOut = true; Refresh(); }
     }
 
     void OnStateChanged() => MainThread.BeginInvokeOnMainThread(Refresh);
@@ -302,7 +320,7 @@ public sealed class DeviceTabPage : ContentPage
 
         if (!connected)
         {
-            _name.Text = _hardware.Text = _firmware.Text = _battery.Text = "—";
+            _name.Text = _hardware.Text = _firmware.Text = _battery.Text = _noise.Text = "—";
             _sync.IsVisible = false;
             return;
         }
@@ -310,6 +328,10 @@ public sealed class DeviceTabPage : ContentPage
         _hardware.Text = _main.HardwareModel ?? "—";
         _firmware.Text = _main.FirmwareVersion ?? "(reported after sync)";
         _battery.Text = FormatBattery(_main.DeviceBattery);
+        _noise.Text = _main.DeviceNoiseFloor is int nf ? $"{nf} dBm"
+                    : !_main.IsSynced ? "(reported after sync)"
+                    : _noiseTimedOut ? "(not reported by this device)"
+                    : "(requesting…)";
         _sync.Text = _main.SyncStatus;
         _sync.IsVisible = !string.IsNullOrEmpty(_main.SyncStatus);
         _sync.TextColor = _main.SyncStatus.StartsWith("Synced", StringComparison.Ordinal) ? SyncDone
