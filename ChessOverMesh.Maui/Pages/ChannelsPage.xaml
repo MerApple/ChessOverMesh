@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ChessOverMesh.Maui.ChannelsPage"
+             BackgroundColor="#2D2D30"
+             Title="Channels">
+    <ScrollView>
+        <VerticalStackLayout Padding="14" Spacing="6">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Text="Device channels" TextColor="#E0E0E0" FontAttributes="Bold" VerticalOptions="Center"/>
+                <Button x:Name="FetchBtn" Grid.Column="1" Text="Fetch from device" Clicked="OnFetch" HeightRequest="34" Padding="10,0" FontSize="13"/>
+            </Grid>
+
+            <CollectionView x:Name="ChannelList" SelectionMode="Single" SelectionChanged="OnChannelSelected"
+                            HeightRequest="170" BackgroundColor="#1E1E1E">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Label Text="{Binding Text}" TextColor="#E0E0E0" Padding="8,6" FontSize="14"/>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <Label Text="PSK (selected):" TextColor="#E0E0E0" Margin="0,6,0,0"/>
+            <Entry x:Name="PskShow" IsReadOnly="True" TextColor="#B0B0B0" BackgroundColor="#1E1E1E" FontSize="12"/>
+
+            <Label Text="App key (selected) — optional AES layered on the channel PSK:" TextColor="#E0E0E0" Margin="0,6,0,0"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <Entry x:Name="AppKeyBox" Grid.Column="0" IsEnabled="False" TextColor="#E0E0E0" Placeholder="passphrase"/>
+                <Button x:Name="SetKeyBtn" Grid.Column="1" Text="Set key" Clicked="OnSetKey" IsEnabled="False" HeightRequest="38" Padding="10,0" FontSize="13"/>
+            </Grid>
+            <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">
+                <Switch x:Name="AckSwitch" IsEnabled="False" Toggled="OnAckToggled"/>
+                <Label Text="Send chat acks on this channel" TextColor="#E0E0E0" VerticalOptions="Center"/>
+            </HorizontalStackLayout>
+            <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">
+                <Switch x:Name="AckSignalSwitch" IsEnabled="False" Toggled="OnAckSignalToggled"/>
+                <Label Text="…include RSSI/SNR/hops in the ack" TextColor="#E0E0E0" VerticalOptions="Center"/>
+            </HorizontalStackLayout>
+
+            <Label Text="Auto-ack keywords (RSSI) — comma-separated:" TextColor="#E0E0E0" Margin="0,6,0,0"/>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <Entry x:Name="TriggerBox" Grid.Column="0" IsEnabled="False" TextColor="#E0E0E0" BackgroundColor="#1E1E1E" Placeholder="ping, test, rssi"/>
+                <Button x:Name="SetTriggerBtn" Grid.Column="1" Text="Set" Clicked="OnSetTrigger" IsEnabled="False" HeightRequest="38" Padding="10,0" FontSize="13"/>
+            </Grid>
+            <Label Text="Case-insensitive. A message matching any of these gets an RSSI ack even when acks are off for this channel. A plain word (ping) matches anywhere in the message; quote it (&quot;ping&quot;) to match only when the whole message is exactly that word." TextColor="#B0B0B0" FontSize="11"/>
+
+            <Label Text="Channel options (selected) — written to the device on Save:" TextColor="#E0E0E0" Margin="0,8,0,0"/>
+            <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">
+                <Switch x:Name="UplinkSwitch" IsEnabled="False"/>
+                <Label Text="Uplink (send to MQTT)" TextColor="#E0E0E0" VerticalOptions="Center"/>
+            </HorizontalStackLayout>
+            <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">
+                <Switch x:Name="DownlinkSwitch" IsEnabled="False"/>
+                <Label Text="Downlink (receive from MQTT)" TextColor="#E0E0E0" VerticalOptions="Center"/>
+            </HorizontalStackLayout>
+            <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">
+                <Switch x:Name="PositionSwitch" IsEnabled="False"/>
+                <Label Text="Share position on this channel" TextColor="#E0E0E0" VerticalOptions="Center"/>
+            </HorizontalStackLayout>
+            <Button x:Name="SaveOptionsBtn" Text="Save options" Clicked="OnSaveOptions" IsEnabled="False" HeightRequest="36" Padding="14,0" FontSize="13" HorizontalOptions="Start" Margin="0,4,0,0"/>
+
+            <BoxView HeightRequest="1" Color="#3F3F46" Margin="0,10,0,6"/>
+
+            <Label Text="Create a channel" TextColor="#E0E0E0" FontAttributes="Bold"/>
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
+                <Label Grid.Row="0" Grid.Column="0" Text="Name" TextColor="#E0E0E0" VerticalOptions="Center"/>
+                <Entry x:Name="NameBox" Grid.Row="0" Grid.Column="1" TextColor="#E0E0E0" Placeholder="channel name"/>
+                <Label Grid.Row="1" Grid.Column="0" Text="PSK" TextColor="#E0E0E0" VerticalOptions="Center"/>
+                <Entry x:Name="PskBox" Grid.Row="1" Grid.Column="1" TextColor="#E0E0E0" Placeholder="base64 key, passphrase, or empty"/>
+            </Grid>
+            <HorizontalStackLayout Spacing="6">
+                <Button x:Name="RandomBtn" Text="Random PSK" Clicked="OnRandomPsk" HeightRequest="36" Padding="10,0" FontSize="13"/>
+                <Button x:Name="CreateBtn" Text="Create" Clicked="OnCreate" HeightRequest="36" Padding="14,0" FontSize="13"/>
+                <Button x:Name="DeleteBtn" Text="Delete" Clicked="OnDelete" IsEnabled="False" HeightRequest="36" Padding="14,0" FontSize="13"/>
+            </HorizontalStackLayout>
+
+            <BoxView HeightRequest="1" Color="#3F3F46" Margin="0,10,0,6"/>
+
+            <Label Text="Chess channel" TextColor="#E0E0E0" FontAttributes="Bold"/>
+            <Label x:Name="ChessHint" TextColor="#B0B0B0" FontSize="12"/>
+            <Picker x:Name="ChessPicker" TextColor="#E0E0E0" BackgroundColor="#1E1E1E"/>
+
+            <Label Text="Info &amp; position channel" TextColor="#E0E0E0" FontAttributes="Bold" Margin="0,8,0,0"/>
+            <Label Text="Channel used for position requests, telemetry requests, and the manual Broadcast node info / Broadcast position actions. Automatic = each node's own channel for requests, and the primary channel (0) for broadcasts — the safest choice for reaching the most nodes." TextColor="#B0B0B0" FontSize="12"/>
+            <Picker x:Name="UtilityPicker" TextColor="#E0E0E0" BackgroundColor="#1E1E1E" SelectedIndexChanged="OnUtilityChanged"/>
+
+            <Label Text="Chat send channels (TX)" TextColor="#E0E0E0" FontAttributes="Bold" Margin="0,8,0,0"/>
+            <Label Text="The checked channels are the ones you can send chat on (the chat tab's TX list). Chat is received on every device channel regardless; use the RX list in the chat tab to choose which channels and DMs to see." TextColor="#B0B0B0" FontSize="12"/>
+            <VerticalStackLayout x:Name="ChatListenPanel" Spacing="2"/>
+
+            <Label x:Name="StatusLabel" TextColor="#B0B0B0" FontSize="12" Margin="0,8,0,0"/>
+
+            <Button x:Name="DoneBtn" Text="Done" Clicked="OnDone" HeightRequest="40" Margin="0,12,0,0"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,184 @@
+@page "/"
+@implements IDisposable
+@inject GameService Game
+
+<h1>♟ Chess over Meshtastic <span class="pill">web POC</span></h1>
+
+@if (!Game.Connected)
+{
+    <div class="panel">
+        <h2>Connect</h2>
+        <label>Device host: <input @bind="_host" style="width:200px" placeholder="192.168.2.183" /></label>
+        <label>Chess channel: <input type="number" @bind="_channel" min="0" max="7" style="width:60px" /></label>
+        <button @onclick="Connect">Connect</button>
+    </div>
+}
+else
+{
+    <div class="panel" style="margin-bottom:12px">
+        <button @onclick="Disconnect">Disconnect</button>
+        <span style="margin-left:12px">Node <code>!@Game.MyNodeNum.ToString("x8")</code> · chess channel @Game.ChessChannel</span>
+    </div>
+
+    <div class="status @(Game.MoveNeedsResend ? "warn" : "")">@Game.Status</div>
+
+    <div class="row">
+        @* ----- Left: board or lobby ----- *@
+        <div>
+            @if (Game.Playing || Game.GameOver)
+            {
+                <div class="board">
+                    @for (int r = 0; r < 8; r++)
+                    {
+                        int rank = Game.MyColor == Color.White ? 7 - r : r;
+                        for (int f = 0; f < 8; f++)
+                        {
+                            int file = Game.MyColor == Color.White ? f : 7 - f;
+                            int sq = rank * 8 + file;
+                            var piece = Game.Board![sq];
+                            <button class="@SquareClass(sq, file, rank)" @onclick="() => OnSquareClick(sq)">
+                                @if (piece.Type != PieceType.None)
+                                {
+                                    <span class="@(piece.Color == Color.White ? "wp" : "bp")">@Glyph(piece)</span>
+                                }
+                            </button>
+                        }
+                    }
+                </div>
+
+                <div style="margin-top:10px">
+                    @if (Game.Playing && !Game.GameOver && !Game.AwaitingOpponent)
+                    {
+                        <button @onclick="Resign">Resign</button>
+                    }
+                    @if (Game.MoveNeedsResend)
+                    {
+                        <button class="warn" @onclick="Resend">Resend move</button>
+                    }
+                    @if (Game.GameOver)
+                    {
+                        <button @onclick="BackToLobby">Back to lobby</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="panel">
+                    <h2>Create a game</h2>
+                    <label>Your colour:
+                        <select @bind="_color">
+                            <option value="auto">Random</option>
+                            <option value="white">White</option>
+                            <option value="black">Black</option>
+                        </select>
+                    </label>
+                    <button @onclick="Create">Create game</button>
+                </div>
+
+                <div class="panel" style="margin-top:12px">
+                    <h2>Join a game</h2>
+                    @if (Game.OpenGames.Count == 0)
+                    {
+                        <div class="status">No games announced yet. When another node creates one, it appears here.</div>
+                    }
+                    else
+                    {
+                        @foreach (var g in Game.OpenGames)
+                        {
+                            <div class="gameItem">
+                                <span class="pill">@g.GameId</span>
+                                <span>from !@g.CreatorNode.ToString("x8") · you'd play @g.CreatorColor.Opposite()</span>
+                                <button @onclick="() => Join(g.GameId)">Join</button>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </div>
+
+        @* ----- Right: log ----- *@
+        <div>
+            <h2>System log</h2>
+            <div class="log">@string.Join("\n", Game.Log)</div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _host = "192.168.2.183";
+    private int _channel = 0;
+    private string _color = "auto";
+    private int? _selected;
+    private HashSet<int> _targets = new();
+
+    protected override void OnInitialized() => Game.Changed += OnChanged;
+    public void Dispose() => Game.Changed -= OnChanged;
+    private async void OnChanged()
+    {
+        try { await InvokeAsync(StateHasChanged); } catch { /* circuit gone — ignore */ }
+    }
+
+    private async Task Connect() => await Game.ConnectAsync(_host, (uint)_channel);
+    private async Task Disconnect() { _selected = null; _targets.Clear(); await Game.DisconnectAsync(); }
+    private async Task Create() => await Game.CreateGameAsync(_color);
+    private async Task Join(string id) => await Game.JoinGameAsync(id);
+    private async Task Resign() => await Game.ResignAsync();
+    private async Task Resend() => await Game.ResendMoveAsync();
+    private async Task BackToLobby() { _selected = null; _targets.Clear(); await Game.ResetToLobbyAsync(); }
+
+    private async Task OnSquareClick(int sq)
+    {
+        try
+        {
+            var board = Game.Board;
+            if (board == null || !Game.MyTurn) return;
+
+            if (_selected == null) { SelectIfOwn(board, sq); return; }
+            if (sq == _selected) { _selected = null; _targets.Clear(); return; }
+            if (_targets.Contains(sq))
+            {
+                int from = _selected.Value;
+                var promo = PieceType.None;
+                var moving = board[from];
+                if (moving.Type == PieceType.Pawn && (Move.RankOf(sq) == 7 || Move.RankOf(sq) == 0))
+                    promo = PieceType.Queen;   // POC: auto-promote to queen
+                _selected = null; _targets.Clear();
+                await Game.MoveAsync(from, sq, promo);
+                return;
+            }
+            SelectIfOwn(board, sq);   // clicked a different own piece → reselect; else clear
+        }
+        catch { _selected = null; _targets.Clear(); }
+    }
+
+    private void SelectIfOwn(Board board, int sq)
+    {
+        var p = board[sq];
+        if (p.Type != PieceType.None && p.Color == Game.MyColor)
+        {
+            _selected = sq;
+            _targets = board.GenerateLegalMoves().Where(m => m.From == sq).Select(m => m.To).ToHashSet();
+        }
+        else { _selected = null; _targets.Clear(); }
+    }
+
+    private string SquareClass(int sq, int file, int rank)
+    {
+        string c = "sq " + ((file + rank) % 2 == 0 ? "dark" : "light");
+        if (Game.LastMove is { } lm && (lm.From == sq || lm.To == sq)) c += " last";
+        if (_selected == sq) c += " sel";
+        if (_targets.Contains(sq)) c += " target";
+        return c;
+    }
+
+    private static string Glyph(Piece p) => p.Type switch
+    {
+        PieceType.King => "♚",
+        PieceType.Queen => "♛",
+        PieceType.Rook => "♜",
+        PieceType.Bishop => "♝",
+        PieceType.Knight => "♞",
+        PieceType.Pawn => "♟",
+        _ => ""
+    };
+}

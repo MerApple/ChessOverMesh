@@ -1,0 +1,67 @@
+﻿namespace ChessOverMesh.Maui;
+
+public partial class AppShell : Shell
+{
+	const string ChatTitle = "Chat";
+	const string ChatAlert = "Chat ●";   // unread marker shown on the bottom tab
+
+	readonly ShellContent _chatTab;
+	IDispatcherTimer? _flashTimer;
+	int _flashTicks;
+	bool _onChatTab;
+
+	public AppShell()
+	{
+		InitializeComponent();
+
+		// MainPage owns the device connection, poll loop and game state. The Chat tab shares that live state via
+		// a reference to the same MainPage instance, so both tabs stay in sync without a separate session service.
+		var main = new MainPage();
+
+		var tabs = new TabBar();
+		tabs.Items.Add(new ShellContent { Title = "Device", Content = new DeviceTabPage(main) });
+		tabs.Items.Add(new ShellContent { Title = "Chess", Content = main });
+		_chatTab = new ShellContent { Title = ChatTitle, Content = new ChatTabPage(main) };
+		tabs.Items.Add(_chatTab);
+		tabs.Items.Add(new ShellContent { Title = "Settings", Content = new SettingsTabPage(main) });
+		Items.Add(tabs);
+	}
+
+	/// <summary>Flashes the Chat tab label (then leaves a "●" marker) to draw attention to a new message — unless
+	/// the Chat tab is already the one being viewed.</summary>
+	public void FlashChatTab()
+	{
+		if (_onChatTab) return;
+		MainThread.BeginInvokeOnMainThread(() =>
+		{
+			_flashTimer ??= MakeFlashTimer();
+			_flashTicks = 0;
+			_flashTimer.Stop();
+			_flashTimer.Start();
+		});
+	}
+
+	IDispatcherTimer MakeFlashTimer()
+	{
+		var t = Dispatcher.CreateTimer();
+		t.Interval = TimeSpan.FromMilliseconds(450);
+		t.Tick += (_, _) =>
+		{
+			_flashTicks++;
+			_chatTab.Title = (_flashTicks % 2 == 1) ? ChatAlert : ChatTitle;
+			if (_flashTicks >= 7) { _chatTab.Title = ChatAlert; t.Stop(); }   // settle on a persistent unread badge
+		};
+		return t;
+	}
+
+	/// <summary>Called by the Chat tab when it becomes visible: stop flashing and clear the unread marker.</summary>
+	public void OnChatTabShown()
+	{
+		_onChatTab = true;
+		_flashTimer?.Stop();
+		_chatTab.Title = ChatTitle;
+	}
+
+	/// <summary>Called by the Chat tab when it's hidden.</summary>
+	public void OnChatTabHidden() => _onChatTab = false;
+}

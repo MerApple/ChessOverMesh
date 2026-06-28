@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<!-- usesCleartextTraffic: the Meshtastic radio's HTTP API is plain http:// on the LAN, which Android blocks by default. -->
+	<application android:allowBackup="true" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round" android:supportsRtl="true" android:usesCleartextTraffic="true"></application>
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.VIBRATE" />
+
+	<!-- Bluetooth LE (experimental transport to the radio). Android 12+ uses the new runtime
+	     BLUETOOTH_SCAN/CONNECT perms; we scan by Meshtastic service UUID so we can declare
+	     neverForLocation and avoid the location requirement. Legacy perms cover Android <=11. -->
+	<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+	<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+	<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+	<uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+	<!-- Background reception: a foreground service keeps the process alive (and the BLE link up) while the
+	     phone sleeps; POST_NOTIFICATIONS lets it alert on new chat/game messages (Android 13+). For HTTP/WiFi
+	     it also holds a WiFi lock + partial wake lock (WAKE_LOCK) so the poll keeps running, declared as a
+	     data-sync foreground service. -->
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.WAKE_LOCK" />
+</manifest>

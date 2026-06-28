@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:ChessOverMesh.Maui"
+             x:Class="ChessOverMesh.Maui.MainPage"
+             BackgroundColor="#1E1E1E"
+             Title="Chess over Meshtastic">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="8" RowSpacing="6">
+
+        <!-- Action buttons (horizontally scrollable). Host/Connect live on the Device tab. -->
+        <ScrollView Grid.Row="0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout Spacing="6">
+                <Button x:Name="CreateBtn" Text="New game" Clicked="OnCreateClicked" IsEnabled="False" HeightRequest="38" Padding="12,0"/>
+                <Button x:Name="JoinBtn"   Text="Join"   Clicked="OnJoinClicked"   IsEnabled="False" HeightRequest="38" Padding="12,0"/>
+                <Button x:Name="ResignBtn" Text="Resign" Clicked="OnResignClicked" IsEnabled="False" HeightRequest="38" Padding="12,0"/>
+                <Button x:Name="SaveBtn"   Text="Save"   Clicked="OnSaveClicked"   IsEnabled="False" HeightRequest="38" Padding="12,0"/>
+                <Button x:Name="CancelBtn" Text="Cancel" Clicked="OnCancelClicked" IsEnabled="False" HeightRequest="38" Padding="12,0"/>
+                <Button x:Name="ResendBtn" Text="Resend" Clicked="OnResendClicked" IsEnabled="False" HeightRequest="38" Padding="12,0"/>
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <!-- Board: square, sized in code-behind to the page width -->
+        <Grid x:Name="BoardHost" Grid.Row="1" HorizontalOptions="Center">
+            <Grid x:Name="BoardGrid" RowSpacing="0" ColumnSpacing="0"/>
+        </Grid>
+
+        <!-- Moves / System panel (chat has its own bottom tab) -->
+        <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <Grid Grid.Row="0" ColumnDefinitions="*,*,Auto" ColumnSpacing="4" Margin="0,2,0,4">
+                <Button x:Name="TabMoves"  Grid.Column="0" Text="Moves"  Clicked="OnTabClicked" HeightRequest="34" FontSize="13"/>
+                <Button x:Name="TabSystem" Grid.Column="1" Text="System" Clicked="OnTabClicked" HeightRequest="34" FontSize="13"/>
+                <Button x:Name="CopyLogBtn" Grid.Column="2" Text="Copy" Clicked="OnCopyLogClicked" HeightRequest="34" FontSize="13" Padding="12,0"/>
+            </Grid>
+
+            <Border Grid.Row="1" BackgroundColor="#1A1A1A" StrokeThickness="0" Padding="2">
+                <Grid>
+                    <CollectionView x:Name="MovesView">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="local:LogEntry">
+                                <Label Text="{Binding Text}" TextColor="{Binding TextColor}" FontFamily="{Binding FontFamily}" FontSize="{Binding FontSize}" Padding="4,2"/>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                    <CollectionView x:Name="SystemView" IsVisible="False">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="local:LogEntry">
+                                <Label Text="{Binding Text}" TextColor="{Binding TextColor}" FontFamily="{Binding FontFamily}" FontSize="{Binding FontSize}" Padding="4,2"/>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status -->
+        <Label x:Name="StatusText" Grid.Row="3" Text="Not connected." TextColor="#B0B0B0" FontSize="12" Margin="2,2,2,0"/>
+    </Grid>
+</ContentPage>

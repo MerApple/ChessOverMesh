@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ChessOverMesh.Web</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reuse the chess engine, mesh transport and game protocol from the console project (net8.0). -->
+    <ProjectReference Include="..\ChessOverMesh\ChessOverMesh.csproj" />
+  </ItemGroup>
+
+</Project>

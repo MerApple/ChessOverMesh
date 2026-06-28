@@ -1,0 +1,65 @@
+# ---- Build output ----
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+build/
+bld/
+[Ll]og/
+[Ll]ogs/
+
+# ---- Published artifacts (large; regenerate with publish.ps1) ----
+publish/
+publish-single/
+publish-apk/
+artifacts/
+*.apk
+*.aab
+*.exe
+*.msix
+*.appx
+
+# ---- .NET / MSBuild / NuGet ----
+project.lock.json
+project.fragment.lock.json
+artifacts/
+.packages/
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.binlog
+
+# ---- IDE / editor ----
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+.idea/
+
+# ---- OS cruft ----
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# ---- Android signing / secrets (never commit) ----
+*.keystore
+*.jks
+*.p12
+*.pfx
+signing.properties
+keystore.properties
+
+# ---- Local app data / settings dumps ----
+settings.json
+devices.json

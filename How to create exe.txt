@@ -1,0 +1,2 @@
+● PowerShell(dotnet publish "C:\Users\MerApple\source\repos\Meshtastic\ChessOverMesh.Gui\ChessOverMesh.Gui.csproj" -c
+            Release -r win-x64 --self-contained true -p:PublishSing…)
