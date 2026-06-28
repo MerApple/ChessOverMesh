@@ -19,6 +19,7 @@ public sealed class DeviceTabPage : ContentPage
     IReadOnlyList<BleDeviceInfo> _bleDevices = Array.Empty<BleDeviceInfo>();
     bool _busy;
     bool _noiseTimedOut;   // set when a noise-floor request got no reply (e.g. firmware without LocalStats noise_floor)
+    bool _noiseRequested;  // we've asked for the noise floor on the current connection (avoid re-asking each refresh)
 
     static readonly Color Dim = Color.FromArgb("#B0B0B0");
     static readonly Color Fg = Color.FromArgb("#E0E0E0");
@@ -161,10 +162,19 @@ public sealed class DeviceTabPage : ContentPage
     {
         base.OnAppearing();
         Refresh();
-        // Ask the connected device for its current noise floor (its own LocalStats) so the row is fresh when this
-        // tab is opened. The reply arrives via the poll loop and refreshes the row through StateChanged.
-        if (_main.IsConnected && _main.IsSynced)
+        MaybeRequestNoiseFloor();
+    }
+
+    // Requests the device's noise floor once we're connected+synced, whether that's already true when this tab is
+    // (re)opened or it becomes true later (sync completes -> StateChanged). Without the latter, a tab that was
+    // already open when sync finished would sit on "(requesting…)" until you switched away and back.
+    void MaybeRequestNoiseFloor()
+    {
+        if (_main.IsConnected && _main.IsSynced && !_noiseRequested)
+        {
+            _noiseRequested = true;
             _ = RequestNoiseFloorAsync();
+        }
     }
 
     // Requests the device's noise floor, then — if no value has arrived after a short wait — marks it "not
@@ -178,7 +188,7 @@ public sealed class DeviceTabPage : ContentPage
         if (_main.IsConnected && _main.DeviceNoiseFloor is null) { _noiseTimedOut = true; Refresh(); }
     }
 
-    void OnStateChanged() => MainThread.BeginInvokeOnMainThread(Refresh);
+    void OnStateChanged() => MainThread.BeginInvokeOnMainThread(() => { Refresh(); MaybeRequestNoiseFloor(); });
 
     // Find a device on the local network by resolving the Meshtastic mDNS hostname (meshtastic.local) — the same
     // approach as the desktop app. Android 12+ resolves ".local" names via the system mDNS resolver.
@@ -322,6 +332,7 @@ public sealed class DeviceTabPage : ContentPage
         {
             _name.Text = _hardware.Text = _firmware.Text = _battery.Text = _noise.Text = "—";
             _sync.IsVisible = false;
+            _noiseRequested = false;   // re-request the noise floor on the next connection
             return;
         }
         _name.Text = _main.DeviceName ?? "—";
