@@ -35,6 +35,7 @@ public sealed class ChatTabPage : ContentPage
     public ChatTabPage(MainPage main)
     {
         _main = main;
+        _main.ChatTab = this;   // so a chat font/size change updates the composer too
         Title = "Chat";
         BackgroundColor = Color.FromArgb("#1E1E1E");
 
@@ -124,6 +125,7 @@ public sealed class ChatTabPage : ContentPage
         // Tapping the box = "writing" (expand + scroll once); losing focus = "reading" (collapse to one line).
         _input.Focused += (_, _) => ExpandComposer();
         _input.Unfocused += (_, _) => CollapseComposer();
+        ApplyComposerFont(AppSettings.ChatFont ?? "", AppSettings.ChatSize);   // match the chat text setting
 
         // Live "<used> / <max> · <left> left" counter under the composer (matches the desktop GUI). Turns red over the limit.
         _charCounter = new Label { TextColor = Color.FromArgb("#B0B0B0"), FontSize = 11, HorizontalOptions = LayoutOptions.End, Margin = new Thickness(0, 0, 4, 0) };
@@ -276,6 +278,14 @@ public sealed class ChatTabPage : ContentPage
     {
         if (_input.IsFocused) _input.Unfocus();               // drop focus + keyboard
         _input.HeightRequest = ComposerCollapsedHeight;       // always one line while reading
+    }
+
+    /// <summary>Applies the chat text font/size (from the "Chat text" setting) to the TX composer, so what you
+    /// type matches what you'll see in the conversation. Called at construction and live from MainPage.ApplyChatFont.</summary>
+    public void ApplyComposerFont(string family, double size)
+    {
+        _input.FontSize = size;
+        _input.FontFamily = string.IsNullOrEmpty(family) ? null : family;
     }
 
     void ScrollToEnd()

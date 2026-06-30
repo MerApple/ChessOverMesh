@@ -73,8 +73,10 @@ public readonly record struct MeshAck(uint PacketId, uint FromNode, byte RelayNo
 /// the return (node→you). Endpoints (you / the node) are not included. RouteBack is empty if the responding
 /// firmware didn't report a return path. SnrTowards/SnrBack are the per-link SNR readings (one per hop, in the
 /// same order as the links of the full path you→…→node and back), each stored as SNR×4 (so dB = value/4); the
-/// firmware uses -128 to mean "unknown". Empty when the firmware didn't report SNR.</summary>
-public readonly record struct MeshTraceroute(uint Node, List<uint> Route, List<int> SnrTowards, List<uint> RouteBack, List<int> SnrBack)
+/// firmware uses -128 to mean "unknown". Empty when the firmware didn't report SNR.
+/// IsRequest is true for an INCOMING traceroute request aimed at us (the firmware auto-answers it): Node is the
+/// requester and the route/SNR lists are empty — it's surfaced only so the app can note that we were traced.</summary>
+public readonly record struct MeshTraceroute(uint Node, List<uint> Route, List<int> SnrTowards, List<uint> RouteBack, List<int> SnrBack, bool IsRequest = false)
 {
     /// <summary>True when this scaled SNR value (SNR×4) is the firmware's "unknown" marker.</summary>
     public static bool SnrUnknown(int scaled) => scaled <= -128;
@@ -1294,6 +1296,13 @@ public sealed class MeshtasticHttpClient : IDisposable
                     _sentTraceroutes.Remove(decoded.RequestId);
                     var (route, snrTo, back, snrBack) = ParseRouteDiscovery(decoded.Payload);
                     traceroutes.Add(new MeshTraceroute(pkt.From, route, snrTo, back, snrBack));
+                }
+                else if (decoded.WantResponse && pkt.To == MyNodeNum && pkt.From != MyNodeNum)
+                {
+                    // An incoming traceroute REQUEST aimed at us — the firmware answers it automatically; surface
+                    // it (Node = the requester, no route) so the app can note that we were traced.
+                    traceroutes.Add(new MeshTraceroute(pkt.From, new List<uint>(), new List<int>(),
+                        new List<uint>(), new List<int>(), IsRequest: true));
                 }
                 continue;
             }

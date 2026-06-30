@@ -536,6 +536,9 @@ public partial class MainWindow : Window
         // The chat message line inherits this; the dim metadata line keeps its small fixed size.
         ChatList.FontFamily = new FontFamily(family);
         ChatList.FontSize = size;
+        // The TX compose box matches the chat list, so what you type looks like what you'll see.
+        ChatBox.FontFamily = new FontFamily(family);
+        ChatBox.FontSize = size;
         if (persist) { AppSettings.ChatFont = family; AppSettings.ChatSize = size; }
     }
 
@@ -2738,6 +2741,13 @@ public partial class MainWindow : Window
 
         foreach (var t in r.Traceroutes)
         {
+            if (t.IsRequest)   // someone traced us — the firmware auto-replies; just note it in the log
+            {
+                string reqLine = $"Traceroute request received from {_mesh.DescribeNode(t.Node)} — the device is replying.";
+                AddSystem(Stamp() + reqLine);
+                _nodeDiagHandler?.Invoke(reqLine);
+                continue;
+            }
             // Render the path: us → [reported hops] → traced node (avoid repeating the node if it's last).
             var parts = new List<string> { _mesh.DescribeNode(_mesh.MyNodeNum) };
             foreach (var hop in t.Route) parts.Add(_mesh.DescribeNode(hop));
@@ -3032,13 +3042,19 @@ public partial class MainWindow : Window
             // Never ack a message sent by our OWN node: through Meshtastic.Proxy several apps share this node id, so a
             // peer client's message arrives as "from us" — a node acking itself is pointless airtime.
             bool fromUs = _mesh != null && msg.FromNode == _mesh.MyNodeNum;
-            bool ackSuppressed = DateTime.UtcNow < _suppressAcksUntil;   // proxy backfill burst — don't re-ack old messages
+            // Don't ack replayed history: the initial post-connect backlog drain (!_synced) and the proxy backfill
+            // burst are both old messages — acking them would flood the mesh. Only live messages (heard after sync)
+            // get an ack.
+            bool ackSuppressed = !_synced || DateTime.UtcNow < _suppressAcksUntil;
             bool keywordAck = !wasDm && !fromUs && !ackSuppressed && MatchesAckTrigger(msg.Channel, msg.Text);
             if (!wasDm && !fromUs && !ackSuppressed && (_chatAckOn.Contains(msg.Channel) || keywordAck))
             {
                 // Report how well we received it (RSSI/SNR/hops) if the channel asks for it, or always on a keyword match.
                 string ackSignal = (keywordAck || _chatAckSignalOn.Contains(msg.Channel)) ? AckSignalText(msg) : "";
                 SendChatAck(msg.PacketId, msg.Channel, ackSignal);   // tell the sender we received it (on its channel)
+                if (keywordAck)   // log keyword-triggered acks so range-test pings are visible even with channel acks off
+                    AddSystem(Stamp() + $"Keyword auto-ack sent to {_mesh?.DescribeNode(msg.FromNode)} on channel {msg.Channel}" +
+                        (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".");
                 _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;   // let that ack send before we chat
                 if (_chatHoldTimer != null)   // grey out Send now; re-enable when the hold ends
                 {

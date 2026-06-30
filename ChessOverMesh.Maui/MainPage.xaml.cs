@@ -119,6 +119,9 @@ public partial class MainPage : ContentPage
     string _movesFamily = "monospace", _systemFamily = "monospace", _chatFamily = "";
     double _movesSize = 13, _systemSize = 13, _chatSize = 15;
 
+    // The Chat tab registers itself here so a chat font/size change also restyles its TX composer.
+    internal ChatTabPage? ChatTab;
+
     sealed record ChannelItem(uint Index, string Label);
 
     readonly List<string> _moveHistory = new();
@@ -1679,12 +1682,18 @@ public partial class MainPage : ContentPage
                 // so a peer client's message arrives as "from us" — only one of us (the sender) should be acked, and
                 // a node acking itself is pointless airtime.
                 bool fromUs = _mesh != null && msg.FromNode == _mesh.MyNodeNum;
-                bool ackSuppressed = DateTime.UtcNow < _suppressAcksUntil;   // proxy backfill burst — don't re-ack old messages
+                // Don't ack replayed history: the initial post-connect backlog drain (!_synced) and the proxy
+                // backfill burst are both old messages — acking them would flood the mesh. Only live messages
+                // (heard after sync) get an ack.
+                bool ackSuppressed = !_synced || DateTime.UtcNow < _suppressAcksUntil;
                 bool keywordAck = !wasDm && !fromUs && !ackSuppressed && MatchesAckTrigger(msg.Channel, msg.Text);
                 if (!wasDm && !fromUs && !ackSuppressed && (_chatAckOn.Contains(msg.Channel) || keywordAck))
                 {
                     string ackSignal = (keywordAck || _chatAckSignalOn.Contains(msg.Channel)) ? AckSignalText(msg) : "";
                     SendChatAck(msg.PacketId, msg.Channel, ackSignal);
+                    if (keywordAck)   // log keyword-triggered acks so range-test pings are visible even with channel acks off
+                        AddSystem(Stamp() + $"Keyword auto-ack sent to {_mesh?.DescribeNode(msg.FromNode)} on channel {msg.Channel}" +
+                            (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".");
                     _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;
                     if (_chatHoldTimer != null) { _chatHoldTimer.Stop(); _chatHoldTimer.Interval = ChatSendDelay + TimeSpan.FromMilliseconds(200); _chatHoldTimer.Start(); }
                 }
@@ -2352,7 +2361,14 @@ public partial class MainPage : ContentPage
     void HandleReceiveExtras(MeshReceiveResult result)
     {
         foreach (var t in result.Traceroutes)
+        {
+            if (t.IsRequest)   // someone traced us — the firmware auto-replies; just note it in the system log
+            {
+                AddSystem(Stamp() + $"Traceroute request received from {_mesh?.DescribeNode(t.Node)} — the device is replying.");
+                continue;
+            }
             if (_tracerouteWaiters.TryGetValue(t.Node, out var waiter)) waiter(t);
+        }
         // Position heard from another node (broadcast, or a reply to our request): note it in the system log.
         if (AppSettings.ShowPositionUpdates)
             foreach (var pos in result.Positions)
@@ -2902,6 +2918,7 @@ public partial class MainPage : ContentPage
     {
         _chatFamily = family; _chatSize = size;
         foreach (var e in _chat) { e.FontFamily = family; e.FontSize = size; }   // message line; detail stays small
+        ChatTab?.ApplyComposerFont(family, size);   // keep the TX composer in sync with the chat text
         AppSettings.ChatFont = family; AppSettings.ChatSize = size;
     }
 
