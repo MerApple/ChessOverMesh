@@ -16,6 +16,7 @@ internal static class AppSettings
         public bool ShowPositionUpdates { get; set; } = true;   // log "Position received from X" in system messages
         public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
+        public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages + chat only
         // Notification sounds: file path per category ("" = off, null = not chosen yet → a default is used),
         // and 0–100 volume.
         public string? ChessSoundPath { get; set; }
@@ -120,6 +121,14 @@ internal static class AppSettings
     {
         get => Load().CacheMessages;
         set => Mutate(d => d.CacheMessages = value);
+    }
+
+    /// <summary>Show the chessboard (and moves) in the main window. When off, the board is hidden and only
+    /// system messages and channel chat are shown (default on).</summary>
+    public static bool ShowChessboard
+    {
+        get => Load().ShowChessboard;
+        set => Mutate(d => d.ShowChessboard = value);
     }
 
     // Notification sound per category: null until the user has chosen (caller substitutes a default).

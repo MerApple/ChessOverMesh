@@ -219,6 +219,7 @@ public partial class MainPage : ContentPage
         BuildBoard();
         Render();
         SelectTab(TabMoves, MovesView);
+        ApplyChessboardVisibility();
 
         _pollTimer = Dispatcher.CreateTimer();
         _pollTimer.Interval = TimeSpan.FromSeconds(2.5);
@@ -793,6 +794,18 @@ public partial class MainPage : ContentPage
 
     void PlayChessSound() => SoundService.Play(_chessSound, _chessVolume);
     void PlayChatSound() => SoundService.Play(_chatSound, _chatVolume);
+
+    /// <summary>Applies the "Show chessboard" setting: when off, the board, game buttons and the Moves/System
+    /// toggle are hidden and only the system-messages list is shown (the bottom tab is renamed by AppShell).
+    /// Called at startup and live from the System settings switch.</summary>
+    public void ApplyChessboardVisibility()
+    {
+        bool show = AppSettings.ShowChessboard;
+        GameButtons.IsVisible = show;   // New game / Join / Resign … (chess actions)
+        BoardHost.IsVisible = show;     // the board
+        TabButtons.IsVisible = show;    // Moves / System toggle + Copy
+        SelectTab(show ? TabMoves : TabSystem, show ? MovesView : SystemView);
+    }
 
     // ---- Tabs ----
     void OnTabClicked(object? sender, EventArgs e)
@@ -2458,7 +2471,7 @@ public partial class MainPage : ContentPage
     public void OpenColours() => OnColorsClicked(this, EventArgs.Empty);
     public void OpenSound() => OnSoundClicked(this, EventArgs.Empty);
     public async void OpenSystemMessages() => await Navigation.PushModalAsync(new SystemMessagesPage());
-    public async void OpenSystemSettings() => await Navigation.PushModalAsync(new SystemSettingsPage());
+    public async void OpenSystemSettings() => await Navigation.PushModalAsync(new SystemSettingsPage(this));
 
 
     void MarkAcked(MeshAck ack)

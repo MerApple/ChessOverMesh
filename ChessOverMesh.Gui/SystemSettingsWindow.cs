@@ -64,6 +64,25 @@ internal sealed class SystemSettingsWindow : Window
             Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
         });
 
+        var board = new CheckBox { Content = "Show chessboard", Foreground = Fg, IsChecked = AppSettings.ShowChessboard };
+        board.Checked += (_, _) =>
+        {
+            AppSettings.ShowChessboard = true;
+            (Owner as MainWindow)?.ApplyChessboardVisibility();
+        };
+        board.Unchecked += (_, _) =>
+        {
+            AppSettings.ShowChessboard = false;
+            (Owner as MainWindow)?.ApplyChessboardVisibility();
+        };
+        root.Children.Add(board);
+        root.Children.Add(new TextBlock
+        {
+            Text = "Show the chessboard and moves. When off, the board is hidden and only system messages " +
+                   "and channel chat are shown.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
+        });
+
         var closeBtn = new Button
         {
             Content = "Close", Width = 80, Height = 26, IsDefault = true, IsCancel = true,

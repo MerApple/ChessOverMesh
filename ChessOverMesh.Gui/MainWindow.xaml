@@ -59,16 +59,16 @@
         <!-- Board + right panel, separated by a draggable splitter -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="320"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="BoardColumn" Width="*" MinWidth="320"/>
+                <ColumnDefinition x:Name="BoardSplitterColumn" Width="Auto"/>
                 <ColumnDefinition x:Name="RightPanelColumn" Width="360" MinWidth="170"/>
             </Grid.ColumnDefinitions>
 
-            <Viewbox Grid.Column="0" Margin="14" Stretch="Uniform">
+            <Viewbox x:Name="BoardBox" Grid.Column="0" Margin="14" Stretch="Uniform">
                 <Grid x:Name="BoardGrid" Width="480" Height="480"/>
             </Viewbox>
 
-            <GridSplitter Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+            <GridSplitter x:Name="BoardSplitter" Grid.Column="1" Width="6" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           Background="#FF3F3F46" ResizeBehavior="PreviousAndNext"
                           ToolTip="Drag to resize the moves / chat panel"/>
 
@@ -77,15 +77,15 @@
             <Grid Margin="8">
                 <!-- Three resizable sections (Moves / System / Chat), each separated by a draggable splitter. -->
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="2*" MinHeight="70"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition x:Name="MovesRow" Height="2*" MinHeight="70"/>
+                    <RowDefinition x:Name="MovesSplitterRow" Height="Auto"/>
                     <RowDefinition Height="2*" MinHeight="60"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="3*" MinHeight="90"/>
                 </Grid.RowDefinitions>
 
                 <!-- Moves section -->
-                <Grid Grid.Row="0">
+                <Grid x:Name="MovesSection" Grid.Row="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -130,7 +130,7 @@
                 </Grid>
                 <!-- end Moves section -->
 
-                <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                <GridSplitter x:Name="MovesSplitter" Grid.Row="1" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"
                               ResizeBehavior="PreviousAndNext" ResizeDirection="Rows" Background="#FF3F3F46"
                               ToolTip="Drag to resize the moves / system panels"/>
 

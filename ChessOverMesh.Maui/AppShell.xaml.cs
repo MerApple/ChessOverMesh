@@ -4,7 +4,10 @@ public partial class AppShell : Shell
 {
 	const string ChatTitle = "Chat";
 	const string ChatAlert = "Chat ●";   // unread marker shown on the bottom tab
+	const string ChessTitle = "Chess";
+	const string SystemTabTitle = "System messages";   // shown on the chess tab when the board is hidden
 
+	readonly ShellContent _chessTab;
 	readonly ShellContent _chatTab;
 	IDispatcherTimer? _flashTimer;
 	int _flashTicks;
@@ -20,12 +23,18 @@ public partial class AppShell : Shell
 
 		var tabs = new TabBar();
 		tabs.Items.Add(new ShellContent { Title = "Device", Content = new DeviceTabPage(main) });
-		tabs.Items.Add(new ShellContent { Title = "Chess", Content = main });
+		_chessTab = new ShellContent { Title = AppSettings.ShowChessboard ? ChessTitle : SystemTabTitle, Content = main };
+		tabs.Items.Add(_chessTab);
 		_chatTab = new ShellContent { Title = ChatTitle, Content = new ChatTabPage(main) };
 		tabs.Items.Add(_chatTab);
 		tabs.Items.Add(new ShellContent { Title = "Settings", Content = new SettingsTabPage(main) });
 		Items.Add(tabs);
 	}
+
+	/// <summary>Updates the chess tab's title from the "Show chessboard" setting — "Chess" when the board is
+	/// shown, "System messages" when it's hidden. Called live from the System settings switch.</summary>
+	public void RefreshChessTabTitle() =>
+		_chessTab.Title = AppSettings.ShowChessboard ? ChessTitle : SystemTabTitle;
 
 	/// <summary>Flashes the Chat tab label (then leaves a "●" marker) to draw attention to a new message — unless
 	/// the Chat tab is already the one being viewed.</summary>

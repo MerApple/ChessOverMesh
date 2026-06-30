@@ -362,6 +362,7 @@ public partial class MainWindow : Window
 
         BuildBoard();
         Render();
+        ApplyChessboardVisibility();
 
         _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         _pollTimer.Tick += async (_, _) => await PollAsync();
@@ -2143,6 +2144,31 @@ public partial class MainWindow : Window
     }
 
     // ---- Board construction & rendering ----------------------------------------------
+
+    /// <summary>Applies the "Show chessboard" setting: when off, the board column and the moves section are
+    /// hidden so the right panel shows only system messages and channel chat. Called at startup and live from
+    /// the System settings checkbox.</summary>
+    public void ApplyChessboardVisibility()
+    {
+        bool show = AppSettings.ShowChessboard;
+
+        // Board column + the splitter between board and right panel. When the board is hidden, the right panel
+        // takes the star width (fills the window) while the board column collapses to nothing.
+        BoardBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        BoardSplitter.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        BoardColumn.Width = show ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        BoardColumn.MinWidth = show ? 320 : 0;
+        BoardSplitterColumn.Width = show ? GridLength.Auto : new GridLength(0);
+        RightPanelColumn.Width = show ? new GridLength(360) : new GridLength(1, GridUnitType.Star);
+        RightPanelColumn.MinWidth = show ? 170 : 0;
+
+        // Moves section is hidden together with the board, leaving System messages + Channel chat.
+        MovesSection.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        MovesSplitter.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        MovesRow.Height = show ? new GridLength(2, GridUnitType.Star) : new GridLength(0);
+        MovesRow.MinHeight = show ? 70 : 0;
+        MovesSplitterRow.Height = show ? GridLength.Auto : new GridLength(0);
+    }
 
     private void BuildBoard()
     {

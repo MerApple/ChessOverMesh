@@ -9,7 +9,7 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="8" RowSpacing="6">
 
         <!-- Action buttons (horizontally scrollable). Host/Connect live on the Device tab. -->
-        <ScrollView Grid.Row="0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+        <ScrollView x:Name="GameButtons" Grid.Row="0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
             <HorizontalStackLayout Spacing="6">
                 <Button x:Name="CreateBtn" Text="New game" Clicked="OnCreateClicked" IsEnabled="False" HeightRequest="38" Padding="12,0"/>
                 <Button x:Name="JoinBtn"   Text="Join"   Clicked="OnJoinClicked"   IsEnabled="False" HeightRequest="38" Padding="12,0"/>
@@ -27,7 +27,7 @@
 
         <!-- Moves / System panel (chat has its own bottom tab) -->
         <Grid Grid.Row="2" RowDefinitions="Auto,*">
-            <Grid Grid.Row="0" ColumnDefinitions="*,*,Auto" ColumnSpacing="4" Margin="0,2,0,4">
+            <Grid x:Name="TabButtons" Grid.Row="0" ColumnDefinitions="*,*,Auto" ColumnSpacing="4" Margin="0,2,0,4">
                 <Button x:Name="TabMoves"  Grid.Column="0" Text="Moves"  Clicked="OnTabClicked" HeightRequest="34" FontSize="13"/>
                 <Button x:Name="TabSystem" Grid.Column="1" Text="System" Clicked="OnTabClicked" HeightRequest="34" FontSize="13"/>
                 <Button x:Name="CopyLogBtn" Grid.Column="2" Text="Copy" Clicked="OnCopyLogClicked" HeightRequest="34" FontSize="13" Padding="12,0"/>

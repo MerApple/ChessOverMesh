@@ -16,6 +16,7 @@ internal static class AppSettings
         public bool ShowPositionUpdates { get; set; } = true;   // log "Position received from X" in system messages
         public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
+        public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages only
         public string? ChessSoundPath { get; set; }
         public string? ChatSoundPath { get; set; }
         public int ChessVolume { get; set; } = 80;
@@ -69,6 +70,7 @@ internal static class AppSettings
     public static bool ShowPositionUpdates { get => Load().ShowPositionUpdates; set => Mutate(d => d.ShowPositionUpdates = value); }
     public static bool ShowNewNodeInfo { get => Load().ShowNewNodeInfo; set => Mutate(d => d.ShowNewNodeInfo = value); }
     public static bool CacheMessages { get => Load().CacheMessages; set => Mutate(d => d.CacheMessages = value); }
+    public static bool ShowChessboard { get => Load().ShowChessboard; set => Mutate(d => d.ShowChessboard = value); }
     public static string? ChessSoundPath { get => Load().ChessSoundPath; set => Mutate(d => d.ChessSoundPath = value); }
     public static string? ChatSoundPath { get => Load().ChatSoundPath; set => Mutate(d => d.ChatSoundPath = value); }
     public static int ChessVolume { get => Load().ChessVolume; set => Mutate(d => d.ChessVolume = value); }

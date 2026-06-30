@@ -89,7 +89,14 @@ public sealed class MeshForegroundService : Service
         catch (System.Exception) { /* best effort — we're shutting down */ }
         finally
         {
-            try { StopForeground(StopForegroundFlags.Remove); } catch (System.Exception) { }
+            try
+            {
+                if (OperatingSystem.IsAndroidVersionAtLeast(24)) StopForeground(StopForegroundFlags.Remove);
+#pragma warning disable CA1422   // the bool overload is deprecated but is the only one on API 23
+                else StopForeground(removeNotification: true);
+#pragma warning restore CA1422
+            }
+            catch (System.Exception) { }
             try { StopSelf(); } catch (System.Exception) { }
             base.OnTaskRemoved(rootIntent);
         }

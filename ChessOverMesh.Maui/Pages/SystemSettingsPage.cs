@@ -11,8 +11,11 @@ public sealed class SystemSettingsPage : ContentPage
 
     bool _suppress;   // guards the revert when the user cancels the delete confirmation
 
-    public SystemSettingsPage()
+    readonly MainPage _main;   // live page so the "Show chessboard" toggle applies immediately
+
+    public SystemSettingsPage(MainPage main)
     {
+        _main = main;
         Title = "System settings";
         BackgroundColor = Bg;
 
@@ -49,6 +52,21 @@ public sealed class SystemSettingsPage : ContentPage
         {
             Text = "Keep a local copy of chat messages per device so the conversation reloads after a reconnect. " +
                    "Turning this off deletes the existing cache and stops storing new messages.",
+            TextColor = Dim, FontSize = 11,
+        });
+
+        var boardSwitch = new Switch { IsToggled = AppSettings.ShowChessboard, VerticalOptions = LayoutOptions.Center };
+        boardSwitch.Toggled += (_, e) =>
+        {
+            AppSettings.ShowChessboard = e.Value;
+            _main.ApplyChessboardVisibility();
+            (Shell.Current as AppShell)?.RefreshChessTabTitle();
+        };
+        root.Add(Row(boardSwitch, "Show chessboard"));
+        root.Add(new Label
+        {
+            Text = "Show the chessboard. When off, the chess tab is renamed “System messages” and shows only " +
+                   "system messages.",
             TextColor = Dim, FontSize = 11,
         });
 
