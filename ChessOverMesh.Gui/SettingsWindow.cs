@@ -58,7 +58,7 @@ internal sealed class SettingsWindow : Window
                 ? "Configure the device: owner/role, LoRa radio, position, telemetry, and reboot/reset"
                 : "Connect to a device first to configure it.",
             openDevice, deviceEnabled));
-        root.Children.Add(Section("Color…",
+        root.Children.Add(Section("Color/Fonts",
             "Choose colors and fonts for message types (received, awaiting ack, delivered, failed)",
             openColor, true));
         root.Children.Add(Section("Sound…",
