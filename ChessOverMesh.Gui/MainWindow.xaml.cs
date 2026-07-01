@@ -778,6 +778,7 @@ public partial class MainWindow : Window
 
         _mesh?.Dispose();
         _mesh = client;
+        _mesh.AdminActivity += OnAdminActivity;   // log admin messages (sent/received) to system messages
         _currentHost = host;
         _probeHost = probeHost;
         _probePort = probePort;
@@ -1069,7 +1070,8 @@ public partial class MainWindow : Window
             var cached = DeviceCache.Get(host);
             if (cached != null)
                 _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw,
-                    cached.Positions.ToDictionary(kv => kv.Key, kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)));
+                    cached.Positions.ToDictionary(kv => kv.Key, kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)),
+                    cached.NodeShortNames, cached.NodeFavorites, cached.NodeIgnored, cached.NodeHopsAway, cached.NodeLastHeard);
         }
 
         // Per-channel chat-ack setting (default off; we store the on exceptions).
@@ -2148,6 +2150,35 @@ public partial class MainWindow : Window
 
     // ---- Board construction & rendering ----------------------------------------------
 
+    /// <summary>Logs an admin message (sent "→" or received "←") to system messages. Marshals to the UI thread
+    /// since the mesh client may raise this off the poll thread.</summary>
+    private void OnAdminActivity(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text));
+
+    /// <summary>Persists the current node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
+    private void SaveNodeCache()
+    {
+        if (_mesh == null || _currentHost.Length == 0) return;
+        DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum,
+            _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(),
+            _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+    }
+
+    /// <summary>Confirms then runs a remote-admin action against another node, reporting via <paramref name="setStatus"/>.</summary>
+    private async Task RunRemoteAdminAction(MeshNode n, string label, string warn, Func<Task<string?>> action, Window owner, Action<string> setStatus)
+    {
+        if (MessageBox.Show(owner,
+                $"{warn}\n\nTarget: {n.Display}\n\nRemote admin needs a shared channel named \"admin\" configured on BOTH this node and the target. Continue?",
+                $"Remote {label}?", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+            return;
+        setStatus($"Sending remote {label} to {n.Display}… (negotiating session key)");
+        try
+        {
+            var err = await action();
+            setStatus(err == null ? $"Remote {label} sent to {n.Display}." : $"Remote {label} failed: {err}");
+        }
+        catch (Exception ex) { setStatus($"Remote {label} failed: {ex.Message}"); }
+    }
+
     /// <summary>Applies the "Show chessboard" setting: when off, the board column and the moves section are
     /// hidden so the right panel shows only system messages and channel chat. Called at startup and live from
     /// the System settings checkbox.</summary>
@@ -2783,7 +2814,7 @@ public partial class MainWindow : Window
 
         // A node-info reply updates the device's node DB; persist the refreshed names so they survive reconnect.
         if (r.NodeInfos.Count > 0 && _currentHost.Length > 0)
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
 
         // Position heard from another node (broadcast or a reply to our request): note it in the system log, and
         // refresh the Nodes dialog/map since the node DB position just changed.
@@ -2830,7 +2861,7 @@ public partial class MainWindow : Window
         {
             _lastNodeViewCount = nodeCount;
             if (_currentHost.Length > 0)
-                DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
+                DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
             _nodesRepopulate?.Invoke();
         }
         else
@@ -2909,7 +2940,7 @@ public partial class MainWindow : Window
         // The full drain populated the node list — persist names and show them on any acks so far.
         if (_mesh != null)
         {
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
             SyncDeviceClockIfAhead();   // correct a radio whose clock is set in the future (bad "last heard" stamps)
             // On a proxy link, ask it to replay any received messages we missed while away (newer than our newest
@@ -3367,19 +3398,39 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Right-click → Node info: opens the full "all info" window for the selected message's sender —
-    /// the same node-details + telemetry-history view as the Nodes list's "Show all info" button.</summary>
+    /// the same node-details + telemetry-history view as the Nodes list's "Show all info" button. For a message
+    /// WE sent, this shows our own node's info.</summary>
     private void NodeInfo_Click(object sender, RoutedEventArgs e)
     {
         if (_mesh == null) return;
-        if (ChatList.SelectedItem is not LogEntry entry || entry.Rx is not { } msg || msg.FromNode == 0)
+        if (ChatList.SelectedItem is not LogEntry entry || entry.Channel == uint.MaxValue)
         {
-            Status("Select a received message to see its sender's node info.");
+            Status("Select a message to see its sender's node info.");
             return;
         }
-        var node = _mesh.GetNodes().FirstOrDefault(n => n.Num == msg.FromNode);
+        // A received message carries its sender (Rx). A message we sent has no Rx — resolve it to our own node
+        // (its line starts with "You:"/"You →", true for both live and cached-history rows).
+        uint fromNum;
+        if (entry.Rx is { } msg && msg.FromNode != 0)
+            fromNum = msg.FromNode;
+        else if (entry.Text.StartsWith("You:", StringComparison.Ordinal) || entry.Text.StartsWith("You →", StringComparison.Ordinal))
+            fromNum = _mesh.MyNodeNum;
+        else
+        {
+            Status("Select a message whose sender is known (a cached message from another node may no longer be identifiable).");
+            return;
+        }
+        if (fromNum == 0)
+        {
+            Status("Your own node isn't known yet — try again once the mesh has synced.");
+            return;
+        }
+        var node = _mesh.GetNodes().FirstOrDefault(n => n.Num == fromNum);
         if (node == null)
         {
-            Status($"No node entry yet for !{msg.FromNode:x8} — use \"Request node info\" first, then try again.");
+            Status(fromNum == _mesh.MyNodeNum
+                ? "Your own node isn't in the list yet — try again once synced."
+                : $"No node entry yet for !{fromNum:x8} — use \"Request node info\" first, then try again.");
             return;
         }
         ShowTelemetryHistory(node, this);
@@ -4208,7 +4259,7 @@ public partial class MainWindow : Window
         DockPanel.SetDock(controls, Dock.Top);
 
         var sortCombo = new ComboBox { Width = 110, Height = 22, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-        foreach (var s in new[] { "Name", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" }) sortCombo.Items.Add(s);
+        foreach (var s in new[] { "Name", "Favorite", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" }) sortCombo.Items.Add(s);
         sortCombo.SelectedIndex = 0;
         var sortLabel = new TextBlock { Text = "Sort:", Foreground = greyBrush, VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(sortCombo, Dock.Right);
@@ -4343,6 +4394,56 @@ public partial class MainWindow : Window
                     catch (Exception ex) { status.Text = $"Remove failed: {ex.Message}"; }
                 };
                 menu.Items.Add(removeItem);
+
+                // Device NodeDB: favorite / ignore (device-level; distinct from the app-side DM "Block" above).
+                menu.Items.Add(new Separator());
+                var favItem = new MenuItem { Header = n.IsFavorite ? "Remove favorite" : "Mark as favorite" };
+                favItem.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        await _mesh!.SetFavoriteNodeAsync(n.Num, !n.IsFavorite);
+                        SaveNodeCache();
+                        _nodesRepopulate?.Invoke();
+                        status.Text = $"{(n.IsFavorite ? "Removed favorite" : "Marked favorite")}: {n.Display}";
+                    }
+                    catch (Exception ex) { status.Text = $"Favorite failed: {ex.Message}"; }
+                };
+                var ignItem = new MenuItem { Header = n.IsIgnored ? "Un-ignore on device" : "Ignore on device" };
+                ignItem.Click += async (_, _) =>
+                {
+                    try
+                    {
+                        await _mesh!.SetIgnoredNodeAsync(n.Num, !n.IsIgnored);
+                        SaveNodeCache();
+                        _nodesRepopulate?.Invoke();
+                        status.Text = $"{(n.IsIgnored ? "Un-ignored" : "Ignored")} {n.Display} on the device.";
+                    }
+                    catch (Exception ex) { status.Text = $"Ignore failed: {ex.Message}"; }
+                };
+                menu.Items.Add(favItem);
+                menu.Items.Add(ignItem);
+
+                // Remote admin: send admin commands to ANOTHER node (needs a shared "admin" channel on both).
+                menu.Items.Add(new Separator());
+                var remoteMenu = new MenuItem { Header = "Remote admin" };
+                var rReboot = new MenuItem { Header = "Reboot…" };
+                rReboot.Click += async (_, _) => await RunRemoteAdminAction(n, "reboot",
+                    "Reboots this remote node in a few seconds.", () => _mesh!.RemoteRebootAsync(n.Num), dialog, s => status.Text = s);
+                var rShutdown = new MenuItem { Header = "Shut down…" };
+                rShutdown.Click += async (_, _) => await RunRemoteAdminAction(n, "shutdown",
+                    "Shuts this remote node down — it must be powered on again by hand.", () => _mesh!.RemoteShutdownAsync(n.Num), dialog, s => status.Text = s);
+                var rNodeDb = new MenuItem { Header = "Reset node DB…" };
+                rNodeDb.Click += async (_, _) => await RunRemoteAdminAction(n, "node-DB reset",
+                    "Clears this remote node's list of known nodes.", () => _mesh!.RemoteNodeDbResetAsync(n.Num), dialog, s => status.Text = s);
+                var rFactory = new MenuItem { Header = "Factory reset…" };
+                rFactory.Click += async (_, _) => await RunRemoteAdminAction(n, "factory reset",
+                    "FACTORY-RESETS this remote node — ALL its settings are wiped. This cannot be undone.", () => _mesh!.RemoteFactoryResetAsync(n.Num), dialog, s => status.Text = s);
+                remoteMenu.Items.Add(rReboot);
+                remoteMenu.Items.Add(rShutdown);
+                remoteMenu.Items.Add(rNodeDb);
+                remoteMenu.Items.Add(rFactory);
+                menu.Items.Add(remoteMenu);
             }
             row.ContextMenu = menu;
 
@@ -4365,7 +4466,7 @@ public partial class MainWindow : Window
         // telemetry — e.g. "… — !a1b2c3d4   21.5°C · 45%RH · dp 9.3°C".
         string NodeRowText(MeshNode n)
         {
-            string text = (n.IsSelf ? "★ " : "") + n.Display;
+            string text = (n.IsSelf ? "★ " : "") + (n.IsFavorite ? "⭐ " : "") + (n.IsIgnored ? "🚫 " : "") + n.Display;
             // Per-node hardware comes from its User broadcast; for our own node fall back to the device metadata.
             string hw = !string.IsNullOrEmpty(n.HwModel) ? n.HwModel : (n.IsSelf ? _mesh!.HardwareModel ?? "" : "");
             if (hw.Length > 0) text += $"   {hw}";
@@ -4430,6 +4531,7 @@ public partial class MainWindow : Window
             var ordered = nodes.OrderByDescending(n => n.IsSelf);
             ordered = mode switch
             {
+                "Favorite"    => ordered.ThenByDescending(n => n.IsFavorite),   // favorites first (after self)
                 "Type"        => ordered.ThenBy(n => string.IsNullOrEmpty(n.Role) ? "￿" : n.Role, StringComparer.OrdinalIgnoreCase),
                 "Hardware"    => ordered.ThenBy(n => string.IsNullOrEmpty(n.HwModel) ? "￿" : n.HwModel, StringComparer.OrdinalIgnoreCase),
                 "Heard"       => ordered.ThenByDescending(n => n.LastHeard),   // most recently heard first; unknown (0) last
@@ -4609,6 +4711,13 @@ public partial class MainWindow : Window
             try { await _mesh!.RequestTelemetryAsync(target.Num); }
             catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
         };
+        var metricsBtn = new Button { Content = "Request battery/metrics", Width = 150, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        metricsBtn.Click += async (_, _) =>
+        {
+            status.Text = $"Requesting device metrics from {target.Display}…";
+            try { await _mesh!.RequestDeviceMetricsAsync(target.Num); status.Text = $"Requested device metrics from {target.Display} — reply refreshes the info above."; }
+            catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
+        };
         var deleteBtn = new Button { Content = "Delete", Width = 80, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
         deleteBtn.Click += (_, _) =>
         {
@@ -4668,6 +4777,7 @@ public partial class MainWindow : Window
         actionPanel.Children.Add(infoBtn);
         actionPanel.Children.Add(posBtn);
         actionPanel.Children.Add(requestBtn);   // Request telemetry — grouped with the other request buttons
+        actionPanel.Children.Add(metricsBtn);   // Request device metrics (battery/voltage/util/uptime)
         actionPanel.Children.Add(traceBtn);
         actionPanel.Children.Add(noiseBtn);
         DockPanel.SetDock(actionPanel, Dock.Bottom);
@@ -4866,7 +4976,7 @@ public partial class MainWindow : Window
             }
 
             RebuildChatTxCombo();   // channel names may have refreshed
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
             DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache positions for the map
             RefreshChatAckerNames();   // resolve any acker numbers to names now that nodes are loaded
             report($"Done — {_mesh.GetNodes().Count} nodes known.");

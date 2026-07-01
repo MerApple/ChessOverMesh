@@ -516,6 +516,7 @@ public partial class MainPage : ContentPage
             await mesh.InitializeAsync(cts.Token);
             _mesh?.Dispose();
             _mesh = mesh; mesh = null;
+            _mesh.AdminActivity += OnAdminActivity;   // log admin messages (sent/received) to system messages
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) AppSettings.LastHost = cacheKey;
             DeviceCache.Save(cacheKey, _mesh.GetAvailableChannels(), _mesh.MyNodeNum);
@@ -609,7 +610,8 @@ public partial class MainPage : ContentPage
             // Seed cached node names/roles/hardware so nodes the device has since forgotten still show in the
             // nodes list (and aren't dropped from the saved cache when we next persist the live set).
             var cached = DeviceCache.Get(host);
-            if (cached != null) _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw);
+            if (cached != null) _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw, nodeShortNames: cached.NodeShortNames,
+                nodeFavorites: cached.NodeFavorites, nodeIgnored: cached.NodeIgnored, nodeHopsAway: cached.NodeHopsAway, nodeLastHeard: cached.NodeLastHeard);
 
             // Seed cached node positions so the map / "open in Google Maps" works immediately on reconnect, before
             // any live position is heard again (MAUI now persists positions, matching the desktop app).
@@ -1574,7 +1576,7 @@ public partial class MainPage : ContentPage
                 }
             }
             catch { /* non-fatal: keep the connection even if the channel re-check fails */ }
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
             SyncDeviceClockIfAhead();   // correct a radio whose clock is set in the future (bad "last heard" stamps)
             // On a proxy link, ask it to replay any received messages we missed while away (newer than our newest
@@ -2102,6 +2104,48 @@ public partial class MainPage : ContentPage
         _nodePrefs.Remove(num);
         RebuildChatTxPicker();
         NodesChanged?.Invoke();
+    }
+
+    public async Task SetFavoriteNodeAsync(uint num, bool favorite)
+    {
+        if (_mesh == null) return;
+        await _mesh.SetFavoriteNodeAsync(num, favorite);
+        SaveNodeCache();
+        NodesChanged?.Invoke();
+    }
+
+    public async Task SetIgnoredNodeAsync(uint num, bool ignored)
+    {
+        if (_mesh == null) return;
+        await _mesh.SetIgnoredNodeAsync(num, ignored);
+        SaveNodeCache();
+        NodesChanged?.Invoke();
+    }
+
+    /// <summary>Runs a remote-admin action ("reboot"/"shutdown"/"nodedb"/"factory") against another node.
+    /// Returns null on success or an error string.</summary>
+    public Task<string?> RemoteAdminAsync(uint target, string action) => action switch
+    {
+        "reboot" => _mesh?.RemoteRebootAsync(target) ?? Task.FromResult<string?>("Not connected."),
+        "shutdown" => _mesh?.RemoteShutdownAsync(target) ?? Task.FromResult<string?>("Not connected."),
+        "nodedb" => _mesh?.RemoteNodeDbResetAsync(target) ?? Task.FromResult<string?>("Not connected."),
+        "factory" => _mesh?.RemoteFactoryResetAsync(target) ?? Task.FromResult<string?>("Not connected."),
+        _ => Task.FromResult<string?>("Unknown action."),
+    };
+
+    public Task<uint> RequestDeviceMetricsForAsync(uint num) => _mesh?.RequestDeviceMetricsAsync(num) ?? Task.FromResult(0u);
+
+    /// <summary>Logs an admin message (sent "→" or received "←") to system messages. Marshals to the main thread
+    /// since the mesh client may raise this off the poll thread.</summary>
+    void OnAdminActivity(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text));
+
+    /// <summary>Persists the node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
+    void SaveNodeCache()
+    {
+        if (_mesh == null || _currentHost.Length == 0) return;
+        DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum,
+            _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(),
+            _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
     }
 
     /// <summary>Raised when node prefs change (so an open Nodes page can refresh its rows).</summary>
@@ -2809,7 +2853,7 @@ public partial class MainPage : ContentPage
                 report($"Updating… {_mesh.GetNodes().Count} nodes so far");
                 if (r.PacketCount < chunk) break;
             }
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
             return _mesh.GetNodes().Count;
         }

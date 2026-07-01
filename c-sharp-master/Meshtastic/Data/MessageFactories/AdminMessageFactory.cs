@@ -119,11 +119,13 @@ public class AdminMessageFactory
 
     public MeshPacket CreateFactoryResetMessage()
     {
-        return GetNewMeshPacket(new AdminMessage() { FactoryReset = 1 });
+        // Newer protobuf split factory_reset into config/device variants; device = full wipe (old semantics).
+        return GetNewMeshPacket(new AdminMessage() { FactoryResetDevice = 1 });
     }
     public MeshPacket CreateNodeDbResetMessage()
     {
-        return GetNewMeshPacket(new AdminMessage() { NodedbReset = 1 });
+        // nodedb_reset is a bool in newer protobuf.
+        return GetNewMeshPacket(new AdminMessage() { NodedbReset = true });
     }
     public MeshPacket CreateRemoveByNodenumMessage(uint nodeNum)
     {

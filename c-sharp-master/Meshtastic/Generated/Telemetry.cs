@@ -24,45 +24,149 @@ namespace Meshtastic.Protobufs {
     static TelemetryReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "ChptZXNodGFzdGljL3RlbGVtZXRyeS5wcm90bxIKbWVzaHRhc3RpYyJpCg1E",
-            "ZXZpY2VNZXRyaWNzEhUKDWJhdHRlcnlfbGV2ZWwYASABKA0SDwoHdm9sdGFn",
-            "ZRgCIAEoAhIbChNjaGFubmVsX3V0aWxpemF0aW9uGAMgASgCEhMKC2Fpcl91",
-            "dGlsX3R4GAQgASgCIpsBChJFbnZpcm9ubWVudE1ldHJpY3MSEwoLdGVtcGVy",
-            "YXR1cmUYASABKAISGQoRcmVsYXRpdmVfaHVtaWRpdHkYAiABKAISGwoTYmFy",
-            "b21ldHJpY19wcmVzc3VyZRgDIAEoAhIWCg5nYXNfcmVzaXN0YW5jZRgEIAEo",
-            "AhIPCgd2b2x0YWdlGAUgASgCEg8KB2N1cnJlbnQYBiABKAIijAEKDFBvd2Vy",
-            "TWV0cmljcxITCgtjaDFfdm9sdGFnZRgBIAEoAhITCgtjaDFfY3VycmVudBgC",
-            "IAEoAhITCgtjaDJfdm9sdGFnZRgDIAEoAhITCgtjaDJfY3VycmVudBgEIAEo",
-            "AhITCgtjaDNfdm9sdGFnZRgFIAEoAhITCgtjaDNfY3VycmVudBgGIAEoAiK/",
-            "AgoRQWlyUXVhbGl0eU1ldHJpY3MSFQoNcG0xMF9zdGFuZGFyZBgBIAEoDRIV",
-            "Cg1wbTI1X3N0YW5kYXJkGAIgASgNEhYKDnBtMTAwX3N0YW5kYXJkGAMgASgN",
-            "EhoKEnBtMTBfZW52aXJvbm1lbnRhbBgEIAEoDRIaChJwbTI1X2Vudmlyb25t",
-            "ZW50YWwYBSABKA0SGwoTcG0xMDBfZW52aXJvbm1lbnRhbBgGIAEoDRIWCg5w",
-            "YXJ0aWNsZXNfMDN1bRgHIAEoDRIWCg5wYXJ0aWNsZXNfMDV1bRgIIAEoDRIW",
-            "Cg5wYXJ0aWNsZXNfMTB1bRgJIAEoDRIWCg5wYXJ0aWNsZXNfMjV1bRgKIAEo",
-            "DRIWCg5wYXJ0aWNsZXNfNTB1bRgLIAEoDRIXCg9wYXJ0aWNsZXNfMTAwdW0Y",
-            "DCABKA0iiQIKCVRlbGVtZXRyeRIMCgR0aW1lGAEgASgHEjMKDmRldmljZV9t",
-            "ZXRyaWNzGAIgASgLMhkubWVzaHRhc3RpYy5EZXZpY2VNZXRyaWNzSAASPQoT",
-            "ZW52aXJvbm1lbnRfbWV0cmljcxgDIAEoCzIeLm1lc2h0YXN0aWMuRW52aXJv",
-            "bm1lbnRNZXRyaWNzSAASPAoTYWlyX3F1YWxpdHlfbWV0cmljcxgEIAEoCzId",
-            "Lm1lc2h0YXN0aWMuQWlyUXVhbGl0eU1ldHJpY3NIABIxCg1wb3dlcl9tZXRy",
-            "aWNzGAUgASgLMhgubWVzaHRhc3RpYy5Qb3dlck1ldHJpY3NIAEIJCgd2YXJp",
-            "YW50KtQBChNUZWxlbWV0cnlTZW5zb3JUeXBlEhAKDFNFTlNPUl9VTlNFVBAA",
-            "EgoKBkJNRTI4MBABEgoKBkJNRTY4MBACEgsKB01DUDk4MDgQAxIKCgZJTkEy",
-            "NjAQBBIKCgZJTkEyMTkQBRIKCgZCTVAyODAQBhIJCgVTSFRDMxAHEgkKBUxQ",
-            "UzIyEAgSCwoHUU1DNjMxMBAJEgsKB1FNSTg2NTgQChIMCghRTUM1ODgzTBAL",
-            "EgkKBVNIVDMxEAwSDAoIUE1TQTAwM0kQDRILCgdJTkEzMjIxEA5CZAoTY29t",
-            "LmdlZWtzdmlsbGUubWVzaEIPVGVsZW1ldHJ5UHJvdG9zWiJnaXRodWIuY29t",
-            "L21lc2h0YXN0aWMvZ28vZ2VuZXJhdGVkqgIUTWVzaHRhc3RpYy5Qcm90b2J1",
-            "ZnO6AgBiBnByb3RvMw=="));
+            "ChptZXNodGFzdGljL3RlbGVtZXRyeS5wcm90bxIKbWVzaHRhc3RpYyLzAQoN",
+            "RGV2aWNlTWV0cmljcxIaCg1iYXR0ZXJ5X2xldmVsGAEgASgNSACIAQESFAoH",
+            "dm9sdGFnZRgCIAEoAkgBiAEBEiAKE2NoYW5uZWxfdXRpbGl6YXRpb24YAyAB",
+            "KAJIAogBARIYCgthaXJfdXRpbF90eBgEIAEoAkgDiAEBEhsKDnVwdGltZV9z",
+            "ZWNvbmRzGAUgASgNSASIAQFCEAoOX2JhdHRlcnlfbGV2ZWxCCgoIX3ZvbHRh",
+            "Z2VCFgoUX2NoYW5uZWxfdXRpbGl6YXRpb25CDgoMX2Fpcl91dGlsX3R4QhEK",
+            "D191cHRpbWVfc2Vjb25kcyKgBwoSRW52aXJvbm1lbnRNZXRyaWNzEhgKC3Rl",
+            "bXBlcmF0dXJlGAEgASgCSACIAQESHgoRcmVsYXRpdmVfaHVtaWRpdHkYAiAB",
+            "KAJIAYgBARIgChNiYXJvbWV0cmljX3ByZXNzdXJlGAMgASgCSAKIAQESGwoO",
+            "Z2FzX3Jlc2lzdGFuY2UYBCABKAJIA4gBARIUCgd2b2x0YWdlGAUgASgCSASI",
+            "AQESFAoHY3VycmVudBgGIAEoAkgFiAEBEhAKA2lhcRgHIAEoDUgGiAEBEhUK",
+            "CGRpc3RhbmNlGAggASgCSAeIAQESEAoDbHV4GAkgASgCSAiIAQESFgoJd2hp",
+            "dGVfbHV4GAogASgCSAmIAQESEwoGaXJfbHV4GAsgASgCSAqIAQESEwoGdXZf",
+            "bHV4GAwgASgCSAuIAQESGwoOd2luZF9kaXJlY3Rpb24YDSABKA1IDIgBARIX",
+            "Cgp3aW5kX3NwZWVkGA4gASgCSA2IAQESEwoGd2VpZ2h0GA8gASgCSA6IAQES",
+            "FgoJd2luZF9ndXN0GBAgASgCSA+IAQESFgoJd2luZF9sdWxsGBEgASgCSBCI",
+            "AQESFgoJcmFkaWF0aW9uGBIgASgCSBGIAQESGAoLcmFpbmZhbGxfMWgYEyAB",
+            "KAJIEogBARIZCgxyYWluZmFsbF8yNGgYFCABKAJIE4gBARIaCg1zb2lsX21v",
+            "aXN0dXJlGBUgASgNSBSIAQESHQoQc29pbF90ZW1wZXJhdHVyZRgWIAEoAkgV",
+            "iAEBEhwKFG9uZV93aXJlX3RlbXBlcmF0dXJlGBcgAygCQg4KDF90ZW1wZXJh",
+            "dHVyZUIUChJfcmVsYXRpdmVfaHVtaWRpdHlCFgoUX2Jhcm9tZXRyaWNfcHJl",
+            "c3N1cmVCEQoPX2dhc19yZXNpc3RhbmNlQgoKCF92b2x0YWdlQgoKCF9jdXJy",
+            "ZW50QgYKBF9pYXFCCwoJX2Rpc3RhbmNlQgYKBF9sdXhCDAoKX3doaXRlX2x1",
+            "eEIJCgdfaXJfbHV4QgkKB191dl9sdXhCEQoPX3dpbmRfZGlyZWN0aW9uQg0K",
+            "C193aW5kX3NwZWVkQgkKB193ZWlnaHRCDAoKX3dpbmRfZ3VzdEIMCgpfd2lu",
+            "ZF9sdWxsQgwKCl9yYWRpYXRpb25CDgoMX3JhaW5mYWxsXzFoQg8KDV9yYWlu",
+            "ZmFsbF8yNGhCEAoOX3NvaWxfbW9pc3R1cmVCEwoRX3NvaWxfdGVtcGVyYXR1",
+            "cmUirgUKDFBvd2VyTWV0cmljcxIYCgtjaDFfdm9sdGFnZRgBIAEoAkgAiAEB",
+            "EhgKC2NoMV9jdXJyZW50GAIgASgCSAGIAQESGAoLY2gyX3ZvbHRhZ2UYAyAB",
+            "KAJIAogBARIYCgtjaDJfY3VycmVudBgEIAEoAkgDiAEBEhgKC2NoM192b2x0",
+            "YWdlGAUgASgCSASIAQESGAoLY2gzX2N1cnJlbnQYBiABKAJIBYgBARIYCgtj",
+            "aDRfdm9sdGFnZRgHIAEoAkgGiAEBEhgKC2NoNF9jdXJyZW50GAggASgCSAeI",
+            "AQESGAoLY2g1X3ZvbHRhZ2UYCSABKAJICIgBARIYCgtjaDVfY3VycmVudBgK",
+            "IAEoAkgJiAEBEhgKC2NoNl92b2x0YWdlGAsgASgCSAqIAQESGAoLY2g2X2N1",
+            "cnJlbnQYDCABKAJIC4gBARIYCgtjaDdfdm9sdGFnZRgNIAEoAkgMiAEBEhgK",
+            "C2NoN19jdXJyZW50GA4gASgCSA2IAQESGAoLY2g4X3ZvbHRhZ2UYDyABKAJI",
+            "DogBARIYCgtjaDhfY3VycmVudBgQIAEoAkgPiAEBQg4KDF9jaDFfdm9sdGFn",
+            "ZUIOCgxfY2gxX2N1cnJlbnRCDgoMX2NoMl92b2x0YWdlQg4KDF9jaDJfY3Vy",
+            "cmVudEIOCgxfY2gzX3ZvbHRhZ2VCDgoMX2NoM19jdXJyZW50Qg4KDF9jaDRf",
+            "dm9sdGFnZUIOCgxfY2g0X2N1cnJlbnRCDgoMX2NoNV92b2x0YWdlQg4KDF9j",
+            "aDVfY3VycmVudEIOCgxfY2g2X3ZvbHRhZ2VCDgoMX2NoNl9jdXJyZW50Qg4K",
+            "DF9jaDdfdm9sdGFnZUIOCgxfY2g3X2N1cnJlbnRCDgoMX2NoOF92b2x0YWdl",
+            "Qg4KDF9jaDhfY3VycmVudCKxCQoRQWlyUXVhbGl0eU1ldHJpY3MSGgoNcG0x",
+            "MF9zdGFuZGFyZBgBIAEoDUgAiAEBEhoKDXBtMjVfc3RhbmRhcmQYAiABKA1I",
+            "AYgBARIbCg5wbTEwMF9zdGFuZGFyZBgDIAEoDUgCiAEBEh8KEnBtMTBfZW52",
+            "aXJvbm1lbnRhbBgEIAEoDUgDiAEBEh8KEnBtMjVfZW52aXJvbm1lbnRhbBgF",
+            "IAEoDUgEiAEBEiAKE3BtMTAwX2Vudmlyb25tZW50YWwYBiABKA1IBYgBARIb",
+            "Cg5wYXJ0aWNsZXNfMDN1bRgHIAEoDUgGiAEBEhsKDnBhcnRpY2xlc18wNXVt",
+            "GAggASgNSAeIAQESGwoOcGFydGljbGVzXzEwdW0YCSABKA1ICIgBARIbCg5w",
+            "YXJ0aWNsZXNfMjV1bRgKIAEoDUgJiAEBEhsKDnBhcnRpY2xlc181MHVtGAsg",
+            "ASgNSAqIAQESHAoPcGFydGljbGVzXzEwMHVtGAwgASgNSAuIAQESEAoDY28y",
+            "GA0gASgNSAyIAQESHAoPY28yX3RlbXBlcmF0dXJlGA4gASgCSA2IAQESGQoM",
+            "Y28yX2h1bWlkaXR5GA8gASgCSA6IAQESHgoRZm9ybV9mb3JtYWxkZWh5ZGUY",
+            "ECABKAJID4gBARIaCg1mb3JtX2h1bWlkaXR5GBEgASgCSBCIAQESHQoQZm9y",
+            "bV90ZW1wZXJhdHVyZRgSIAEoAkgRiAEBEhoKDXBtNDBfc3RhbmRhcmQYEyAB",
+            "KA1IEogBARIbCg5wYXJ0aWNsZXNfNDB1bRgUIAEoDUgTiAEBEhsKDnBtX3Rl",
+            "bXBlcmF0dXJlGBUgASgCSBSIAQESGAoLcG1faHVtaWRpdHkYFiABKAJIFYgB",
+            "ARIXCgpwbV92b2NfaWR4GBcgASgCSBaIAQESFwoKcG1fbm94X2lkeBgYIAEo",
+            "AkgXiAEBEhoKDXBhcnRpY2xlc190cHMYGSABKAJIGIgBAUIQCg5fcG0xMF9z",
+            "dGFuZGFyZEIQCg5fcG0yNV9zdGFuZGFyZEIRCg9fcG0xMDBfc3RhbmRhcmRC",
+            "FQoTX3BtMTBfZW52aXJvbm1lbnRhbEIVChNfcG0yNV9lbnZpcm9ubWVudGFs",
+            "QhYKFF9wbTEwMF9lbnZpcm9ubWVudGFsQhEKD19wYXJ0aWNsZXNfMDN1bUIR",
+            "Cg9fcGFydGljbGVzXzA1dW1CEQoPX3BhcnRpY2xlc18xMHVtQhEKD19wYXJ0",
+            "aWNsZXNfMjV1bUIRCg9fcGFydGljbGVzXzUwdW1CEgoQX3BhcnRpY2xlc18x",
+            "MDB1bUIGCgRfY28yQhIKEF9jbzJfdGVtcGVyYXR1cmVCDwoNX2NvMl9odW1p",
+            "ZGl0eUIUChJfZm9ybV9mb3JtYWxkZWh5ZGVCEAoOX2Zvcm1faHVtaWRpdHlC",
+            "EwoRX2Zvcm1fdGVtcGVyYXR1cmVCEAoOX3BtNDBfc3RhbmRhcmRCEQoPX3Bh",
+            "cnRpY2xlc180MHVtQhEKD19wbV90ZW1wZXJhdHVyZUIOCgxfcG1faHVtaWRp",
+            "dHlCDQoLX3BtX3ZvY19pZHhCDQoLX3BtX25veF9pZHhCEAoOX3BhcnRpY2xl",
+            "c190cHMi/wIKCkxvY2FsU3RhdHMSFgoOdXB0aW1lX3NlY29uZHMYASABKA0S",
+            "GwoTY2hhbm5lbF91dGlsaXphdGlvbhgCIAEoAhITCgthaXJfdXRpbF90eBgD",
+            "IAEoAhIWCg5udW1fcGFja2V0c190eBgEIAEoDRIWCg5udW1fcGFja2V0c19y",
+            "eBgFIAEoDRIaChJudW1fcGFja2V0c19yeF9iYWQYBiABKA0SGAoQbnVtX29u",
+            "bGluZV9ub2RlcxgHIAEoDRIXCg9udW1fdG90YWxfbm9kZXMYCCABKA0SEwoL",
+            "bnVtX3J4X2R1cGUYCSABKA0SFAoMbnVtX3R4X3JlbGF5GAogASgNEh0KFW51",
+            "bV90eF9yZWxheV9jYW5jZWxlZBgLIAEoDRIYChBoZWFwX3RvdGFsX2J5dGVz",
+            "GAwgASgNEhcKD2hlYXBfZnJlZV9ieXRlcxgNIAEoDRIWCg5udW1fdHhfZHJv",
+            "cHBlZBgOIAEoDRITCgtub2lzZV9mbG9vchgPIAEoBSLkAQoWVHJhZmZpY01h",
+            "bmFnZW1lbnRTdGF0cxIZChFwYWNrZXRzX2luc3BlY3RlZBgBIAEoDRIcChRw",
+            "b3NpdGlvbl9kZWR1cF9kcm9wcxgCIAEoDRIbChNub2RlaW5mb19jYWNoZV9o",
+            "aXRzGAMgASgNEhgKEHJhdGVfbGltaXRfZHJvcHMYBCABKA0SHAoUdW5rbm93",
+            "bl9wYWNrZXRfZHJvcHMYBSABKA0SHQoVaG9wX2V4aGF1c3RlZF9wYWNrZXRz",
+            "GAYgASgNEh0KFXJvdXRlcl9ob3BzX3ByZXNlcnZlZBgHIAEoDSJ7Cg1IZWFs",
+            "dGhNZXRyaWNzEhYKCWhlYXJ0X2JwbRgBIAEoDUgAiAEBEhEKBHNwTzIYAiAB",
+            "KA1IAYgBARIYCgt0ZW1wZXJhdHVyZRgDIAEoAkgCiAEBQgwKCl9oZWFydF9i",
+            "cG1CBwoFX3NwTzJCDgoMX3RlbXBlcmF0dXJlIpECCgtIb3N0TWV0cmljcxIW",
+            "Cg51cHRpbWVfc2Vjb25kcxgBIAEoDRIVCg1mcmVlbWVtX2J5dGVzGAIgASgE",
+            "EhcKD2Rpc2tmcmVlMV9ieXRlcxgDIAEoBBIcCg9kaXNrZnJlZTJfYnl0ZXMY",
+            "BCABKARIAIgBARIcCg9kaXNrZnJlZTNfYnl0ZXMYBSABKARIAYgBARINCgVs",
+            "b2FkMRgGIAEoDRINCgVsb2FkNRgHIAEoDRIOCgZsb2FkMTUYCCABKA0SGAoL",
+            "dXNlcl9zdHJpbmcYCSABKAlIAogBAUISChBfZGlza2ZyZWUyX2J5dGVzQhIK",
+            "EF9kaXNrZnJlZTNfYnl0ZXNCDgoMX3VzZXJfc3RyaW5nIuYDCglUZWxlbWV0",
+            "cnkSDAoEdGltZRgBIAEoBxIzCg5kZXZpY2VfbWV0cmljcxgCIAEoCzIZLm1l",
+            "c2h0YXN0aWMuRGV2aWNlTWV0cmljc0gAEj0KE2Vudmlyb25tZW50X21ldHJp",
+            "Y3MYAyABKAsyHi5tZXNodGFzdGljLkVudmlyb25tZW50TWV0cmljc0gAEjwK",
+            "E2Fpcl9xdWFsaXR5X21ldHJpY3MYBCABKAsyHS5tZXNodGFzdGljLkFpclF1",
+            "YWxpdHlNZXRyaWNzSAASMQoNcG93ZXJfbWV0cmljcxgFIAEoCzIYLm1lc2h0",
+            "YXN0aWMuUG93ZXJNZXRyaWNzSAASLQoLbG9jYWxfc3RhdHMYBiABKAsyFi5t",
+            "ZXNodGFzdGljLkxvY2FsU3RhdHNIABIzCg5oZWFsdGhfbWV0cmljcxgHIAEo",
+            "CzIZLm1lc2h0YXN0aWMuSGVhbHRoTWV0cmljc0gAEi8KDGhvc3RfbWV0cmlj",
+            "cxgIIAEoCzIXLm1lc2h0YXN0aWMuSG9zdE1ldHJpY3NIABJGChh0cmFmZmlj",
+            "X21hbmFnZW1lbnRfc3RhdHMYCSABKAsyIi5tZXNodGFzdGljLlRyYWZmaWNN",
+            "YW5hZ2VtZW50U3RhdHNIAEIJCgd2YXJpYW50Ij4KDU5hdTc4MDJDb25maWcS",
+            "EgoKemVyb09mZnNldBgBIAEoBRIZChFjYWxpYnJhdGlvbkZhY3RvchgCIAEo",
+            "AiLwAQoKU0VONVhTdGF0ZRIaChJsYXN0X2NsZWFuaW5nX3RpbWUYASABKA0S",
+            "GwoTbGFzdF9jbGVhbmluZ192YWxpZBgCIAEoCBIVCg1vbmVfc2hvdF9tb2Rl",
+            "GAMgASgIEhsKDnZvY19zdGF0ZV90aW1lGAQgASgNSACIAQESHAoPdm9jX3N0",
+            "YXRlX3ZhbGlkGAUgASgISAGIAQESHAoPdm9jX3N0YXRlX2FycmF5GAYgASgG",
+            "SAKIAQFCEQoPX3ZvY19zdGF0ZV90aW1lQhIKEF92b2Nfc3RhdGVfdmFsaWRC",
+            "EgoQX3ZvY19zdGF0ZV9hcnJheSrcBQoTVGVsZW1ldHJ5U2Vuc29yVHlwZRIQ",
+            "CgxTRU5TT1JfVU5TRVQQABIKCgZCTUUyODAQARIKCgZCTUU2ODAQAhILCgdN",
+            "Q1A5ODA4EAMSCgoGSU5BMjYwEAQSCgoGSU5BMjE5EAUSCgoGQk1QMjgwEAYS",
+            "CQoFU0hUQzMQBxIJCgVMUFMyMhAIEgsKB1FNQzYzMTAQCRILCgdRTUk4NjU4",
+            "EAoSDAoIUU1DNTg4M0wQCxIJCgVTSFQzMRAMEgwKCFBNU0EwMDNJEA0SCwoH",
+            "SU5BMzIyMRAOEgoKBkJNUDA4NRAPEgwKCFJDV0w5NjIwEBASCQoFU0hUNFgQ",
+            "ERIMCghWRU1MNzcwMBASEgwKCE1MWDkwNjMyEBMSCwoHT1BUMzAwMRAUEgwK",
+            "CExUUjM5MFVWEBUSDgoKVFNMMjU5MTFGThAWEgkKBUFIVDEwEBcSEAoMREZS",
+            "T0JPVF9MQVJLEBgSCwoHTkFVNzgwMhAZEgoKBkJNUDNYWBAaEgwKCElDTTIw",
+            "OTQ4EBsSDAoITUFYMTcwNDgQHBIRCg1DVVNUT01fU0VOU09SEB0SDAoITUFY",
+            "MzAxMDIQHhIMCghNTFg5MDYxNBAfEgkKBVNDRDRYECASCwoHUkFEU0VOUxAh",
+            "EgoKBklOQTIyNhAiEhAKDERGUk9CT1RfUkFJThAjEgoKBkRQUzMxMBAkEgwK",
+            "CFJBSzEyMDM1ECUSDAoITUFYMTcyNjEQJhILCgdQQ1QyMDc1ECcSCwoHQURT",
+            "MVgxNRAoEg8KC0FEUzFYMTVfQUxUECkSCQoFU0ZBMzAQKhIJCgVTRU41WBAr",
+            "EgsKB1RTTDI1NjEQLBIKCgZCSDE3NTAQLRILCgdIREMxMDgwEC4SCQoFU0hU",
+            "MjEQLxIJCgVTVEMzMRAwEgkKBVNDRDMwEDESCQoFU0hUWFgQMhIKCgZEUzI0",
+            "OFgQMxINCglNTUM1OTgzTUEQNBINCglJQ000MjYwN1AQNUJlChRvcmcubWVz",
+            "aHRhc3RpYy5wcm90b0IPVGVsZW1ldHJ5UHJvdG9zWiJnaXRodWIuY29tL21l",
+            "c2h0YXN0aWMvZ28vZ2VuZXJhdGVkqgIUTWVzaHRhc3RpYy5Qcm90b2J1ZnO6",
+            "AgBiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Meshtastic.Protobufs.TelemetrySensorType), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.DeviceMetrics), global::Meshtastic.Protobufs.DeviceMetrics.Parser, new[]{ "BatteryLevel", "Voltage", "ChannelUtilization", "AirUtilTx" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.EnvironmentMetrics), global::Meshtastic.Protobufs.EnvironmentMetrics.Parser, new[]{ "Temperature", "RelativeHumidity", "BarometricPressure", "GasResistance", "Voltage", "Current" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.PowerMetrics), global::Meshtastic.Protobufs.PowerMetrics.Parser, new[]{ "Ch1Voltage", "Ch1Current", "Ch2Voltage", "Ch2Current", "Ch3Voltage", "Ch3Current" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.AirQualityMetrics), global::Meshtastic.Protobufs.AirQualityMetrics.Parser, new[]{ "Pm10Standard", "Pm25Standard", "Pm100Standard", "Pm10Environmental", "Pm25Environmental", "Pm100Environmental", "Particles03Um", "Particles05Um", "Particles10Um", "Particles25Um", "Particles50Um", "Particles100Um" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.Telemetry), global::Meshtastic.Protobufs.Telemetry.Parser, new[]{ "Time", "DeviceMetrics", "EnvironmentMetrics", "AirQualityMetrics", "PowerMetrics" }, new[]{ "Variant" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.DeviceMetrics), global::Meshtastic.Protobufs.DeviceMetrics.Parser, new[]{ "BatteryLevel", "Voltage", "ChannelUtilization", "AirUtilTx", "UptimeSeconds" }, new[]{ "BatteryLevel", "Voltage", "ChannelUtilization", "AirUtilTx", "UptimeSeconds" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.EnvironmentMetrics), global::Meshtastic.Protobufs.EnvironmentMetrics.Parser, new[]{ "Temperature", "RelativeHumidity", "BarometricPressure", "GasResistance", "Voltage", "Current", "Iaq", "Distance", "Lux", "WhiteLux", "IrLux", "UvLux", "WindDirection", "WindSpeed", "Weight", "WindGust", "WindLull", "Radiation", "Rainfall1H", "Rainfall24H", "SoilMoisture", "SoilTemperature", "OneWireTemperature" }, new[]{ "Temperature", "RelativeHumidity", "BarometricPressure", "GasResistance", "Voltage", "Current", "Iaq", "Distance", "Lux", "WhiteLux", "IrLux", "UvLux", "WindDirection", "WindSpeed", "Weight", "WindGust", "WindLull", "Radiation", "Rainfall1H", "Rainfall24H", "SoilMoisture", "SoilTemperature" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.PowerMetrics), global::Meshtastic.Protobufs.PowerMetrics.Parser, new[]{ "Ch1Voltage", "Ch1Current", "Ch2Voltage", "Ch2Current", "Ch3Voltage", "Ch3Current", "Ch4Voltage", "Ch4Current", "Ch5Voltage", "Ch5Current", "Ch6Voltage", "Ch6Current", "Ch7Voltage", "Ch7Current", "Ch8Voltage", "Ch8Current" }, new[]{ "Ch1Voltage", "Ch1Current", "Ch2Voltage", "Ch2Current", "Ch3Voltage", "Ch3Current", "Ch4Voltage", "Ch4Current", "Ch5Voltage", "Ch5Current", "Ch6Voltage", "Ch6Current", "Ch7Voltage", "Ch7Current", "Ch8Voltage", "Ch8Current" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.AirQualityMetrics), global::Meshtastic.Protobufs.AirQualityMetrics.Parser, new[]{ "Pm10Standard", "Pm25Standard", "Pm100Standard", "Pm10Environmental", "Pm25Environmental", "Pm100Environmental", "Particles03Um", "Particles05Um", "Particles10Um", "Particles25Um", "Particles50Um", "Particles100Um", "Co2", "Co2Temperature", "Co2Humidity", "FormFormaldehyde", "FormHumidity", "FormTemperature", "Pm40Standard", "Particles40Um", "PmTemperature", "PmHumidity", "PmVocIdx", "PmNoxIdx", "ParticlesTps" }, new[]{ "Pm10Standard", "Pm25Standard", "Pm100Standard", "Pm10Environmental", "Pm25Environmental", "Pm100Environmental", "Particles03Um", "Particles05Um", "Particles10Um", "Particles25Um", "Particles50Um", "Particles100Um", "Co2", "Co2Temperature", "Co2Humidity", "FormFormaldehyde", "FormHumidity", "FormTemperature", "Pm40Standard", "Particles40Um", "PmTemperature", "PmHumidity", "PmVocIdx", "PmNoxIdx", "ParticlesTps" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.LocalStats), global::Meshtastic.Protobufs.LocalStats.Parser, new[]{ "UptimeSeconds", "ChannelUtilization", "AirUtilTx", "NumPacketsTx", "NumPacketsRx", "NumPacketsRxBad", "NumOnlineNodes", "NumTotalNodes", "NumRxDupe", "NumTxRelay", "NumTxRelayCanceled", "HeapTotalBytes", "HeapFreeBytes", "NumTxDropped", "NoiseFloor" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.TrafficManagementStats), global::Meshtastic.Protobufs.TrafficManagementStats.Parser, new[]{ "PacketsInspected", "PositionDedupDrops", "NodeinfoCacheHits", "RateLimitDrops", "UnknownPacketDrops", "HopExhaustedPackets", "RouterHopsPreserved" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.HealthMetrics), global::Meshtastic.Protobufs.HealthMetrics.Parser, new[]{ "HeartBpm", "SpO2", "Temperature" }, new[]{ "HeartBpm", "SpO2", "Temperature" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.HostMetrics), global::Meshtastic.Protobufs.HostMetrics.Parser, new[]{ "UptimeSeconds", "FreememBytes", "Diskfree1Bytes", "Diskfree2Bytes", "Diskfree3Bytes", "Load1", "Load5", "Load15", "UserString" }, new[]{ "Diskfree2Bytes", "Diskfree3Bytes", "UserString" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.Telemetry), global::Meshtastic.Protobufs.Telemetry.Parser, new[]{ "Time", "DeviceMetrics", "EnvironmentMetrics", "AirQualityMetrics", "PowerMetrics", "LocalStats", "HealthMetrics", "HostMetrics", "TrafficManagementStats" }, new[]{ "Variant" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.Nau7802Config), global::Meshtastic.Protobufs.Nau7802Config.Parser, new[]{ "ZeroOffset", "CalibrationFactor" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Meshtastic.Protobufs.SEN5XState), global::Meshtastic.Protobufs.SEN5XState.Parser, new[]{ "LastCleaningTime", "LastCleaningValid", "OneShotMode", "VocStateTime", "VocStateValid", "VocStateArray" }, new[]{ "VocStateTime", "VocStateValid", "VocStateArray" }, null, null, null)
           }));
     }
     #endregion
@@ -111,7 +215,7 @@ namespace Meshtastic.Protobufs {
     [pbr::OriginalName("BMP280")] Bmp280 = 6,
     /// <summary>
     ///
-    /// High accuracy temperature and humidity
+    /// TODO - REMOVE High accuracy temperature and humidity
     /// </summary>
     [pbr::OriginalName("SHTC3")] Shtc3 = 7,
     /// <summary>
@@ -136,7 +240,7 @@ namespace Meshtastic.Protobufs {
     [pbr::OriginalName("QMC5883L")] Qmc5883L = 11,
     /// <summary>
     ///
-    /// High accuracy temperature and humidity
+    /// TODO - REMOVE High accuracy temperature and humidity
     /// </summary>
     [pbr::OriginalName("SHT31")] Sht31 = 12,
     /// <summary>
@@ -149,6 +253,201 @@ namespace Meshtastic.Protobufs {
     /// INA3221 3 Channel Voltage / Current Sensor
     /// </summary>
     [pbr::OriginalName("INA3221")] Ina3221 = 14,
+    /// <summary>
+    ///
+    /// BMP085/BMP180 High accuracy temperature and pressure (older Version of BMP280)
+    /// </summary>
+    [pbr::OriginalName("BMP085")] Bmp085 = 15,
+    /// <summary>
+    ///
+    /// RCWL-9620 Doppler Radar Distance Sensor, used for water level detection
+    /// </summary>
+    [pbr::OriginalName("RCWL9620")] Rcwl9620 = 16,
+    /// <summary>
+    ///
+    /// TODO - REMOVE Sensirion High accuracy temperature and humidity
+    /// </summary>
+    [pbr::OriginalName("SHT4X")] Sht4X = 17,
+    /// <summary>
+    ///
+    /// VEML7700 high accuracy ambient light(Lux) digital 16-bit resolution sensor.
+    /// </summary>
+    [pbr::OriginalName("VEML7700")] Veml7700 = 18,
+    /// <summary>
+    ///
+    /// MLX90632 non-contact IR temperature sensor.
+    /// </summary>
+    [pbr::OriginalName("MLX90632")] Mlx90632 = 19,
+    /// <summary>
+    ///
+    /// TI OPT3001 Ambient Light Sensor
+    /// </summary>
+    [pbr::OriginalName("OPT3001")] Opt3001 = 20,
+    /// <summary>
+    ///
+    /// Lite On LTR-390UV-01 UV Light Sensor
+    /// </summary>
+    [pbr::OriginalName("LTR390UV")] Ltr390Uv = 21,
+    /// <summary>
+    ///
+    /// AMS TSL25911FN RGB Light Sensor
+    /// </summary>
+    [pbr::OriginalName("TSL25911FN")] Tsl25911Fn = 22,
+    /// <summary>
+    ///
+    /// AHT10 Integrated temperature and humidity sensor
+    /// </summary>
+    [pbr::OriginalName("AHT10")] Aht10 = 23,
+    /// <summary>
+    ///
+    /// DFRobot Lark Weather station (temperature, humidity, pressure, wind speed and direction)
+    /// </summary>
+    [pbr::OriginalName("DFROBOT_LARK")] DfrobotLark = 24,
+    /// <summary>
+    ///
+    /// NAU7802 Scale Chip or compatible
+    /// </summary>
+    [pbr::OriginalName("NAU7802")] Nau7802 = 25,
+    /// <summary>
+    ///
+    /// BMP3XX High accuracy temperature and pressure
+    /// </summary>
+    [pbr::OriginalName("BMP3XX")] Bmp3Xx = 26,
+    /// <summary>
+    ///
+    /// ICM-20948 9-Axis digital motion processor
+    /// </summary>
+    [pbr::OriginalName("ICM20948")] Icm20948 = 27,
+    /// <summary>
+    ///
+    /// MAX17048 1S lipo battery sensor (voltage, state of charge, time to go)
+    /// </summary>
+    [pbr::OriginalName("MAX17048")] Max17048 = 28,
+    /// <summary>
+    ///
+    /// Custom I2C sensor implementation based on https://github.com/meshtastic/i2c-sensor
+    /// </summary>
+    [pbr::OriginalName("CUSTOM_SENSOR")] CustomSensor = 29,
+    /// <summary>
+    ///
+    /// MAX30102 Pulse Oximeter and Heart-Rate Sensor
+    /// </summary>
+    [pbr::OriginalName("MAX30102")] Max30102 = 30,
+    /// <summary>
+    ///
+    /// MLX90614 non-contact IR temperature sensor
+    /// </summary>
+    [pbr::OriginalName("MLX90614")] Mlx90614 = 31,
+    /// <summary>
+    ///
+    /// SCD40/SCD41 CO2, humidity, temperature sensor
+    /// </summary>
+    [pbr::OriginalName("SCD4X")] Scd4X = 32,
+    /// <summary>
+    ///
+    /// ClimateGuard RadSens, radiation, Geiger-Muller Tube
+    /// </summary>
+    [pbr::OriginalName("RADSENS")] Radsens = 33,
+    /// <summary>
+    ///
+    /// High accuracy current and voltage
+    /// </summary>
+    [pbr::OriginalName("INA226")] Ina226 = 34,
+    /// <summary>
+    ///
+    /// DFRobot Gravity tipping bucket rain gauge
+    /// </summary>
+    [pbr::OriginalName("DFROBOT_RAIN")] DfrobotRain = 35,
+    /// <summary>
+    ///
+    /// Infineon DPS310 High accuracy pressure and temperature
+    /// </summary>
+    [pbr::OriginalName("DPS310")] Dps310 = 36,
+    /// <summary>
+    ///
+    /// RAKWireless RAK12035 Soil Moisture Sensor Module
+    /// </summary>
+    [pbr::OriginalName("RAK12035")] Rak12035 = 37,
+    /// <summary>
+    ///
+    /// MAX17261 lipo battery gauge
+    /// </summary>
+    [pbr::OriginalName("MAX17261")] Max17261 = 38,
+    /// <summary>
+    ///
+    /// PCT2075 Temperature Sensor
+    /// </summary>
+    [pbr::OriginalName("PCT2075")] Pct2075 = 39,
+    /// <summary>
+    ///
+    /// ADS1X15 ADC
+    /// </summary>
+    [pbr::OriginalName("ADS1X15")] Ads1X15 = 40,
+    /// <summary>
+    ///
+    /// ADS1X15 ADC_ALT
+    /// </summary>
+    [pbr::OriginalName("ADS1X15_ALT")] Ads1X15Alt = 41,
+    /// <summary>
+    ///
+    /// Sensirion SFA30 Formaldehyde sensor
+    /// </summary>
+    [pbr::OriginalName("SFA30")] Sfa30 = 42,
+    /// <summary>
+    ///
+    /// SEN5X PM SENSORS
+    /// </summary>
+    [pbr::OriginalName("SEN5X")] Sen5X = 43,
+    /// <summary>
+    ///
+    /// TSL2561 light sensor
+    /// </summary>
+    [pbr::OriginalName("TSL2561")] Tsl2561 = 44,
+    /// <summary>
+    ///
+    /// BH1750 light sensor
+    /// </summary>
+    [pbr::OriginalName("BH1750")] Bh1750 = 45,
+    /// <summary>
+    ///
+    /// HDC1080 Temperature and Humidity Sensor
+    /// </summary>
+    [pbr::OriginalName("HDC1080")] Hdc1080 = 46,
+    /// <summary>
+    ///
+    /// TODO - REMOVE STH21 Temperature and R. Humidity sensor
+    /// </summary>
+    [pbr::OriginalName("SHT21")] Sht21 = 47,
+    /// <summary>
+    ///
+    /// Sensirion STC31 CO2 sensor
+    /// </summary>
+    [pbr::OriginalName("STC31")] Stc31 = 48,
+    /// <summary>
+    ///
+    /// SCD30 CO2, humidity, temperature sensor
+    /// </summary>
+    [pbr::OriginalName("SCD30")] Scd30 = 49,
+    /// <summary>
+    ///
+    /// SHT family of sensors for temperature and humidity
+    /// </summary>
+    [pbr::OriginalName("SHTXX")] Shtxx = 50,
+    /// <summary>
+    ///
+    /// DS248X Bridge for one-wire temperature sensors
+    /// </summary>
+    [pbr::OriginalName("DS248X")] Ds248X = 51,
+    /// <summary>
+    ///
+    /// MMC5983MA 3-Axis Digital Magnetic Sensor
+    /// </summary>
+    [pbr::OriginalName("MMC5983MA")] Mmc5983Ma = 52,
+    /// <summary>
+    ///
+    /// ICM-42607-P 6‑Axis IMU
+    /// </summary>
+    [pbr::OriginalName("ICM42607P")] Icm42607P = 53,
   }
 
   #endregion
@@ -165,6 +464,7 @@ namespace Meshtastic.Protobufs {
   {
     private static readonly pb::MessageParser<DeviceMetrics> _parser = new pb::MessageParser<DeviceMetrics>(() => new DeviceMetrics());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<DeviceMetrics> Parser { get { return _parser; } }
@@ -192,10 +492,12 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public DeviceMetrics(DeviceMetrics other) : this() {
+      _hasBits0 = other._hasBits0;
       batteryLevel_ = other.batteryLevel_;
       voltage_ = other.voltage_;
       channelUtilization_ = other.channelUtilization_;
       airUtilTx_ = other.airUtilTx_;
+      uptimeSeconds_ = other.uptimeSeconds_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -215,10 +517,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint BatteryLevel {
-      get { return batteryLevel_; }
+      get { if ((_hasBits0 & 1) != 0) { return batteryLevel_; } else { return 0; } }
       set {
+        _hasBits0 |= 1;
         batteryLevel_ = value;
       }
+    }
+    /// <summary>Gets whether the "battery_level" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasBatteryLevel {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "battery_level" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearBatteryLevel() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "voltage" field.</summary>
@@ -231,10 +546,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Voltage {
-      get { return voltage_; }
+      get { if ((_hasBits0 & 2) != 0) { return voltage_; } else { return 0F; } }
       set {
+        _hasBits0 |= 2;
         voltage_ = value;
       }
+    }
+    /// <summary>Gets whether the "voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasVoltage {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearVoltage() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "channel_utilization" field.</summary>
@@ -247,10 +575,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float ChannelUtilization {
-      get { return channelUtilization_; }
+      get { if ((_hasBits0 & 4) != 0) { return channelUtilization_; } else { return 0F; } }
       set {
+        _hasBits0 |= 4;
         channelUtilization_ = value;
       }
+    }
+    /// <summary>Gets whether the "channel_utilization" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasChannelUtilization {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "channel_utilization" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearChannelUtilization() {
+      _hasBits0 &= ~4;
     }
 
     /// <summary>Field number for the "air_util_tx" field.</summary>
@@ -263,10 +604,52 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float AirUtilTx {
-      get { return airUtilTx_; }
+      get { if ((_hasBits0 & 8) != 0) { return airUtilTx_; } else { return 0F; } }
       set {
+        _hasBits0 |= 8;
         airUtilTx_ = value;
       }
+    }
+    /// <summary>Gets whether the "air_util_tx" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasAirUtilTx {
+      get { return (_hasBits0 & 8) != 0; }
+    }
+    /// <summary>Clears the value of the "air_util_tx" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearAirUtilTx() {
+      _hasBits0 &= ~8;
+    }
+
+    /// <summary>Field number for the "uptime_seconds" field.</summary>
+    public const int UptimeSecondsFieldNumber = 5;
+    private uint uptimeSeconds_;
+    /// <summary>
+    ///
+    /// How long the device has been running since the last reboot (in seconds)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint UptimeSeconds {
+      get { if ((_hasBits0 & 16) != 0) { return uptimeSeconds_; } else { return 0; } }
+      set {
+        _hasBits0 |= 16;
+        uptimeSeconds_ = value;
+      }
+    }
+    /// <summary>Gets whether the "uptime_seconds" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasUptimeSeconds {
+      get { return (_hasBits0 & 16) != 0; }
+    }
+    /// <summary>Clears the value of the "uptime_seconds" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearUptimeSeconds() {
+      _hasBits0 &= ~16;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -288,6 +671,7 @@ namespace Meshtastic.Protobufs {
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Voltage, other.Voltage)) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(ChannelUtilization, other.ChannelUtilization)) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(AirUtilTx, other.AirUtilTx)) return false;
+      if (UptimeSeconds != other.UptimeSeconds) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -295,10 +679,11 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (BatteryLevel != 0) hash ^= BatteryLevel.GetHashCode();
-      if (Voltage != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Voltage);
-      if (ChannelUtilization != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(ChannelUtilization);
-      if (AirUtilTx != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(AirUtilTx);
+      if (HasBatteryLevel) hash ^= BatteryLevel.GetHashCode();
+      if (HasVoltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Voltage);
+      if (HasChannelUtilization) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(ChannelUtilization);
+      if (HasAirUtilTx) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(AirUtilTx);
+      if (HasUptimeSeconds) hash ^= UptimeSeconds.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -317,21 +702,25 @@ namespace Meshtastic.Protobufs {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (BatteryLevel != 0) {
+      if (HasBatteryLevel) {
         output.WriteRawTag(8);
         output.WriteUInt32(BatteryLevel);
       }
-      if (Voltage != 0F) {
+      if (HasVoltage) {
         output.WriteRawTag(21);
         output.WriteFloat(Voltage);
       }
-      if (ChannelUtilization != 0F) {
+      if (HasChannelUtilization) {
         output.WriteRawTag(29);
         output.WriteFloat(ChannelUtilization);
       }
-      if (AirUtilTx != 0F) {
+      if (HasAirUtilTx) {
         output.WriteRawTag(37);
         output.WriteFloat(AirUtilTx);
+      }
+      if (HasUptimeSeconds) {
+        output.WriteRawTag(40);
+        output.WriteUInt32(UptimeSeconds);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -343,21 +732,25 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (BatteryLevel != 0) {
+      if (HasBatteryLevel) {
         output.WriteRawTag(8);
         output.WriteUInt32(BatteryLevel);
       }
-      if (Voltage != 0F) {
+      if (HasVoltage) {
         output.WriteRawTag(21);
         output.WriteFloat(Voltage);
       }
-      if (ChannelUtilization != 0F) {
+      if (HasChannelUtilization) {
         output.WriteRawTag(29);
         output.WriteFloat(ChannelUtilization);
       }
-      if (AirUtilTx != 0F) {
+      if (HasAirUtilTx) {
         output.WriteRawTag(37);
         output.WriteFloat(AirUtilTx);
+      }
+      if (HasUptimeSeconds) {
+        output.WriteRawTag(40);
+        output.WriteUInt32(UptimeSeconds);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -369,17 +762,20 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (BatteryLevel != 0) {
+      if (HasBatteryLevel) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(BatteryLevel);
       }
-      if (Voltage != 0F) {
+      if (HasVoltage) {
         size += 1 + 4;
       }
-      if (ChannelUtilization != 0F) {
+      if (HasChannelUtilization) {
         size += 1 + 4;
       }
-      if (AirUtilTx != 0F) {
+      if (HasAirUtilTx) {
         size += 1 + 4;
+      }
+      if (HasUptimeSeconds) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(UptimeSeconds);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -393,17 +789,20 @@ namespace Meshtastic.Protobufs {
       if (other == null) {
         return;
       }
-      if (other.BatteryLevel != 0) {
+      if (other.HasBatteryLevel) {
         BatteryLevel = other.BatteryLevel;
       }
-      if (other.Voltage != 0F) {
+      if (other.HasVoltage) {
         Voltage = other.Voltage;
       }
-      if (other.ChannelUtilization != 0F) {
+      if (other.HasChannelUtilization) {
         ChannelUtilization = other.ChannelUtilization;
       }
-      if (other.AirUtilTx != 0F) {
+      if (other.HasAirUtilTx) {
         AirUtilTx = other.AirUtilTx;
+      }
+      if (other.HasUptimeSeconds) {
+        UptimeSeconds = other.UptimeSeconds;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -434,6 +833,10 @@ namespace Meshtastic.Protobufs {
           }
           case 37: {
             AirUtilTx = input.ReadFloat();
+            break;
+          }
+          case 40: {
+            UptimeSeconds = input.ReadUInt32();
             break;
           }
         }
@@ -467,6 +870,10 @@ namespace Meshtastic.Protobufs {
             AirUtilTx = input.ReadFloat();
             break;
           }
+          case 40: {
+            UptimeSeconds = input.ReadUInt32();
+            break;
+          }
         }
       }
     }
@@ -485,6 +892,7 @@ namespace Meshtastic.Protobufs {
   {
     private static readonly pb::MessageParser<EnvironmentMetrics> _parser = new pb::MessageParser<EnvironmentMetrics>(() => new EnvironmentMetrics());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<EnvironmentMetrics> Parser { get { return _parser; } }
@@ -512,12 +920,30 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public EnvironmentMetrics(EnvironmentMetrics other) : this() {
+      _hasBits0 = other._hasBits0;
       temperature_ = other.temperature_;
       relativeHumidity_ = other.relativeHumidity_;
       barometricPressure_ = other.barometricPressure_;
       gasResistance_ = other.gasResistance_;
       voltage_ = other.voltage_;
       current_ = other.current_;
+      iaq_ = other.iaq_;
+      distance_ = other.distance_;
+      lux_ = other.lux_;
+      whiteLux_ = other.whiteLux_;
+      irLux_ = other.irLux_;
+      uvLux_ = other.uvLux_;
+      windDirection_ = other.windDirection_;
+      windSpeed_ = other.windSpeed_;
+      weight_ = other.weight_;
+      windGust_ = other.windGust_;
+      windLull_ = other.windLull_;
+      radiation_ = other.radiation_;
+      rainfall1H_ = other.rainfall1H_;
+      rainfall24H_ = other.rainfall24H_;
+      soilMoisture_ = other.soilMoisture_;
+      soilTemperature_ = other.soilTemperature_;
+      oneWireTemperature_ = other.oneWireTemperature_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -537,10 +963,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Temperature {
-      get { return temperature_; }
+      get { if ((_hasBits0 & 1) != 0) { return temperature_; } else { return 0F; } }
       set {
+        _hasBits0 |= 1;
         temperature_ = value;
       }
+    }
+    /// <summary>Gets whether the "temperature" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasTemperature {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "temperature" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearTemperature() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "relative_humidity" field.</summary>
@@ -553,10 +992,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float RelativeHumidity {
-      get { return relativeHumidity_; }
+      get { if ((_hasBits0 & 2) != 0) { return relativeHumidity_; } else { return 0F; } }
       set {
+        _hasBits0 |= 2;
         relativeHumidity_ = value;
       }
+    }
+    /// <summary>Gets whether the "relative_humidity" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRelativeHumidity {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "relative_humidity" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRelativeHumidity() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "barometric_pressure" field.</summary>
@@ -569,10 +1021,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float BarometricPressure {
-      get { return barometricPressure_; }
+      get { if ((_hasBits0 & 4) != 0) { return barometricPressure_; } else { return 0F; } }
       set {
+        _hasBits0 |= 4;
         barometricPressure_ = value;
       }
+    }
+    /// <summary>Gets whether the "barometric_pressure" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasBarometricPressure {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "barometric_pressure" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearBarometricPressure() {
+      _hasBits0 &= ~4;
     }
 
     /// <summary>Field number for the "gas_resistance" field.</summary>
@@ -585,10 +1050,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float GasResistance {
-      get { return gasResistance_; }
+      get { if ((_hasBits0 & 8) != 0) { return gasResistance_; } else { return 0F; } }
       set {
+        _hasBits0 |= 8;
         gasResistance_ = value;
       }
+    }
+    /// <summary>Gets whether the "gas_resistance" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasGasResistance {
+      get { return (_hasBits0 & 8) != 0; }
+    }
+    /// <summary>Clears the value of the "gas_resistance" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearGasResistance() {
+      _hasBits0 &= ~8;
     }
 
     /// <summary>Field number for the "voltage" field.</summary>
@@ -601,10 +1079,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Voltage {
-      get { return voltage_; }
+      get { if ((_hasBits0 & 16) != 0) { return voltage_; } else { return 0F; } }
       set {
+        _hasBits0 |= 16;
         voltage_ = value;
       }
+    }
+    /// <summary>Gets whether the "voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasVoltage {
+      get { return (_hasBits0 & 16) != 0; }
+    }
+    /// <summary>Clears the value of the "voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearVoltage() {
+      _hasBits0 &= ~16;
     }
 
     /// <summary>Field number for the "current" field.</summary>
@@ -617,10 +1108,504 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Current {
-      get { return current_; }
+      get { if ((_hasBits0 & 32) != 0) { return current_; } else { return 0F; } }
       set {
+        _hasBits0 |= 32;
         current_ = value;
       }
+    }
+    /// <summary>Gets whether the "current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCurrent {
+      get { return (_hasBits0 & 32) != 0; }
+    }
+    /// <summary>Clears the value of the "current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCurrent() {
+      _hasBits0 &= ~32;
+    }
+
+    /// <summary>Field number for the "iaq" field.</summary>
+    public const int IaqFieldNumber = 7;
+    private uint iaq_;
+    /// <summary>
+    ///
+    /// relative scale IAQ value as measured by Bosch BME680 . value 0-500.
+    /// Belongs to Air Quality but is not particle but VOC measurement. Other VOC values can also be put in here.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Iaq {
+      get { if ((_hasBits0 & 64) != 0) { return iaq_; } else { return 0; } }
+      set {
+        _hasBits0 |= 64;
+        iaq_ = value;
+      }
+    }
+    /// <summary>Gets whether the "iaq" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasIaq {
+      get { return (_hasBits0 & 64) != 0; }
+    }
+    /// <summary>Clears the value of the "iaq" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearIaq() {
+      _hasBits0 &= ~64;
+    }
+
+    /// <summary>Field number for the "distance" field.</summary>
+    public const int DistanceFieldNumber = 8;
+    private float distance_;
+    /// <summary>
+    ///
+    /// RCWL9620 Doppler Radar Distance Sensor, used for water level detection. Float value in mm.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Distance {
+      get { if ((_hasBits0 & 128) != 0) { return distance_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 128;
+        distance_ = value;
+      }
+    }
+    /// <summary>Gets whether the "distance" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasDistance {
+      get { return (_hasBits0 & 128) != 0; }
+    }
+    /// <summary>Clears the value of the "distance" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearDistance() {
+      _hasBits0 &= ~128;
+    }
+
+    /// <summary>Field number for the "lux" field.</summary>
+    public const int LuxFieldNumber = 9;
+    private float lux_;
+    /// <summary>
+    ///
+    /// VEML7700 high accuracy ambient light(Lux) digital 16-bit resolution sensor.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Lux {
+      get { if ((_hasBits0 & 256) != 0) { return lux_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 256;
+        lux_ = value;
+      }
+    }
+    /// <summary>Gets whether the "lux" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasLux {
+      get { return (_hasBits0 & 256) != 0; }
+    }
+    /// <summary>Clears the value of the "lux" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearLux() {
+      _hasBits0 &= ~256;
+    }
+
+    /// <summary>Field number for the "white_lux" field.</summary>
+    public const int WhiteLuxFieldNumber = 10;
+    private float whiteLux_;
+    /// <summary>
+    ///
+    /// VEML7700 high accuracy white light(irradiance) not calibrated digital 16-bit resolution sensor.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float WhiteLux {
+      get { if ((_hasBits0 & 512) != 0) { return whiteLux_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 512;
+        whiteLux_ = value;
+      }
+    }
+    /// <summary>Gets whether the "white_lux" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWhiteLux {
+      get { return (_hasBits0 & 512) != 0; }
+    }
+    /// <summary>Clears the value of the "white_lux" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWhiteLux() {
+      _hasBits0 &= ~512;
+    }
+
+    /// <summary>Field number for the "ir_lux" field.</summary>
+    public const int IrLuxFieldNumber = 11;
+    private float irLux_;
+    /// <summary>
+    ///
+    /// Infrared lux
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float IrLux {
+      get { if ((_hasBits0 & 1024) != 0) { return irLux_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 1024;
+        irLux_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ir_lux" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasIrLux {
+      get { return (_hasBits0 & 1024) != 0; }
+    }
+    /// <summary>Clears the value of the "ir_lux" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearIrLux() {
+      _hasBits0 &= ~1024;
+    }
+
+    /// <summary>Field number for the "uv_lux" field.</summary>
+    public const int UvLuxFieldNumber = 12;
+    private float uvLux_;
+    /// <summary>
+    ///
+    /// Ultraviolet lux
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float UvLux {
+      get { if ((_hasBits0 & 2048) != 0) { return uvLux_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 2048;
+        uvLux_ = value;
+      }
+    }
+    /// <summary>Gets whether the "uv_lux" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasUvLux {
+      get { return (_hasBits0 & 2048) != 0; }
+    }
+    /// <summary>Clears the value of the "uv_lux" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearUvLux() {
+      _hasBits0 &= ~2048;
+    }
+
+    /// <summary>Field number for the "wind_direction" field.</summary>
+    public const int WindDirectionFieldNumber = 13;
+    private uint windDirection_;
+    /// <summary>
+    ///
+    /// Wind direction in degrees
+    /// 0 degrees = North, 90 = East, etc...
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint WindDirection {
+      get { if ((_hasBits0 & 4096) != 0) { return windDirection_; } else { return 0; } }
+      set {
+        _hasBits0 |= 4096;
+        windDirection_ = value;
+      }
+    }
+    /// <summary>Gets whether the "wind_direction" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWindDirection {
+      get { return (_hasBits0 & 4096) != 0; }
+    }
+    /// <summary>Clears the value of the "wind_direction" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWindDirection() {
+      _hasBits0 &= ~4096;
+    }
+
+    /// <summary>Field number for the "wind_speed" field.</summary>
+    public const int WindSpeedFieldNumber = 14;
+    private float windSpeed_;
+    /// <summary>
+    ///
+    /// Wind speed in m/s
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float WindSpeed {
+      get { if ((_hasBits0 & 8192) != 0) { return windSpeed_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 8192;
+        windSpeed_ = value;
+      }
+    }
+    /// <summary>Gets whether the "wind_speed" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWindSpeed {
+      get { return (_hasBits0 & 8192) != 0; }
+    }
+    /// <summary>Clears the value of the "wind_speed" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWindSpeed() {
+      _hasBits0 &= ~8192;
+    }
+
+    /// <summary>Field number for the "weight" field.</summary>
+    public const int WeightFieldNumber = 15;
+    private float weight_;
+    /// <summary>
+    ///
+    /// Weight in KG
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Weight {
+      get { if ((_hasBits0 & 16384) != 0) { return weight_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 16384;
+        weight_ = value;
+      }
+    }
+    /// <summary>Gets whether the "weight" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWeight {
+      get { return (_hasBits0 & 16384) != 0; }
+    }
+    /// <summary>Clears the value of the "weight" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWeight() {
+      _hasBits0 &= ~16384;
+    }
+
+    /// <summary>Field number for the "wind_gust" field.</summary>
+    public const int WindGustFieldNumber = 16;
+    private float windGust_;
+    /// <summary>
+    ///
+    /// Wind gust in m/s
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float WindGust {
+      get { if ((_hasBits0 & 32768) != 0) { return windGust_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 32768;
+        windGust_ = value;
+      }
+    }
+    /// <summary>Gets whether the "wind_gust" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWindGust {
+      get { return (_hasBits0 & 32768) != 0; }
+    }
+    /// <summary>Clears the value of the "wind_gust" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWindGust() {
+      _hasBits0 &= ~32768;
+    }
+
+    /// <summary>Field number for the "wind_lull" field.</summary>
+    public const int WindLullFieldNumber = 17;
+    private float windLull_;
+    /// <summary>
+    ///
+    /// Wind lull in m/s
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float WindLull {
+      get { if ((_hasBits0 & 65536) != 0) { return windLull_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 65536;
+        windLull_ = value;
+      }
+    }
+    /// <summary>Gets whether the "wind_lull" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasWindLull {
+      get { return (_hasBits0 & 65536) != 0; }
+    }
+    /// <summary>Clears the value of the "wind_lull" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearWindLull() {
+      _hasBits0 &= ~65536;
+    }
+
+    /// <summary>Field number for the "radiation" field.</summary>
+    public const int RadiationFieldNumber = 18;
+    private float radiation_;
+    /// <summary>
+    ///
+    /// Radiation in µR/h
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Radiation {
+      get { if ((_hasBits0 & 131072) != 0) { return radiation_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 131072;
+        radiation_ = value;
+      }
+    }
+    /// <summary>Gets whether the "radiation" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRadiation {
+      get { return (_hasBits0 & 131072) != 0; }
+    }
+    /// <summary>Clears the value of the "radiation" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRadiation() {
+      _hasBits0 &= ~131072;
+    }
+
+    /// <summary>Field number for the "rainfall_1h" field.</summary>
+    public const int Rainfall1HFieldNumber = 19;
+    private float rainfall1H_;
+    /// <summary>
+    ///
+    /// Rainfall in the last hour in mm
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Rainfall1H {
+      get { if ((_hasBits0 & 262144) != 0) { return rainfall1H_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 262144;
+        rainfall1H_ = value;
+      }
+    }
+    /// <summary>Gets whether the "rainfall_1h" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRainfall1H {
+      get { return (_hasBits0 & 262144) != 0; }
+    }
+    /// <summary>Clears the value of the "rainfall_1h" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRainfall1H() {
+      _hasBits0 &= ~262144;
+    }
+
+    /// <summary>Field number for the "rainfall_24h" field.</summary>
+    public const int Rainfall24HFieldNumber = 20;
+    private float rainfall24H_;
+    /// <summary>
+    ///
+    /// Rainfall in the last 24 hours in mm
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Rainfall24H {
+      get { if ((_hasBits0 & 524288) != 0) { return rainfall24H_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 524288;
+        rainfall24H_ = value;
+      }
+    }
+    /// <summary>Gets whether the "rainfall_24h" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasRainfall24H {
+      get { return (_hasBits0 & 524288) != 0; }
+    }
+    /// <summary>Clears the value of the "rainfall_24h" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearRainfall24H() {
+      _hasBits0 &= ~524288;
+    }
+
+    /// <summary>Field number for the "soil_moisture" field.</summary>
+    public const int SoilMoistureFieldNumber = 21;
+    private uint soilMoisture_;
+    /// <summary>
+    ///
+    /// Soil moisture measured (% 1-100)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint SoilMoisture {
+      get { if ((_hasBits0 & 1048576) != 0) { return soilMoisture_; } else { return 0; } }
+      set {
+        _hasBits0 |= 1048576;
+        soilMoisture_ = value;
+      }
+    }
+    /// <summary>Gets whether the "soil_moisture" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSoilMoisture {
+      get { return (_hasBits0 & 1048576) != 0; }
+    }
+    /// <summary>Clears the value of the "soil_moisture" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSoilMoisture() {
+      _hasBits0 &= ~1048576;
+    }
+
+    /// <summary>Field number for the "soil_temperature" field.</summary>
+    public const int SoilTemperatureFieldNumber = 22;
+    private float soilTemperature_;
+    /// <summary>
+    ///
+    /// Soil temperature measured (*C)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float SoilTemperature {
+      get { if ((_hasBits0 & 2097152) != 0) { return soilTemperature_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 2097152;
+        soilTemperature_ = value;
+      }
+    }
+    /// <summary>Gets whether the "soil_temperature" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSoilTemperature {
+      get { return (_hasBits0 & 2097152) != 0; }
+    }
+    /// <summary>Clears the value of the "soil_temperature" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSoilTemperature() {
+      _hasBits0 &= ~2097152;
+    }
+
+    /// <summary>Field number for the "one_wire_temperature" field.</summary>
+    public const int OneWireTemperatureFieldNumber = 23;
+    private static readonly pb::FieldCodec<float> _repeated_oneWireTemperature_codec
+        = pb::FieldCodec.ForFloat(186);
+    private readonly pbc::RepeatedField<float> oneWireTemperature_ = new pbc::RepeatedField<float>();
+    /// <summary>
+    ///
+    /// One-wire temperature (*C)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<float> OneWireTemperature {
+      get { return oneWireTemperature_; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -644,6 +1629,23 @@ namespace Meshtastic.Protobufs {
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(GasResistance, other.GasResistance)) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Voltage, other.Voltage)) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Current, other.Current)) return false;
+      if (Iaq != other.Iaq) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Distance, other.Distance)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Lux, other.Lux)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(WhiteLux, other.WhiteLux)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(IrLux, other.IrLux)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(UvLux, other.UvLux)) return false;
+      if (WindDirection != other.WindDirection) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(WindSpeed, other.WindSpeed)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Weight, other.Weight)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(WindGust, other.WindGust)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(WindLull, other.WindLull)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Radiation, other.Radiation)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Rainfall1H, other.Rainfall1H)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Rainfall24H, other.Rainfall24H)) return false;
+      if (SoilMoisture != other.SoilMoisture) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(SoilTemperature, other.SoilTemperature)) return false;
+      if(!oneWireTemperature_.Equals(other.oneWireTemperature_)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -651,12 +1653,29 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Temperature != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Temperature);
-      if (RelativeHumidity != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(RelativeHumidity);
-      if (BarometricPressure != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(BarometricPressure);
-      if (GasResistance != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(GasResistance);
-      if (Voltage != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Voltage);
-      if (Current != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Current);
+      if (HasTemperature) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Temperature);
+      if (HasRelativeHumidity) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(RelativeHumidity);
+      if (HasBarometricPressure) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(BarometricPressure);
+      if (HasGasResistance) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(GasResistance);
+      if (HasVoltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Voltage);
+      if (HasCurrent) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Current);
+      if (HasIaq) hash ^= Iaq.GetHashCode();
+      if (HasDistance) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Distance);
+      if (HasLux) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Lux);
+      if (HasWhiteLux) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(WhiteLux);
+      if (HasIrLux) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(IrLux);
+      if (HasUvLux) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(UvLux);
+      if (HasWindDirection) hash ^= WindDirection.GetHashCode();
+      if (HasWindSpeed) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(WindSpeed);
+      if (HasWeight) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Weight);
+      if (HasWindGust) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(WindGust);
+      if (HasWindLull) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(WindLull);
+      if (HasRadiation) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Radiation);
+      if (HasRainfall1H) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Rainfall1H);
+      if (HasRainfall24H) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Rainfall24H);
+      if (HasSoilMoisture) hash ^= SoilMoisture.GetHashCode();
+      if (HasSoilTemperature) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(SoilTemperature);
+      hash ^= oneWireTemperature_.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -675,30 +1694,95 @@ namespace Meshtastic.Protobufs {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Temperature != 0F) {
+      if (HasTemperature) {
         output.WriteRawTag(13);
         output.WriteFloat(Temperature);
       }
-      if (RelativeHumidity != 0F) {
+      if (HasRelativeHumidity) {
         output.WriteRawTag(21);
         output.WriteFloat(RelativeHumidity);
       }
-      if (BarometricPressure != 0F) {
+      if (HasBarometricPressure) {
         output.WriteRawTag(29);
         output.WriteFloat(BarometricPressure);
       }
-      if (GasResistance != 0F) {
+      if (HasGasResistance) {
         output.WriteRawTag(37);
         output.WriteFloat(GasResistance);
       }
-      if (Voltage != 0F) {
+      if (HasVoltage) {
         output.WriteRawTag(45);
         output.WriteFloat(Voltage);
       }
-      if (Current != 0F) {
+      if (HasCurrent) {
         output.WriteRawTag(53);
         output.WriteFloat(Current);
       }
+      if (HasIaq) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(Iaq);
+      }
+      if (HasDistance) {
+        output.WriteRawTag(69);
+        output.WriteFloat(Distance);
+      }
+      if (HasLux) {
+        output.WriteRawTag(77);
+        output.WriteFloat(Lux);
+      }
+      if (HasWhiteLux) {
+        output.WriteRawTag(85);
+        output.WriteFloat(WhiteLux);
+      }
+      if (HasIrLux) {
+        output.WriteRawTag(93);
+        output.WriteFloat(IrLux);
+      }
+      if (HasUvLux) {
+        output.WriteRawTag(101);
+        output.WriteFloat(UvLux);
+      }
+      if (HasWindDirection) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(WindDirection);
+      }
+      if (HasWindSpeed) {
+        output.WriteRawTag(117);
+        output.WriteFloat(WindSpeed);
+      }
+      if (HasWeight) {
+        output.WriteRawTag(125);
+        output.WriteFloat(Weight);
+      }
+      if (HasWindGust) {
+        output.WriteRawTag(133, 1);
+        output.WriteFloat(WindGust);
+      }
+      if (HasWindLull) {
+        output.WriteRawTag(141, 1);
+        output.WriteFloat(WindLull);
+      }
+      if (HasRadiation) {
+        output.WriteRawTag(149, 1);
+        output.WriteFloat(Radiation);
+      }
+      if (HasRainfall1H) {
+        output.WriteRawTag(157, 1);
+        output.WriteFloat(Rainfall1H);
+      }
+      if (HasRainfall24H) {
+        output.WriteRawTag(165, 1);
+        output.WriteFloat(Rainfall24H);
+      }
+      if (HasSoilMoisture) {
+        output.WriteRawTag(168, 1);
+        output.WriteUInt32(SoilMoisture);
+      }
+      if (HasSoilTemperature) {
+        output.WriteRawTag(181, 1);
+        output.WriteFloat(SoilTemperature);
+      }
+      oneWireTemperature_.WriteTo(output, _repeated_oneWireTemperature_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -709,30 +1793,95 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Temperature != 0F) {
+      if (HasTemperature) {
         output.WriteRawTag(13);
         output.WriteFloat(Temperature);
       }
-      if (RelativeHumidity != 0F) {
+      if (HasRelativeHumidity) {
         output.WriteRawTag(21);
         output.WriteFloat(RelativeHumidity);
       }
-      if (BarometricPressure != 0F) {
+      if (HasBarometricPressure) {
         output.WriteRawTag(29);
         output.WriteFloat(BarometricPressure);
       }
-      if (GasResistance != 0F) {
+      if (HasGasResistance) {
         output.WriteRawTag(37);
         output.WriteFloat(GasResistance);
       }
-      if (Voltage != 0F) {
+      if (HasVoltage) {
         output.WriteRawTag(45);
         output.WriteFloat(Voltage);
       }
-      if (Current != 0F) {
+      if (HasCurrent) {
         output.WriteRawTag(53);
         output.WriteFloat(Current);
       }
+      if (HasIaq) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(Iaq);
+      }
+      if (HasDistance) {
+        output.WriteRawTag(69);
+        output.WriteFloat(Distance);
+      }
+      if (HasLux) {
+        output.WriteRawTag(77);
+        output.WriteFloat(Lux);
+      }
+      if (HasWhiteLux) {
+        output.WriteRawTag(85);
+        output.WriteFloat(WhiteLux);
+      }
+      if (HasIrLux) {
+        output.WriteRawTag(93);
+        output.WriteFloat(IrLux);
+      }
+      if (HasUvLux) {
+        output.WriteRawTag(101);
+        output.WriteFloat(UvLux);
+      }
+      if (HasWindDirection) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(WindDirection);
+      }
+      if (HasWindSpeed) {
+        output.WriteRawTag(117);
+        output.WriteFloat(WindSpeed);
+      }
+      if (HasWeight) {
+        output.WriteRawTag(125);
+        output.WriteFloat(Weight);
+      }
+      if (HasWindGust) {
+        output.WriteRawTag(133, 1);
+        output.WriteFloat(WindGust);
+      }
+      if (HasWindLull) {
+        output.WriteRawTag(141, 1);
+        output.WriteFloat(WindLull);
+      }
+      if (HasRadiation) {
+        output.WriteRawTag(149, 1);
+        output.WriteFloat(Radiation);
+      }
+      if (HasRainfall1H) {
+        output.WriteRawTag(157, 1);
+        output.WriteFloat(Rainfall1H);
+      }
+      if (HasRainfall24H) {
+        output.WriteRawTag(165, 1);
+        output.WriteFloat(Rainfall24H);
+      }
+      if (HasSoilMoisture) {
+        output.WriteRawTag(168, 1);
+        output.WriteUInt32(SoilMoisture);
+      }
+      if (HasSoilTemperature) {
+        output.WriteRawTag(181, 1);
+        output.WriteFloat(SoilTemperature);
+      }
+      oneWireTemperature_.WriteTo(ref output, _repeated_oneWireTemperature_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -743,24 +1892,73 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Temperature != 0F) {
+      if (HasTemperature) {
         size += 1 + 4;
       }
-      if (RelativeHumidity != 0F) {
+      if (HasRelativeHumidity) {
         size += 1 + 4;
       }
-      if (BarometricPressure != 0F) {
+      if (HasBarometricPressure) {
         size += 1 + 4;
       }
-      if (GasResistance != 0F) {
+      if (HasGasResistance) {
         size += 1 + 4;
       }
-      if (Voltage != 0F) {
+      if (HasVoltage) {
         size += 1 + 4;
       }
-      if (Current != 0F) {
+      if (HasCurrent) {
         size += 1 + 4;
       }
+      if (HasIaq) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Iaq);
+      }
+      if (HasDistance) {
+        size += 1 + 4;
+      }
+      if (HasLux) {
+        size += 1 + 4;
+      }
+      if (HasWhiteLux) {
+        size += 1 + 4;
+      }
+      if (HasIrLux) {
+        size += 1 + 4;
+      }
+      if (HasUvLux) {
+        size += 1 + 4;
+      }
+      if (HasWindDirection) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(WindDirection);
+      }
+      if (HasWindSpeed) {
+        size += 1 + 4;
+      }
+      if (HasWeight) {
+        size += 1 + 4;
+      }
+      if (HasWindGust) {
+        size += 2 + 4;
+      }
+      if (HasWindLull) {
+        size += 2 + 4;
+      }
+      if (HasRadiation) {
+        size += 2 + 4;
+      }
+      if (HasRainfall1H) {
+        size += 2 + 4;
+      }
+      if (HasRainfall24H) {
+        size += 2 + 4;
+      }
+      if (HasSoilMoisture) {
+        size += 2 + pb::CodedOutputStream.ComputeUInt32Size(SoilMoisture);
+      }
+      if (HasSoilTemperature) {
+        size += 2 + 4;
+      }
+      size += oneWireTemperature_.CalculateSize(_repeated_oneWireTemperature_codec);
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -773,24 +1971,73 @@ namespace Meshtastic.Protobufs {
       if (other == null) {
         return;
       }
-      if (other.Temperature != 0F) {
+      if (other.HasTemperature) {
         Temperature = other.Temperature;
       }
-      if (other.RelativeHumidity != 0F) {
+      if (other.HasRelativeHumidity) {
         RelativeHumidity = other.RelativeHumidity;
       }
-      if (other.BarometricPressure != 0F) {
+      if (other.HasBarometricPressure) {
         BarometricPressure = other.BarometricPressure;
       }
-      if (other.GasResistance != 0F) {
+      if (other.HasGasResistance) {
         GasResistance = other.GasResistance;
       }
-      if (other.Voltage != 0F) {
+      if (other.HasVoltage) {
         Voltage = other.Voltage;
       }
-      if (other.Current != 0F) {
+      if (other.HasCurrent) {
         Current = other.Current;
       }
+      if (other.HasIaq) {
+        Iaq = other.Iaq;
+      }
+      if (other.HasDistance) {
+        Distance = other.Distance;
+      }
+      if (other.HasLux) {
+        Lux = other.Lux;
+      }
+      if (other.HasWhiteLux) {
+        WhiteLux = other.WhiteLux;
+      }
+      if (other.HasIrLux) {
+        IrLux = other.IrLux;
+      }
+      if (other.HasUvLux) {
+        UvLux = other.UvLux;
+      }
+      if (other.HasWindDirection) {
+        WindDirection = other.WindDirection;
+      }
+      if (other.HasWindSpeed) {
+        WindSpeed = other.WindSpeed;
+      }
+      if (other.HasWeight) {
+        Weight = other.Weight;
+      }
+      if (other.HasWindGust) {
+        WindGust = other.WindGust;
+      }
+      if (other.HasWindLull) {
+        WindLull = other.WindLull;
+      }
+      if (other.HasRadiation) {
+        Radiation = other.Radiation;
+      }
+      if (other.HasRainfall1H) {
+        Rainfall1H = other.Rainfall1H;
+      }
+      if (other.HasRainfall24H) {
+        Rainfall24H = other.Rainfall24H;
+      }
+      if (other.HasSoilMoisture) {
+        SoilMoisture = other.SoilMoisture;
+      }
+      if (other.HasSoilTemperature) {
+        SoilTemperature = other.SoilTemperature;
+      }
+      oneWireTemperature_.Add(other.oneWireTemperature_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -828,6 +2075,75 @@ namespace Meshtastic.Protobufs {
           }
           case 53: {
             Current = input.ReadFloat();
+            break;
+          }
+          case 56: {
+            Iaq = input.ReadUInt32();
+            break;
+          }
+          case 69: {
+            Distance = input.ReadFloat();
+            break;
+          }
+          case 77: {
+            Lux = input.ReadFloat();
+            break;
+          }
+          case 85: {
+            WhiteLux = input.ReadFloat();
+            break;
+          }
+          case 93: {
+            IrLux = input.ReadFloat();
+            break;
+          }
+          case 101: {
+            UvLux = input.ReadFloat();
+            break;
+          }
+          case 104: {
+            WindDirection = input.ReadUInt32();
+            break;
+          }
+          case 117: {
+            WindSpeed = input.ReadFloat();
+            break;
+          }
+          case 125: {
+            Weight = input.ReadFloat();
+            break;
+          }
+          case 133: {
+            WindGust = input.ReadFloat();
+            break;
+          }
+          case 141: {
+            WindLull = input.ReadFloat();
+            break;
+          }
+          case 149: {
+            Radiation = input.ReadFloat();
+            break;
+          }
+          case 157: {
+            Rainfall1H = input.ReadFloat();
+            break;
+          }
+          case 165: {
+            Rainfall24H = input.ReadFloat();
+            break;
+          }
+          case 168: {
+            SoilMoisture = input.ReadUInt32();
+            break;
+          }
+          case 181: {
+            SoilTemperature = input.ReadFloat();
+            break;
+          }
+          case 186:
+          case 189: {
+            oneWireTemperature_.AddEntriesFrom(input, _repeated_oneWireTemperature_codec);
             break;
           }
         }
@@ -869,6 +2185,75 @@ namespace Meshtastic.Protobufs {
             Current = input.ReadFloat();
             break;
           }
+          case 56: {
+            Iaq = input.ReadUInt32();
+            break;
+          }
+          case 69: {
+            Distance = input.ReadFloat();
+            break;
+          }
+          case 77: {
+            Lux = input.ReadFloat();
+            break;
+          }
+          case 85: {
+            WhiteLux = input.ReadFloat();
+            break;
+          }
+          case 93: {
+            IrLux = input.ReadFloat();
+            break;
+          }
+          case 101: {
+            UvLux = input.ReadFloat();
+            break;
+          }
+          case 104: {
+            WindDirection = input.ReadUInt32();
+            break;
+          }
+          case 117: {
+            WindSpeed = input.ReadFloat();
+            break;
+          }
+          case 125: {
+            Weight = input.ReadFloat();
+            break;
+          }
+          case 133: {
+            WindGust = input.ReadFloat();
+            break;
+          }
+          case 141: {
+            WindLull = input.ReadFloat();
+            break;
+          }
+          case 149: {
+            Radiation = input.ReadFloat();
+            break;
+          }
+          case 157: {
+            Rainfall1H = input.ReadFloat();
+            break;
+          }
+          case 165: {
+            Rainfall24H = input.ReadFloat();
+            break;
+          }
+          case 168: {
+            SoilMoisture = input.ReadUInt32();
+            break;
+          }
+          case 181: {
+            SoilTemperature = input.ReadFloat();
+            break;
+          }
+          case 186:
+          case 189: {
+            oneWireTemperature_.AddEntriesFrom(ref input, _repeated_oneWireTemperature_codec);
+            break;
+          }
         }
       }
     }
@@ -887,6 +2272,7 @@ namespace Meshtastic.Protobufs {
   {
     private static readonly pb::MessageParser<PowerMetrics> _parser = new pb::MessageParser<PowerMetrics>(() => new PowerMetrics());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<PowerMetrics> Parser { get { return _parser; } }
@@ -914,12 +2300,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public PowerMetrics(PowerMetrics other) : this() {
+      _hasBits0 = other._hasBits0;
       ch1Voltage_ = other.ch1Voltage_;
       ch1Current_ = other.ch1Current_;
       ch2Voltage_ = other.ch2Voltage_;
       ch2Current_ = other.ch2Current_;
       ch3Voltage_ = other.ch3Voltage_;
       ch3Current_ = other.ch3Current_;
+      ch4Voltage_ = other.ch4Voltage_;
+      ch4Current_ = other.ch4Current_;
+      ch5Voltage_ = other.ch5Voltage_;
+      ch5Current_ = other.ch5Current_;
+      ch6Voltage_ = other.ch6Voltage_;
+      ch6Current_ = other.ch6Current_;
+      ch7Voltage_ = other.ch7Voltage_;
+      ch7Current_ = other.ch7Current_;
+      ch8Voltage_ = other.ch8Voltage_;
+      ch8Current_ = other.ch8Current_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -939,10 +2336,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Ch1Voltage {
-      get { return ch1Voltage_; }
+      get { if ((_hasBits0 & 1) != 0) { return ch1Voltage_; } else { return 0F; } }
       set {
+        _hasBits0 |= 1;
         ch1Voltage_ = value;
       }
+    }
+    /// <summary>Gets whether the "ch1_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh1Voltage {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "ch1_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh1Voltage() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "ch1_current" field.</summary>
@@ -955,10 +2365,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Ch1Current {
-      get { return ch1Current_; }
+      get { if ((_hasBits0 & 2) != 0) { return ch1Current_; } else { return 0F; } }
       set {
+        _hasBits0 |= 2;
         ch1Current_ = value;
       }
+    }
+    /// <summary>Gets whether the "ch1_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh1Current {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "ch1_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh1Current() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "ch2_voltage" field.</summary>
@@ -971,10 +2394,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Ch2Voltage {
-      get { return ch2Voltage_; }
+      get { if ((_hasBits0 & 4) != 0) { return ch2Voltage_; } else { return 0F; } }
       set {
+        _hasBits0 |= 4;
         ch2Voltage_ = value;
       }
+    }
+    /// <summary>Gets whether the "ch2_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh2Voltage {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "ch2_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh2Voltage() {
+      _hasBits0 &= ~4;
     }
 
     /// <summary>Field number for the "ch2_current" field.</summary>
@@ -987,10 +2423,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Ch2Current {
-      get { return ch2Current_; }
+      get { if ((_hasBits0 & 8) != 0) { return ch2Current_; } else { return 0F; } }
       set {
+        _hasBits0 |= 8;
         ch2Current_ = value;
       }
+    }
+    /// <summary>Gets whether the "ch2_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh2Current {
+      get { return (_hasBits0 & 8) != 0; }
+    }
+    /// <summary>Clears the value of the "ch2_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh2Current() {
+      _hasBits0 &= ~8;
     }
 
     /// <summary>Field number for the "ch3_voltage" field.</summary>
@@ -1003,10 +2452,23 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Ch3Voltage {
-      get { return ch3Voltage_; }
+      get { if ((_hasBits0 & 16) != 0) { return ch3Voltage_; } else { return 0F; } }
       set {
+        _hasBits0 |= 16;
         ch3Voltage_ = value;
       }
+    }
+    /// <summary>Gets whether the "ch3_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh3Voltage {
+      get { return (_hasBits0 & 16) != 0; }
+    }
+    /// <summary>Clears the value of the "ch3_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh3Voltage() {
+      _hasBits0 &= ~16;
     }
 
     /// <summary>Field number for the "ch3_current" field.</summary>
@@ -1019,10 +2481,313 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public float Ch3Current {
-      get { return ch3Current_; }
+      get { if ((_hasBits0 & 32) != 0) { return ch3Current_; } else { return 0F; } }
       set {
+        _hasBits0 |= 32;
         ch3Current_ = value;
       }
+    }
+    /// <summary>Gets whether the "ch3_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh3Current {
+      get { return (_hasBits0 & 32) != 0; }
+    }
+    /// <summary>Clears the value of the "ch3_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh3Current() {
+      _hasBits0 &= ~32;
+    }
+
+    /// <summary>Field number for the "ch4_voltage" field.</summary>
+    public const int Ch4VoltageFieldNumber = 7;
+    private float ch4Voltage_;
+    /// <summary>
+    ///
+    /// Voltage (Ch4)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch4Voltage {
+      get { if ((_hasBits0 & 64) != 0) { return ch4Voltage_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 64;
+        ch4Voltage_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch4_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh4Voltage {
+      get { return (_hasBits0 & 64) != 0; }
+    }
+    /// <summary>Clears the value of the "ch4_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh4Voltage() {
+      _hasBits0 &= ~64;
+    }
+
+    /// <summary>Field number for the "ch4_current" field.</summary>
+    public const int Ch4CurrentFieldNumber = 8;
+    private float ch4Current_;
+    /// <summary>
+    ///
+    /// Current (Ch4)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch4Current {
+      get { if ((_hasBits0 & 128) != 0) { return ch4Current_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 128;
+        ch4Current_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch4_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh4Current {
+      get { return (_hasBits0 & 128) != 0; }
+    }
+    /// <summary>Clears the value of the "ch4_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh4Current() {
+      _hasBits0 &= ~128;
+    }
+
+    /// <summary>Field number for the "ch5_voltage" field.</summary>
+    public const int Ch5VoltageFieldNumber = 9;
+    private float ch5Voltage_;
+    /// <summary>
+    ///
+    /// Voltage (Ch5)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch5Voltage {
+      get { if ((_hasBits0 & 256) != 0) { return ch5Voltage_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 256;
+        ch5Voltage_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch5_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh5Voltage {
+      get { return (_hasBits0 & 256) != 0; }
+    }
+    /// <summary>Clears the value of the "ch5_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh5Voltage() {
+      _hasBits0 &= ~256;
+    }
+
+    /// <summary>Field number for the "ch5_current" field.</summary>
+    public const int Ch5CurrentFieldNumber = 10;
+    private float ch5Current_;
+    /// <summary>
+    ///
+    /// Current (Ch5)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch5Current {
+      get { if ((_hasBits0 & 512) != 0) { return ch5Current_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 512;
+        ch5Current_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch5_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh5Current {
+      get { return (_hasBits0 & 512) != 0; }
+    }
+    /// <summary>Clears the value of the "ch5_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh5Current() {
+      _hasBits0 &= ~512;
+    }
+
+    /// <summary>Field number for the "ch6_voltage" field.</summary>
+    public const int Ch6VoltageFieldNumber = 11;
+    private float ch6Voltage_;
+    /// <summary>
+    ///
+    /// Voltage (Ch6)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch6Voltage {
+      get { if ((_hasBits0 & 1024) != 0) { return ch6Voltage_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 1024;
+        ch6Voltage_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch6_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh6Voltage {
+      get { return (_hasBits0 & 1024) != 0; }
+    }
+    /// <summary>Clears the value of the "ch6_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh6Voltage() {
+      _hasBits0 &= ~1024;
+    }
+
+    /// <summary>Field number for the "ch6_current" field.</summary>
+    public const int Ch6CurrentFieldNumber = 12;
+    private float ch6Current_;
+    /// <summary>
+    ///
+    /// Current (Ch6)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch6Current {
+      get { if ((_hasBits0 & 2048) != 0) { return ch6Current_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 2048;
+        ch6Current_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch6_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh6Current {
+      get { return (_hasBits0 & 2048) != 0; }
+    }
+    /// <summary>Clears the value of the "ch6_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh6Current() {
+      _hasBits0 &= ~2048;
+    }
+
+    /// <summary>Field number for the "ch7_voltage" field.</summary>
+    public const int Ch7VoltageFieldNumber = 13;
+    private float ch7Voltage_;
+    /// <summary>
+    ///
+    /// Voltage (Ch7)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch7Voltage {
+      get { if ((_hasBits0 & 4096) != 0) { return ch7Voltage_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 4096;
+        ch7Voltage_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch7_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh7Voltage {
+      get { return (_hasBits0 & 4096) != 0; }
+    }
+    /// <summary>Clears the value of the "ch7_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh7Voltage() {
+      _hasBits0 &= ~4096;
+    }
+
+    /// <summary>Field number for the "ch7_current" field.</summary>
+    public const int Ch7CurrentFieldNumber = 14;
+    private float ch7Current_;
+    /// <summary>
+    ///
+    /// Current (Ch7)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch7Current {
+      get { if ((_hasBits0 & 8192) != 0) { return ch7Current_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 8192;
+        ch7Current_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch7_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh7Current {
+      get { return (_hasBits0 & 8192) != 0; }
+    }
+    /// <summary>Clears the value of the "ch7_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh7Current() {
+      _hasBits0 &= ~8192;
+    }
+
+    /// <summary>Field number for the "ch8_voltage" field.</summary>
+    public const int Ch8VoltageFieldNumber = 15;
+    private float ch8Voltage_;
+    /// <summary>
+    ///
+    /// Voltage (Ch8)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch8Voltage {
+      get { if ((_hasBits0 & 16384) != 0) { return ch8Voltage_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 16384;
+        ch8Voltage_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch8_voltage" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh8Voltage {
+      get { return (_hasBits0 & 16384) != 0; }
+    }
+    /// <summary>Clears the value of the "ch8_voltage" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh8Voltage() {
+      _hasBits0 &= ~16384;
+    }
+
+    /// <summary>Field number for the "ch8_current" field.</summary>
+    public const int Ch8CurrentFieldNumber = 16;
+    private float ch8Current_;
+    /// <summary>
+    ///
+    /// Current (Ch8)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Ch8Current {
+      get { if ((_hasBits0 & 32768) != 0) { return ch8Current_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 32768;
+        ch8Current_ = value;
+      }
+    }
+    /// <summary>Gets whether the "ch8_current" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCh8Current {
+      get { return (_hasBits0 & 32768) != 0; }
+    }
+    /// <summary>Clears the value of the "ch8_current" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCh8Current() {
+      _hasBits0 &= ~32768;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1046,6 +2811,16 @@ namespace Meshtastic.Protobufs {
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch2Current, other.Ch2Current)) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch3Voltage, other.Ch3Voltage)) return false;
       if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch3Current, other.Ch3Current)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch4Voltage, other.Ch4Voltage)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch4Current, other.Ch4Current)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch5Voltage, other.Ch5Voltage)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch5Current, other.Ch5Current)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch6Voltage, other.Ch6Voltage)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch6Current, other.Ch6Current)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch7Voltage, other.Ch7Voltage)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch7Current, other.Ch7Current)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch8Voltage, other.Ch8Voltage)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Ch8Current, other.Ch8Current)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1053,12 +2828,22 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Ch1Voltage != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch1Voltage);
-      if (Ch1Current != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch1Current);
-      if (Ch2Voltage != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch2Voltage);
-      if (Ch2Current != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch2Current);
-      if (Ch3Voltage != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch3Voltage);
-      if (Ch3Current != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch3Current);
+      if (HasCh1Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch1Voltage);
+      if (HasCh1Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch1Current);
+      if (HasCh2Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch2Voltage);
+      if (HasCh2Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch2Current);
+      if (HasCh3Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch3Voltage);
+      if (HasCh3Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch3Current);
+      if (HasCh4Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch4Voltage);
+      if (HasCh4Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch4Current);
+      if (HasCh5Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch5Voltage);
+      if (HasCh5Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch5Current);
+      if (HasCh6Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch6Voltage);
+      if (HasCh6Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch6Current);
+      if (HasCh7Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch7Voltage);
+      if (HasCh7Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch7Current);
+      if (HasCh8Voltage) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch8Voltage);
+      if (HasCh8Current) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Ch8Current);
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1077,29 +2862,69 @@ namespace Meshtastic.Protobufs {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Ch1Voltage != 0F) {
+      if (HasCh1Voltage) {
         output.WriteRawTag(13);
         output.WriteFloat(Ch1Voltage);
       }
-      if (Ch1Current != 0F) {
+      if (HasCh1Current) {
         output.WriteRawTag(21);
         output.WriteFloat(Ch1Current);
       }
-      if (Ch2Voltage != 0F) {
+      if (HasCh2Voltage) {
         output.WriteRawTag(29);
         output.WriteFloat(Ch2Voltage);
       }
-      if (Ch2Current != 0F) {
+      if (HasCh2Current) {
         output.WriteRawTag(37);
         output.WriteFloat(Ch2Current);
       }
-      if (Ch3Voltage != 0F) {
+      if (HasCh3Voltage) {
         output.WriteRawTag(45);
         output.WriteFloat(Ch3Voltage);
       }
-      if (Ch3Current != 0F) {
+      if (HasCh3Current) {
         output.WriteRawTag(53);
         output.WriteFloat(Ch3Current);
+      }
+      if (HasCh4Voltage) {
+        output.WriteRawTag(61);
+        output.WriteFloat(Ch4Voltage);
+      }
+      if (HasCh4Current) {
+        output.WriteRawTag(69);
+        output.WriteFloat(Ch4Current);
+      }
+      if (HasCh5Voltage) {
+        output.WriteRawTag(77);
+        output.WriteFloat(Ch5Voltage);
+      }
+      if (HasCh5Current) {
+        output.WriteRawTag(85);
+        output.WriteFloat(Ch5Current);
+      }
+      if (HasCh6Voltage) {
+        output.WriteRawTag(93);
+        output.WriteFloat(Ch6Voltage);
+      }
+      if (HasCh6Current) {
+        output.WriteRawTag(101);
+        output.WriteFloat(Ch6Current);
+      }
+      if (HasCh7Voltage) {
+        output.WriteRawTag(109);
+        output.WriteFloat(Ch7Voltage);
+      }
+      if (HasCh7Current) {
+        output.WriteRawTag(117);
+        output.WriteFloat(Ch7Current);
+      }
+      if (HasCh8Voltage) {
+        output.WriteRawTag(125);
+        output.WriteFloat(Ch8Voltage);
+      }
+      if (HasCh8Current) {
+        output.WriteRawTag(133, 1);
+        output.WriteFloat(Ch8Current);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -1111,29 +2936,69 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Ch1Voltage != 0F) {
+      if (HasCh1Voltage) {
         output.WriteRawTag(13);
         output.WriteFloat(Ch1Voltage);
       }
-      if (Ch1Current != 0F) {
+      if (HasCh1Current) {
         output.WriteRawTag(21);
         output.WriteFloat(Ch1Current);
       }
-      if (Ch2Voltage != 0F) {
+      if (HasCh2Voltage) {
         output.WriteRawTag(29);
         output.WriteFloat(Ch2Voltage);
       }
-      if (Ch2Current != 0F) {
+      if (HasCh2Current) {
         output.WriteRawTag(37);
         output.WriteFloat(Ch2Current);
       }
-      if (Ch3Voltage != 0F) {
+      if (HasCh3Voltage) {
         output.WriteRawTag(45);
         output.WriteFloat(Ch3Voltage);
       }
-      if (Ch3Current != 0F) {
+      if (HasCh3Current) {
         output.WriteRawTag(53);
         output.WriteFloat(Ch3Current);
+      }
+      if (HasCh4Voltage) {
+        output.WriteRawTag(61);
+        output.WriteFloat(Ch4Voltage);
+      }
+      if (HasCh4Current) {
+        output.WriteRawTag(69);
+        output.WriteFloat(Ch4Current);
+      }
+      if (HasCh5Voltage) {
+        output.WriteRawTag(77);
+        output.WriteFloat(Ch5Voltage);
+      }
+      if (HasCh5Current) {
+        output.WriteRawTag(85);
+        output.WriteFloat(Ch5Current);
+      }
+      if (HasCh6Voltage) {
+        output.WriteRawTag(93);
+        output.WriteFloat(Ch6Voltage);
+      }
+      if (HasCh6Current) {
+        output.WriteRawTag(101);
+        output.WriteFloat(Ch6Current);
+      }
+      if (HasCh7Voltage) {
+        output.WriteRawTag(109);
+        output.WriteFloat(Ch7Voltage);
+      }
+      if (HasCh7Current) {
+        output.WriteRawTag(117);
+        output.WriteFloat(Ch7Current);
+      }
+      if (HasCh8Voltage) {
+        output.WriteRawTag(125);
+        output.WriteFloat(Ch8Voltage);
+      }
+      if (HasCh8Current) {
+        output.WriteRawTag(133, 1);
+        output.WriteFloat(Ch8Current);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -1145,23 +3010,53 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Ch1Voltage != 0F) {
+      if (HasCh1Voltage) {
         size += 1 + 4;
       }
-      if (Ch1Current != 0F) {
+      if (HasCh1Current) {
         size += 1 + 4;
       }
-      if (Ch2Voltage != 0F) {
+      if (HasCh2Voltage) {
         size += 1 + 4;
       }
-      if (Ch2Current != 0F) {
+      if (HasCh2Current) {
         size += 1 + 4;
       }
-      if (Ch3Voltage != 0F) {
+      if (HasCh3Voltage) {
         size += 1 + 4;
       }
-      if (Ch3Current != 0F) {
+      if (HasCh3Current) {
         size += 1 + 4;
+      }
+      if (HasCh4Voltage) {
+        size += 1 + 4;
+      }
+      if (HasCh4Current) {
+        size += 1 + 4;
+      }
+      if (HasCh5Voltage) {
+        size += 1 + 4;
+      }
+      if (HasCh5Current) {
+        size += 1 + 4;
+      }
+      if (HasCh6Voltage) {
+        size += 1 + 4;
+      }
+      if (HasCh6Current) {
+        size += 1 + 4;
+      }
+      if (HasCh7Voltage) {
+        size += 1 + 4;
+      }
+      if (HasCh7Current) {
+        size += 1 + 4;
+      }
+      if (HasCh8Voltage) {
+        size += 1 + 4;
+      }
+      if (HasCh8Current) {
+        size += 2 + 4;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1175,23 +3070,53 @@ namespace Meshtastic.Protobufs {
       if (other == null) {
         return;
       }
-      if (other.Ch1Voltage != 0F) {
+      if (other.HasCh1Voltage) {
         Ch1Voltage = other.Ch1Voltage;
       }
-      if (other.Ch1Current != 0F) {
+      if (other.HasCh1Current) {
         Ch1Current = other.Ch1Current;
       }
-      if (other.Ch2Voltage != 0F) {
+      if (other.HasCh2Voltage) {
         Ch2Voltage = other.Ch2Voltage;
       }
-      if (other.Ch2Current != 0F) {
+      if (other.HasCh2Current) {
         Ch2Current = other.Ch2Current;
       }
-      if (other.Ch3Voltage != 0F) {
+      if (other.HasCh3Voltage) {
         Ch3Voltage = other.Ch3Voltage;
       }
-      if (other.Ch3Current != 0F) {
+      if (other.HasCh3Current) {
         Ch3Current = other.Ch3Current;
+      }
+      if (other.HasCh4Voltage) {
+        Ch4Voltage = other.Ch4Voltage;
+      }
+      if (other.HasCh4Current) {
+        Ch4Current = other.Ch4Current;
+      }
+      if (other.HasCh5Voltage) {
+        Ch5Voltage = other.Ch5Voltage;
+      }
+      if (other.HasCh5Current) {
+        Ch5Current = other.Ch5Current;
+      }
+      if (other.HasCh6Voltage) {
+        Ch6Voltage = other.Ch6Voltage;
+      }
+      if (other.HasCh6Current) {
+        Ch6Current = other.Ch6Current;
+      }
+      if (other.HasCh7Voltage) {
+        Ch7Voltage = other.Ch7Voltage;
+      }
+      if (other.HasCh7Current) {
+        Ch7Current = other.Ch7Current;
+      }
+      if (other.HasCh8Voltage) {
+        Ch8Voltage = other.Ch8Voltage;
+      }
+      if (other.HasCh8Current) {
+        Ch8Current = other.Ch8Current;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1230,6 +3155,46 @@ namespace Meshtastic.Protobufs {
           }
           case 53: {
             Ch3Current = input.ReadFloat();
+            break;
+          }
+          case 61: {
+            Ch4Voltage = input.ReadFloat();
+            break;
+          }
+          case 69: {
+            Ch4Current = input.ReadFloat();
+            break;
+          }
+          case 77: {
+            Ch5Voltage = input.ReadFloat();
+            break;
+          }
+          case 85: {
+            Ch5Current = input.ReadFloat();
+            break;
+          }
+          case 93: {
+            Ch6Voltage = input.ReadFloat();
+            break;
+          }
+          case 101: {
+            Ch6Current = input.ReadFloat();
+            break;
+          }
+          case 109: {
+            Ch7Voltage = input.ReadFloat();
+            break;
+          }
+          case 117: {
+            Ch7Current = input.ReadFloat();
+            break;
+          }
+          case 125: {
+            Ch8Voltage = input.ReadFloat();
+            break;
+          }
+          case 133: {
+            Ch8Current = input.ReadFloat();
             break;
           }
         }
@@ -1271,6 +3236,46 @@ namespace Meshtastic.Protobufs {
             Ch3Current = input.ReadFloat();
             break;
           }
+          case 61: {
+            Ch4Voltage = input.ReadFloat();
+            break;
+          }
+          case 69: {
+            Ch4Current = input.ReadFloat();
+            break;
+          }
+          case 77: {
+            Ch5Voltage = input.ReadFloat();
+            break;
+          }
+          case 85: {
+            Ch5Current = input.ReadFloat();
+            break;
+          }
+          case 93: {
+            Ch6Voltage = input.ReadFloat();
+            break;
+          }
+          case 101: {
+            Ch6Current = input.ReadFloat();
+            break;
+          }
+          case 109: {
+            Ch7Voltage = input.ReadFloat();
+            break;
+          }
+          case 117: {
+            Ch7Current = input.ReadFloat();
+            break;
+          }
+          case 125: {
+            Ch8Voltage = input.ReadFloat();
+            break;
+          }
+          case 133: {
+            Ch8Current = input.ReadFloat();
+            break;
+          }
         }
       }
     }
@@ -1289,6 +3294,7 @@ namespace Meshtastic.Protobufs {
   {
     private static readonly pb::MessageParser<AirQualityMetrics> _parser = new pb::MessageParser<AirQualityMetrics>(() => new AirQualityMetrics());
     private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<AirQualityMetrics> Parser { get { return _parser; } }
@@ -1316,6 +3322,7 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public AirQualityMetrics(AirQualityMetrics other) : this() {
+      _hasBits0 = other._hasBits0;
       pm10Standard_ = other.pm10Standard_;
       pm25Standard_ = other.pm25Standard_;
       pm100Standard_ = other.pm100Standard_;
@@ -1328,6 +3335,19 @@ namespace Meshtastic.Protobufs {
       particles25Um_ = other.particles25Um_;
       particles50Um_ = other.particles50Um_;
       particles100Um_ = other.particles100Um_;
+      co2_ = other.co2_;
+      co2Temperature_ = other.co2Temperature_;
+      co2Humidity_ = other.co2Humidity_;
+      formFormaldehyde_ = other.formFormaldehyde_;
+      formHumidity_ = other.formHumidity_;
+      formTemperature_ = other.formTemperature_;
+      pm40Standard_ = other.pm40Standard_;
+      particles40Um_ = other.particles40Um_;
+      pmTemperature_ = other.pmTemperature_;
+      pmHumidity_ = other.pmHumidity_;
+      pmVocIdx_ = other.pmVocIdx_;
+      pmNoxIdx_ = other.pmNoxIdx_;
+      particlesTps_ = other.particlesTps_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -1342,15 +3362,28 @@ namespace Meshtastic.Protobufs {
     private uint pm10Standard_;
     /// <summary>
     ///
-    /// Concentration Units Standard PM1.0
+    /// Concentration Units Standard PM1.0 in ug/m3
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Pm10Standard {
-      get { return pm10Standard_; }
+      get { if ((_hasBits0 & 1) != 0) { return pm10Standard_; } else { return 0; } }
       set {
+        _hasBits0 |= 1;
         pm10Standard_ = value;
       }
+    }
+    /// <summary>Gets whether the "pm10_standard" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm10Standard {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "pm10_standard" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm10Standard() {
+      _hasBits0 &= ~1;
     }
 
     /// <summary>Field number for the "pm25_standard" field.</summary>
@@ -1358,15 +3391,28 @@ namespace Meshtastic.Protobufs {
     private uint pm25Standard_;
     /// <summary>
     ///
-    /// Concentration Units Standard PM2.5
+    /// Concentration Units Standard PM2.5 in ug/m3
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Pm25Standard {
-      get { return pm25Standard_; }
+      get { if ((_hasBits0 & 2) != 0) { return pm25Standard_; } else { return 0; } }
       set {
+        _hasBits0 |= 2;
         pm25Standard_ = value;
       }
+    }
+    /// <summary>Gets whether the "pm25_standard" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm25Standard {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "pm25_standard" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm25Standard() {
+      _hasBits0 &= ~2;
     }
 
     /// <summary>Field number for the "pm100_standard" field.</summary>
@@ -1374,15 +3420,28 @@ namespace Meshtastic.Protobufs {
     private uint pm100Standard_;
     /// <summary>
     ///
-    /// Concentration Units Standard PM10.0
+    /// Concentration Units Standard PM10.0 in ug/m3
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Pm100Standard {
-      get { return pm100Standard_; }
+      get { if ((_hasBits0 & 4) != 0) { return pm100Standard_; } else { return 0; } }
       set {
+        _hasBits0 |= 4;
         pm100Standard_ = value;
       }
+    }
+    /// <summary>Gets whether the "pm100_standard" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm100Standard {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "pm100_standard" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm100Standard() {
+      _hasBits0 &= ~4;
     }
 
     /// <summary>Field number for the "pm10_environmental" field.</summary>
@@ -1390,15 +3449,28 @@ namespace Meshtastic.Protobufs {
     private uint pm10Environmental_;
     /// <summary>
     ///
-    /// Concentration Units Environmental PM1.0
+    /// Concentration Units Environmental PM1.0 in ug/m3
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Pm10Environmental {
-      get { return pm10Environmental_; }
+      get { if ((_hasBits0 & 8) != 0) { return pm10Environmental_; } else { return 0; } }
       set {
+        _hasBits0 |= 8;
         pm10Environmental_ = value;
       }
+    }
+    /// <summary>Gets whether the "pm10_environmental" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm10Environmental {
+      get { return (_hasBits0 & 8) != 0; }
+    }
+    /// <summary>Clears the value of the "pm10_environmental" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm10Environmental() {
+      _hasBits0 &= ~8;
     }
 
     /// <summary>Field number for the "pm25_environmental" field.</summary>
@@ -1406,15 +3478,28 @@ namespace Meshtastic.Protobufs {
     private uint pm25Environmental_;
     /// <summary>
     ///
-    /// Concentration Units Environmental PM2.5
+    /// Concentration Units Environmental PM2.5 in ug/m3
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Pm25Environmental {
-      get { return pm25Environmental_; }
+      get { if ((_hasBits0 & 16) != 0) { return pm25Environmental_; } else { return 0; } }
       set {
+        _hasBits0 |= 16;
         pm25Environmental_ = value;
       }
+    }
+    /// <summary>Gets whether the "pm25_environmental" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm25Environmental {
+      get { return (_hasBits0 & 16) != 0; }
+    }
+    /// <summary>Clears the value of the "pm25_environmental" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm25Environmental() {
+      _hasBits0 &= ~16;
     }
 
     /// <summary>Field number for the "pm100_environmental" field.</summary>
@@ -1422,15 +3507,28 @@ namespace Meshtastic.Protobufs {
     private uint pm100Environmental_;
     /// <summary>
     ///
-    /// Concentration Units Environmental PM10.0
+    /// Concentration Units Environmental PM10.0 in ug/m3
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Pm100Environmental {
-      get { return pm100Environmental_; }
+      get { if ((_hasBits0 & 32) != 0) { return pm100Environmental_; } else { return 0; } }
       set {
+        _hasBits0 |= 32;
         pm100Environmental_ = value;
       }
+    }
+    /// <summary>Gets whether the "pm100_environmental" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm100Environmental {
+      get { return (_hasBits0 & 32) != 0; }
+    }
+    /// <summary>Clears the value of the "pm100_environmental" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm100Environmental() {
+      _hasBits0 &= ~32;
     }
 
     /// <summary>Field number for the "particles_03um" field.</summary>
@@ -1438,15 +3536,28 @@ namespace Meshtastic.Protobufs {
     private uint particles03Um_;
     /// <summary>
     ///
-    /// 0.3um Particle Count
+    /// 0.3um Particle Count in #/0.1l
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Particles03Um {
-      get { return particles03Um_; }
+      get { if ((_hasBits0 & 64) != 0) { return particles03Um_; } else { return 0; } }
       set {
+        _hasBits0 |= 64;
         particles03Um_ = value;
       }
+    }
+    /// <summary>Gets whether the "particles_03um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles03Um {
+      get { return (_hasBits0 & 64) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_03um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles03Um() {
+      _hasBits0 &= ~64;
     }
 
     /// <summary>Field number for the "particles_05um" field.</summary>
@@ -1454,15 +3565,28 @@ namespace Meshtastic.Protobufs {
     private uint particles05Um_;
     /// <summary>
     ///
-    /// 0.5um Particle Count
+    /// 0.5um Particle Count in #/0.1l
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Particles05Um {
-      get { return particles05Um_; }
+      get { if ((_hasBits0 & 128) != 0) { return particles05Um_; } else { return 0; } }
       set {
+        _hasBits0 |= 128;
         particles05Um_ = value;
       }
+    }
+    /// <summary>Gets whether the "particles_05um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles05Um {
+      get { return (_hasBits0 & 128) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_05um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles05Um() {
+      _hasBits0 &= ~128;
     }
 
     /// <summary>Field number for the "particles_10um" field.</summary>
@@ -1470,15 +3594,28 @@ namespace Meshtastic.Protobufs {
     private uint particles10Um_;
     /// <summary>
     ///
-    /// 1.0um Particle Count
+    /// 1.0um Particle Count in #/0.1l
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Particles10Um {
-      get { return particles10Um_; }
+      get { if ((_hasBits0 & 256) != 0) { return particles10Um_; } else { return 0; } }
       set {
+        _hasBits0 |= 256;
         particles10Um_ = value;
       }
+    }
+    /// <summary>Gets whether the "particles_10um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles10Um {
+      get { return (_hasBits0 & 256) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_10um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles10Um() {
+      _hasBits0 &= ~256;
     }
 
     /// <summary>Field number for the "particles_25um" field.</summary>
@@ -1486,15 +3623,28 @@ namespace Meshtastic.Protobufs {
     private uint particles25Um_;
     /// <summary>
     ///
-    /// 2.5um Particle Count
+    /// 2.5um Particle Count in #/0.1l
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Particles25Um {
-      get { return particles25Um_; }
+      get { if ((_hasBits0 & 512) != 0) { return particles25Um_; } else { return 0; } }
       set {
+        _hasBits0 |= 512;
         particles25Um_ = value;
       }
+    }
+    /// <summary>Gets whether the "particles_25um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles25Um {
+      get { return (_hasBits0 & 512) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_25um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles25Um() {
+      _hasBits0 &= ~512;
     }
 
     /// <summary>Field number for the "particles_50um" field.</summary>
@@ -1502,15 +3652,28 @@ namespace Meshtastic.Protobufs {
     private uint particles50Um_;
     /// <summary>
     ///
-    /// 5.0um Particle Count
+    /// 5.0um Particle Count in #/0.1l
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Particles50Um {
-      get { return particles50Um_; }
+      get { if ((_hasBits0 & 1024) != 0) { return particles50Um_; } else { return 0; } }
       set {
+        _hasBits0 |= 1024;
         particles50Um_ = value;
       }
+    }
+    /// <summary>Gets whether the "particles_50um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles50Um {
+      get { return (_hasBits0 & 1024) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_50um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles50Um() {
+      _hasBits0 &= ~1024;
     }
 
     /// <summary>Field number for the "particles_100um" field.</summary>
@@ -1518,15 +3681,405 @@ namespace Meshtastic.Protobufs {
     private uint particles100Um_;
     /// <summary>
     ///
-    /// 10.0um Particle Count
+    /// 10.0um Particle Count in #/0.1l
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint Particles100Um {
-      get { return particles100Um_; }
+      get { if ((_hasBits0 & 2048) != 0) { return particles100Um_; } else { return 0; } }
       set {
+        _hasBits0 |= 2048;
         particles100Um_ = value;
       }
+    }
+    /// <summary>Gets whether the "particles_100um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles100Um {
+      get { return (_hasBits0 & 2048) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_100um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles100Um() {
+      _hasBits0 &= ~2048;
+    }
+
+    /// <summary>Field number for the "co2" field.</summary>
+    public const int Co2FieldNumber = 13;
+    private uint co2_;
+    /// <summary>
+    ///
+    /// CO2 concentration in ppm
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Co2 {
+      get { if ((_hasBits0 & 4096) != 0) { return co2_; } else { return 0; } }
+      set {
+        _hasBits0 |= 4096;
+        co2_ = value;
+      }
+    }
+    /// <summary>Gets whether the "co2" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCo2 {
+      get { return (_hasBits0 & 4096) != 0; }
+    }
+    /// <summary>Clears the value of the "co2" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCo2() {
+      _hasBits0 &= ~4096;
+    }
+
+    /// <summary>Field number for the "co2_temperature" field.</summary>
+    public const int Co2TemperatureFieldNumber = 14;
+    private float co2Temperature_;
+    /// <summary>
+    ///
+    /// CO2 sensor temperature in degC
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Co2Temperature {
+      get { if ((_hasBits0 & 8192) != 0) { return co2Temperature_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 8192;
+        co2Temperature_ = value;
+      }
+    }
+    /// <summary>Gets whether the "co2_temperature" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCo2Temperature {
+      get { return (_hasBits0 & 8192) != 0; }
+    }
+    /// <summary>Clears the value of the "co2_temperature" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCo2Temperature() {
+      _hasBits0 &= ~8192;
+    }
+
+    /// <summary>Field number for the "co2_humidity" field.</summary>
+    public const int Co2HumidityFieldNumber = 15;
+    private float co2Humidity_;
+    /// <summary>
+    ///
+    /// CO2 sensor relative humidity in %
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Co2Humidity {
+      get { if ((_hasBits0 & 16384) != 0) { return co2Humidity_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 16384;
+        co2Humidity_ = value;
+      }
+    }
+    /// <summary>Gets whether the "co2_humidity" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCo2Humidity {
+      get { return (_hasBits0 & 16384) != 0; }
+    }
+    /// <summary>Clears the value of the "co2_humidity" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCo2Humidity() {
+      _hasBits0 &= ~16384;
+    }
+
+    /// <summary>Field number for the "form_formaldehyde" field.</summary>
+    public const int FormFormaldehydeFieldNumber = 16;
+    private float formFormaldehyde_;
+    /// <summary>
+    ///
+    /// Formaldehyde sensor formaldehyde concentration in ppb
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float FormFormaldehyde {
+      get { if ((_hasBits0 & 32768) != 0) { return formFormaldehyde_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 32768;
+        formFormaldehyde_ = value;
+      }
+    }
+    /// <summary>Gets whether the "form_formaldehyde" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasFormFormaldehyde {
+      get { return (_hasBits0 & 32768) != 0; }
+    }
+    /// <summary>Clears the value of the "form_formaldehyde" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearFormFormaldehyde() {
+      _hasBits0 &= ~32768;
+    }
+
+    /// <summary>Field number for the "form_humidity" field.</summary>
+    public const int FormHumidityFieldNumber = 17;
+    private float formHumidity_;
+    /// <summary>
+    ///
+    /// Formaldehyde sensor relative humidity in %RH
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float FormHumidity {
+      get { if ((_hasBits0 & 65536) != 0) { return formHumidity_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 65536;
+        formHumidity_ = value;
+      }
+    }
+    /// <summary>Gets whether the "form_humidity" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasFormHumidity {
+      get { return (_hasBits0 & 65536) != 0; }
+    }
+    /// <summary>Clears the value of the "form_humidity" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearFormHumidity() {
+      _hasBits0 &= ~65536;
+    }
+
+    /// <summary>Field number for the "form_temperature" field.</summary>
+    public const int FormTemperatureFieldNumber = 18;
+    private float formTemperature_;
+    /// <summary>
+    ///
+    /// Formaldehyde sensor temperature in degrees Celsius
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float FormTemperature {
+      get { if ((_hasBits0 & 131072) != 0) { return formTemperature_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 131072;
+        formTemperature_ = value;
+      }
+    }
+    /// <summary>Gets whether the "form_temperature" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasFormTemperature {
+      get { return (_hasBits0 & 131072) != 0; }
+    }
+    /// <summary>Clears the value of the "form_temperature" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearFormTemperature() {
+      _hasBits0 &= ~131072;
+    }
+
+    /// <summary>Field number for the "pm40_standard" field.</summary>
+    public const int Pm40StandardFieldNumber = 19;
+    private uint pm40Standard_;
+    /// <summary>
+    ///
+    /// Concentration Units Standard PM4.0 in ug/m3
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Pm40Standard {
+      get { if ((_hasBits0 & 262144) != 0) { return pm40Standard_; } else { return 0; } }
+      set {
+        _hasBits0 |= 262144;
+        pm40Standard_ = value;
+      }
+    }
+    /// <summary>Gets whether the "pm40_standard" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPm40Standard {
+      get { return (_hasBits0 & 262144) != 0; }
+    }
+    /// <summary>Clears the value of the "pm40_standard" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPm40Standard() {
+      _hasBits0 &= ~262144;
+    }
+
+    /// <summary>Field number for the "particles_40um" field.</summary>
+    public const int Particles40UmFieldNumber = 20;
+    private uint particles40Um_;
+    /// <summary>
+    ///
+    /// 4.0um Particle Count in #/0.1l
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Particles40Um {
+      get { if ((_hasBits0 & 524288) != 0) { return particles40Um_; } else { return 0; } }
+      set {
+        _hasBits0 |= 524288;
+        particles40Um_ = value;
+      }
+    }
+    /// <summary>Gets whether the "particles_40um" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticles40Um {
+      get { return (_hasBits0 & 524288) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_40um" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticles40Um() {
+      _hasBits0 &= ~524288;
+    }
+
+    /// <summary>Field number for the "pm_temperature" field.</summary>
+    public const int PmTemperatureFieldNumber = 21;
+    private float pmTemperature_;
+    /// <summary>
+    ///
+    /// PM Sensor Temperature
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float PmTemperature {
+      get { if ((_hasBits0 & 1048576) != 0) { return pmTemperature_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 1048576;
+        pmTemperature_ = value;
+      }
+    }
+    /// <summary>Gets whether the "pm_temperature" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPmTemperature {
+      get { return (_hasBits0 & 1048576) != 0; }
+    }
+    /// <summary>Clears the value of the "pm_temperature" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPmTemperature() {
+      _hasBits0 &= ~1048576;
+    }
+
+    /// <summary>Field number for the "pm_humidity" field.</summary>
+    public const int PmHumidityFieldNumber = 22;
+    private float pmHumidity_;
+    /// <summary>
+    ///
+    /// PM Sensor humidity
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float PmHumidity {
+      get { if ((_hasBits0 & 2097152) != 0) { return pmHumidity_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 2097152;
+        pmHumidity_ = value;
+      }
+    }
+    /// <summary>Gets whether the "pm_humidity" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPmHumidity {
+      get { return (_hasBits0 & 2097152) != 0; }
+    }
+    /// <summary>Clears the value of the "pm_humidity" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPmHumidity() {
+      _hasBits0 &= ~2097152;
+    }
+
+    /// <summary>Field number for the "pm_voc_idx" field.</summary>
+    public const int PmVocIdxFieldNumber = 23;
+    private float pmVocIdx_;
+    /// <summary>
+    ///
+    /// PM Sensor VOC Index
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float PmVocIdx {
+      get { if ((_hasBits0 & 4194304) != 0) { return pmVocIdx_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 4194304;
+        pmVocIdx_ = value;
+      }
+    }
+    /// <summary>Gets whether the "pm_voc_idx" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPmVocIdx {
+      get { return (_hasBits0 & 4194304) != 0; }
+    }
+    /// <summary>Clears the value of the "pm_voc_idx" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPmVocIdx() {
+      _hasBits0 &= ~4194304;
+    }
+
+    /// <summary>Field number for the "pm_nox_idx" field.</summary>
+    public const int PmNoxIdxFieldNumber = 24;
+    private float pmNoxIdx_;
+    /// <summary>
+    ///
+    /// PM Sensor NOx Index
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float PmNoxIdx {
+      get { if ((_hasBits0 & 8388608) != 0) { return pmNoxIdx_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 8388608;
+        pmNoxIdx_ = value;
+      }
+    }
+    /// <summary>Gets whether the "pm_nox_idx" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasPmNoxIdx {
+      get { return (_hasBits0 & 8388608) != 0; }
+    }
+    /// <summary>Clears the value of the "pm_nox_idx" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearPmNoxIdx() {
+      _hasBits0 &= ~8388608;
+    }
+
+    /// <summary>Field number for the "particles_tps" field.</summary>
+    public const int ParticlesTpsFieldNumber = 25;
+    private float particlesTps_;
+    /// <summary>
+    ///
+    /// Typical Particle Size in um
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float ParticlesTps {
+      get { if ((_hasBits0 & 16777216) != 0) { return particlesTps_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 16777216;
+        particlesTps_ = value;
+      }
+    }
+    /// <summary>Gets whether the "particles_tps" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasParticlesTps {
+      get { return (_hasBits0 & 16777216) != 0; }
+    }
+    /// <summary>Clears the value of the "particles_tps" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearParticlesTps() {
+      _hasBits0 &= ~16777216;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1556,6 +4109,19 @@ namespace Meshtastic.Protobufs {
       if (Particles25Um != other.Particles25Um) return false;
       if (Particles50Um != other.Particles50Um) return false;
       if (Particles100Um != other.Particles100Um) return false;
+      if (Co2 != other.Co2) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Co2Temperature, other.Co2Temperature)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Co2Humidity, other.Co2Humidity)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(FormFormaldehyde, other.FormFormaldehyde)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(FormHumidity, other.FormHumidity)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(FormTemperature, other.FormTemperature)) return false;
+      if (Pm40Standard != other.Pm40Standard) return false;
+      if (Particles40Um != other.Particles40Um) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PmTemperature, other.PmTemperature)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PmHumidity, other.PmHumidity)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PmVocIdx, other.PmVocIdx)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(PmNoxIdx, other.PmNoxIdx)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(ParticlesTps, other.ParticlesTps)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -1563,18 +4129,31 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Pm10Standard != 0) hash ^= Pm10Standard.GetHashCode();
-      if (Pm25Standard != 0) hash ^= Pm25Standard.GetHashCode();
-      if (Pm100Standard != 0) hash ^= Pm100Standard.GetHashCode();
-      if (Pm10Environmental != 0) hash ^= Pm10Environmental.GetHashCode();
-      if (Pm25Environmental != 0) hash ^= Pm25Environmental.GetHashCode();
-      if (Pm100Environmental != 0) hash ^= Pm100Environmental.GetHashCode();
-      if (Particles03Um != 0) hash ^= Particles03Um.GetHashCode();
-      if (Particles05Um != 0) hash ^= Particles05Um.GetHashCode();
-      if (Particles10Um != 0) hash ^= Particles10Um.GetHashCode();
-      if (Particles25Um != 0) hash ^= Particles25Um.GetHashCode();
-      if (Particles50Um != 0) hash ^= Particles50Um.GetHashCode();
-      if (Particles100Um != 0) hash ^= Particles100Um.GetHashCode();
+      if (HasPm10Standard) hash ^= Pm10Standard.GetHashCode();
+      if (HasPm25Standard) hash ^= Pm25Standard.GetHashCode();
+      if (HasPm100Standard) hash ^= Pm100Standard.GetHashCode();
+      if (HasPm10Environmental) hash ^= Pm10Environmental.GetHashCode();
+      if (HasPm25Environmental) hash ^= Pm25Environmental.GetHashCode();
+      if (HasPm100Environmental) hash ^= Pm100Environmental.GetHashCode();
+      if (HasParticles03Um) hash ^= Particles03Um.GetHashCode();
+      if (HasParticles05Um) hash ^= Particles05Um.GetHashCode();
+      if (HasParticles10Um) hash ^= Particles10Um.GetHashCode();
+      if (HasParticles25Um) hash ^= Particles25Um.GetHashCode();
+      if (HasParticles50Um) hash ^= Particles50Um.GetHashCode();
+      if (HasParticles100Um) hash ^= Particles100Um.GetHashCode();
+      if (HasCo2) hash ^= Co2.GetHashCode();
+      if (HasCo2Temperature) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Co2Temperature);
+      if (HasCo2Humidity) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Co2Humidity);
+      if (HasFormFormaldehyde) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(FormFormaldehyde);
+      if (HasFormHumidity) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(FormHumidity);
+      if (HasFormTemperature) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(FormTemperature);
+      if (HasPm40Standard) hash ^= Pm40Standard.GetHashCode();
+      if (HasParticles40Um) hash ^= Particles40Um.GetHashCode();
+      if (HasPmTemperature) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PmTemperature);
+      if (HasPmHumidity) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PmHumidity);
+      if (HasPmVocIdx) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PmVocIdx);
+      if (HasPmNoxIdx) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(PmNoxIdx);
+      if (HasParticlesTps) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(ParticlesTps);
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1593,53 +4172,105 @@ namespace Meshtastic.Protobufs {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Pm10Standard != 0) {
+      if (HasPm10Standard) {
         output.WriteRawTag(8);
         output.WriteUInt32(Pm10Standard);
       }
-      if (Pm25Standard != 0) {
+      if (HasPm25Standard) {
         output.WriteRawTag(16);
         output.WriteUInt32(Pm25Standard);
       }
-      if (Pm100Standard != 0) {
+      if (HasPm100Standard) {
         output.WriteRawTag(24);
         output.WriteUInt32(Pm100Standard);
       }
-      if (Pm10Environmental != 0) {
+      if (HasPm10Environmental) {
         output.WriteRawTag(32);
         output.WriteUInt32(Pm10Environmental);
       }
-      if (Pm25Environmental != 0) {
+      if (HasPm25Environmental) {
         output.WriteRawTag(40);
         output.WriteUInt32(Pm25Environmental);
       }
-      if (Pm100Environmental != 0) {
+      if (HasPm100Environmental) {
         output.WriteRawTag(48);
         output.WriteUInt32(Pm100Environmental);
       }
-      if (Particles03Um != 0) {
+      if (HasParticles03Um) {
         output.WriteRawTag(56);
         output.WriteUInt32(Particles03Um);
       }
-      if (Particles05Um != 0) {
+      if (HasParticles05Um) {
         output.WriteRawTag(64);
         output.WriteUInt32(Particles05Um);
       }
-      if (Particles10Um != 0) {
+      if (HasParticles10Um) {
         output.WriteRawTag(72);
         output.WriteUInt32(Particles10Um);
       }
-      if (Particles25Um != 0) {
+      if (HasParticles25Um) {
         output.WriteRawTag(80);
         output.WriteUInt32(Particles25Um);
       }
-      if (Particles50Um != 0) {
+      if (HasParticles50Um) {
         output.WriteRawTag(88);
         output.WriteUInt32(Particles50Um);
       }
-      if (Particles100Um != 0) {
+      if (HasParticles100Um) {
         output.WriteRawTag(96);
         output.WriteUInt32(Particles100Um);
+      }
+      if (HasCo2) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(Co2);
+      }
+      if (HasCo2Temperature) {
+        output.WriteRawTag(117);
+        output.WriteFloat(Co2Temperature);
+      }
+      if (HasCo2Humidity) {
+        output.WriteRawTag(125);
+        output.WriteFloat(Co2Humidity);
+      }
+      if (HasFormFormaldehyde) {
+        output.WriteRawTag(133, 1);
+        output.WriteFloat(FormFormaldehyde);
+      }
+      if (HasFormHumidity) {
+        output.WriteRawTag(141, 1);
+        output.WriteFloat(FormHumidity);
+      }
+      if (HasFormTemperature) {
+        output.WriteRawTag(149, 1);
+        output.WriteFloat(FormTemperature);
+      }
+      if (HasPm40Standard) {
+        output.WriteRawTag(152, 1);
+        output.WriteUInt32(Pm40Standard);
+      }
+      if (HasParticles40Um) {
+        output.WriteRawTag(160, 1);
+        output.WriteUInt32(Particles40Um);
+      }
+      if (HasPmTemperature) {
+        output.WriteRawTag(173, 1);
+        output.WriteFloat(PmTemperature);
+      }
+      if (HasPmHumidity) {
+        output.WriteRawTag(181, 1);
+        output.WriteFloat(PmHumidity);
+      }
+      if (HasPmVocIdx) {
+        output.WriteRawTag(189, 1);
+        output.WriteFloat(PmVocIdx);
+      }
+      if (HasPmNoxIdx) {
+        output.WriteRawTag(197, 1);
+        output.WriteFloat(PmNoxIdx);
+      }
+      if (HasParticlesTps) {
+        output.WriteRawTag(205, 1);
+        output.WriteFloat(ParticlesTps);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
@@ -1651,53 +4282,105 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Pm10Standard != 0) {
+      if (HasPm10Standard) {
         output.WriteRawTag(8);
         output.WriteUInt32(Pm10Standard);
       }
-      if (Pm25Standard != 0) {
+      if (HasPm25Standard) {
         output.WriteRawTag(16);
         output.WriteUInt32(Pm25Standard);
       }
-      if (Pm100Standard != 0) {
+      if (HasPm100Standard) {
         output.WriteRawTag(24);
         output.WriteUInt32(Pm100Standard);
       }
-      if (Pm10Environmental != 0) {
+      if (HasPm10Environmental) {
         output.WriteRawTag(32);
         output.WriteUInt32(Pm10Environmental);
       }
-      if (Pm25Environmental != 0) {
+      if (HasPm25Environmental) {
         output.WriteRawTag(40);
         output.WriteUInt32(Pm25Environmental);
       }
-      if (Pm100Environmental != 0) {
+      if (HasPm100Environmental) {
         output.WriteRawTag(48);
         output.WriteUInt32(Pm100Environmental);
       }
-      if (Particles03Um != 0) {
+      if (HasParticles03Um) {
         output.WriteRawTag(56);
         output.WriteUInt32(Particles03Um);
       }
-      if (Particles05Um != 0) {
+      if (HasParticles05Um) {
         output.WriteRawTag(64);
         output.WriteUInt32(Particles05Um);
       }
-      if (Particles10Um != 0) {
+      if (HasParticles10Um) {
         output.WriteRawTag(72);
         output.WriteUInt32(Particles10Um);
       }
-      if (Particles25Um != 0) {
+      if (HasParticles25Um) {
         output.WriteRawTag(80);
         output.WriteUInt32(Particles25Um);
       }
-      if (Particles50Um != 0) {
+      if (HasParticles50Um) {
         output.WriteRawTag(88);
         output.WriteUInt32(Particles50Um);
       }
-      if (Particles100Um != 0) {
+      if (HasParticles100Um) {
         output.WriteRawTag(96);
         output.WriteUInt32(Particles100Um);
+      }
+      if (HasCo2) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(Co2);
+      }
+      if (HasCo2Temperature) {
+        output.WriteRawTag(117);
+        output.WriteFloat(Co2Temperature);
+      }
+      if (HasCo2Humidity) {
+        output.WriteRawTag(125);
+        output.WriteFloat(Co2Humidity);
+      }
+      if (HasFormFormaldehyde) {
+        output.WriteRawTag(133, 1);
+        output.WriteFloat(FormFormaldehyde);
+      }
+      if (HasFormHumidity) {
+        output.WriteRawTag(141, 1);
+        output.WriteFloat(FormHumidity);
+      }
+      if (HasFormTemperature) {
+        output.WriteRawTag(149, 1);
+        output.WriteFloat(FormTemperature);
+      }
+      if (HasPm40Standard) {
+        output.WriteRawTag(152, 1);
+        output.WriteUInt32(Pm40Standard);
+      }
+      if (HasParticles40Um) {
+        output.WriteRawTag(160, 1);
+        output.WriteUInt32(Particles40Um);
+      }
+      if (HasPmTemperature) {
+        output.WriteRawTag(173, 1);
+        output.WriteFloat(PmTemperature);
+      }
+      if (HasPmHumidity) {
+        output.WriteRawTag(181, 1);
+        output.WriteFloat(PmHumidity);
+      }
+      if (HasPmVocIdx) {
+        output.WriteRawTag(189, 1);
+        output.WriteFloat(PmVocIdx);
+      }
+      if (HasPmNoxIdx) {
+        output.WriteRawTag(197, 1);
+        output.WriteFloat(PmNoxIdx);
+      }
+      if (HasParticlesTps) {
+        output.WriteRawTag(205, 1);
+        output.WriteFloat(ParticlesTps);
       }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
@@ -1709,41 +4392,80 @@ namespace Meshtastic.Protobufs {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Pm10Standard != 0) {
+      if (HasPm10Standard) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Pm10Standard);
       }
-      if (Pm25Standard != 0) {
+      if (HasPm25Standard) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Pm25Standard);
       }
-      if (Pm100Standard != 0) {
+      if (HasPm100Standard) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Pm100Standard);
       }
-      if (Pm10Environmental != 0) {
+      if (HasPm10Environmental) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Pm10Environmental);
       }
-      if (Pm25Environmental != 0) {
+      if (HasPm25Environmental) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Pm25Environmental);
       }
-      if (Pm100Environmental != 0) {
+      if (HasPm100Environmental) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Pm100Environmental);
       }
-      if (Particles03Um != 0) {
+      if (HasParticles03Um) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Particles03Um);
       }
-      if (Particles05Um != 0) {
+      if (HasParticles05Um) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Particles05Um);
       }
-      if (Particles10Um != 0) {
+      if (HasParticles10Um) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Particles10Um);
       }
-      if (Particles25Um != 0) {
+      if (HasParticles25Um) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Particles25Um);
       }
-      if (Particles50Um != 0) {
+      if (HasParticles50Um) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Particles50Um);
       }
-      if (Particles100Um != 0) {
+      if (HasParticles100Um) {
         size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Particles100Um);
+      }
+      if (HasCo2) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Co2);
+      }
+      if (HasCo2Temperature) {
+        size += 1 + 4;
+      }
+      if (HasCo2Humidity) {
+        size += 1 + 4;
+      }
+      if (HasFormFormaldehyde) {
+        size += 2 + 4;
+      }
+      if (HasFormHumidity) {
+        size += 2 + 4;
+      }
+      if (HasFormTemperature) {
+        size += 2 + 4;
+      }
+      if (HasPm40Standard) {
+        size += 2 + pb::CodedOutputStream.ComputeUInt32Size(Pm40Standard);
+      }
+      if (HasParticles40Um) {
+        size += 2 + pb::CodedOutputStream.ComputeUInt32Size(Particles40Um);
+      }
+      if (HasPmTemperature) {
+        size += 2 + 4;
+      }
+      if (HasPmHumidity) {
+        size += 2 + 4;
+      }
+      if (HasPmVocIdx) {
+        size += 2 + 4;
+      }
+      if (HasPmNoxIdx) {
+        size += 2 + 4;
+      }
+      if (HasParticlesTps) {
+        size += 2 + 4;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1757,41 +4479,80 @@ namespace Meshtastic.Protobufs {
       if (other == null) {
         return;
       }
-      if (other.Pm10Standard != 0) {
+      if (other.HasPm10Standard) {
         Pm10Standard = other.Pm10Standard;
       }
-      if (other.Pm25Standard != 0) {
+      if (other.HasPm25Standard) {
         Pm25Standard = other.Pm25Standard;
       }
-      if (other.Pm100Standard != 0) {
+      if (other.HasPm100Standard) {
         Pm100Standard = other.Pm100Standard;
       }
-      if (other.Pm10Environmental != 0) {
+      if (other.HasPm10Environmental) {
         Pm10Environmental = other.Pm10Environmental;
       }
-      if (other.Pm25Environmental != 0) {
+      if (other.HasPm25Environmental) {
         Pm25Environmental = other.Pm25Environmental;
       }
-      if (other.Pm100Environmental != 0) {
+      if (other.HasPm100Environmental) {
         Pm100Environmental = other.Pm100Environmental;
       }
-      if (other.Particles03Um != 0) {
+      if (other.HasParticles03Um) {
         Particles03Um = other.Particles03Um;
       }
-      if (other.Particles05Um != 0) {
+      if (other.HasParticles05Um) {
         Particles05Um = other.Particles05Um;
       }
-      if (other.Particles10Um != 0) {
+      if (other.HasParticles10Um) {
         Particles10Um = other.Particles10Um;
       }
-      if (other.Particles25Um != 0) {
+      if (other.HasParticles25Um) {
         Particles25Um = other.Particles25Um;
       }
-      if (other.Particles50Um != 0) {
+      if (other.HasParticles50Um) {
         Particles50Um = other.Particles50Um;
       }
-      if (other.Particles100Um != 0) {
+      if (other.HasParticles100Um) {
         Particles100Um = other.Particles100Um;
+      }
+      if (other.HasCo2) {
+        Co2 = other.Co2;
+      }
+      if (other.HasCo2Temperature) {
+        Co2Temperature = other.Co2Temperature;
+      }
+      if (other.HasCo2Humidity) {
+        Co2Humidity = other.Co2Humidity;
+      }
+      if (other.HasFormFormaldehyde) {
+        FormFormaldehyde = other.FormFormaldehyde;
+      }
+      if (other.HasFormHumidity) {
+        FormHumidity = other.FormHumidity;
+      }
+      if (other.HasFormTemperature) {
+        FormTemperature = other.FormTemperature;
+      }
+      if (other.HasPm40Standard) {
+        Pm40Standard = other.Pm40Standard;
+      }
+      if (other.HasParticles40Um) {
+        Particles40Um = other.Particles40Um;
+      }
+      if (other.HasPmTemperature) {
+        PmTemperature = other.PmTemperature;
+      }
+      if (other.HasPmHumidity) {
+        PmHumidity = other.PmHumidity;
+      }
+      if (other.HasPmVocIdx) {
+        PmVocIdx = other.PmVocIdx;
+      }
+      if (other.HasPmNoxIdx) {
+        PmNoxIdx = other.PmNoxIdx;
+      }
+      if (other.HasParticlesTps) {
+        ParticlesTps = other.ParticlesTps;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1854,6 +4615,58 @@ namespace Meshtastic.Protobufs {
           }
           case 96: {
             Particles100Um = input.ReadUInt32();
+            break;
+          }
+          case 104: {
+            Co2 = input.ReadUInt32();
+            break;
+          }
+          case 117: {
+            Co2Temperature = input.ReadFloat();
+            break;
+          }
+          case 125: {
+            Co2Humidity = input.ReadFloat();
+            break;
+          }
+          case 133: {
+            FormFormaldehyde = input.ReadFloat();
+            break;
+          }
+          case 141: {
+            FormHumidity = input.ReadFloat();
+            break;
+          }
+          case 149: {
+            FormTemperature = input.ReadFloat();
+            break;
+          }
+          case 152: {
+            Pm40Standard = input.ReadUInt32();
+            break;
+          }
+          case 160: {
+            Particles40Um = input.ReadUInt32();
+            break;
+          }
+          case 173: {
+            PmTemperature = input.ReadFloat();
+            break;
+          }
+          case 181: {
+            PmHumidity = input.ReadFloat();
+            break;
+          }
+          case 189: {
+            PmVocIdx = input.ReadFloat();
+            break;
+          }
+          case 197: {
+            PmNoxIdx = input.ReadFloat();
+            break;
+          }
+          case 205: {
+            ParticlesTps = input.ReadFloat();
             break;
           }
         }
@@ -1919,6 +4732,2160 @@ namespace Meshtastic.Protobufs {
             Particles100Um = input.ReadUInt32();
             break;
           }
+          case 104: {
+            Co2 = input.ReadUInt32();
+            break;
+          }
+          case 117: {
+            Co2Temperature = input.ReadFloat();
+            break;
+          }
+          case 125: {
+            Co2Humidity = input.ReadFloat();
+            break;
+          }
+          case 133: {
+            FormFormaldehyde = input.ReadFloat();
+            break;
+          }
+          case 141: {
+            FormHumidity = input.ReadFloat();
+            break;
+          }
+          case 149: {
+            FormTemperature = input.ReadFloat();
+            break;
+          }
+          case 152: {
+            Pm40Standard = input.ReadUInt32();
+            break;
+          }
+          case 160: {
+            Particles40Um = input.ReadUInt32();
+            break;
+          }
+          case 173: {
+            PmTemperature = input.ReadFloat();
+            break;
+          }
+          case 181: {
+            PmHumidity = input.ReadFloat();
+            break;
+          }
+          case 189: {
+            PmVocIdx = input.ReadFloat();
+            break;
+          }
+          case 197: {
+            PmNoxIdx = input.ReadFloat();
+            break;
+          }
+          case 205: {
+            ParticlesTps = input.ReadFloat();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  ///
+  /// Local device mesh statistics
+  /// </summary>
+  public sealed partial class LocalStats : pb::IMessage<LocalStats>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<LocalStats> _parser = new pb::MessageParser<LocalStats>(() => new LocalStats());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<LocalStats> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[4]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public LocalStats() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public LocalStats(LocalStats other) : this() {
+      uptimeSeconds_ = other.uptimeSeconds_;
+      channelUtilization_ = other.channelUtilization_;
+      airUtilTx_ = other.airUtilTx_;
+      numPacketsTx_ = other.numPacketsTx_;
+      numPacketsRx_ = other.numPacketsRx_;
+      numPacketsRxBad_ = other.numPacketsRxBad_;
+      numOnlineNodes_ = other.numOnlineNodes_;
+      numTotalNodes_ = other.numTotalNodes_;
+      numRxDupe_ = other.numRxDupe_;
+      numTxRelay_ = other.numTxRelay_;
+      numTxRelayCanceled_ = other.numTxRelayCanceled_;
+      heapTotalBytes_ = other.heapTotalBytes_;
+      heapFreeBytes_ = other.heapFreeBytes_;
+      numTxDropped_ = other.numTxDropped_;
+      noiseFloor_ = other.noiseFloor_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public LocalStats Clone() {
+      return new LocalStats(this);
+    }
+
+    /// <summary>Field number for the "uptime_seconds" field.</summary>
+    public const int UptimeSecondsFieldNumber = 1;
+    private uint uptimeSeconds_;
+    /// <summary>
+    ///
+    /// How long the device has been running since the last reboot (in seconds)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint UptimeSeconds {
+      get { return uptimeSeconds_; }
+      set {
+        uptimeSeconds_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "channel_utilization" field.</summary>
+    public const int ChannelUtilizationFieldNumber = 2;
+    private float channelUtilization_;
+    /// <summary>
+    ///
+    /// Utilization for the current channel, including well formed TX, RX and malformed RX (aka noise).
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float ChannelUtilization {
+      get { return channelUtilization_; }
+      set {
+        channelUtilization_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "air_util_tx" field.</summary>
+    public const int AirUtilTxFieldNumber = 3;
+    private float airUtilTx_;
+    /// <summary>
+    ///
+    /// Percent of airtime for transmission used within the last hour.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float AirUtilTx {
+      get { return airUtilTx_; }
+      set {
+        airUtilTx_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_packets_tx" field.</summary>
+    public const int NumPacketsTxFieldNumber = 4;
+    private uint numPacketsTx_;
+    /// <summary>
+    ///
+    /// Number of packets sent
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumPacketsTx {
+      get { return numPacketsTx_; }
+      set {
+        numPacketsTx_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_packets_rx" field.</summary>
+    public const int NumPacketsRxFieldNumber = 5;
+    private uint numPacketsRx_;
+    /// <summary>
+    ///
+    /// Number of packets received (both good and bad)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumPacketsRx {
+      get { return numPacketsRx_; }
+      set {
+        numPacketsRx_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_packets_rx_bad" field.</summary>
+    public const int NumPacketsRxBadFieldNumber = 6;
+    private uint numPacketsRxBad_;
+    /// <summary>
+    ///
+    /// Number of packets received that are malformed or violate the protocol
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumPacketsRxBad {
+      get { return numPacketsRxBad_; }
+      set {
+        numPacketsRxBad_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_online_nodes" field.</summary>
+    public const int NumOnlineNodesFieldNumber = 7;
+    private uint numOnlineNodes_;
+    /// <summary>
+    ///
+    /// Number of nodes online (in the past 2 hours)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumOnlineNodes {
+      get { return numOnlineNodes_; }
+      set {
+        numOnlineNodes_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_total_nodes" field.</summary>
+    public const int NumTotalNodesFieldNumber = 8;
+    private uint numTotalNodes_;
+    /// <summary>
+    ///
+    /// Number of nodes total
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumTotalNodes {
+      get { return numTotalNodes_; }
+      set {
+        numTotalNodes_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_rx_dupe" field.</summary>
+    public const int NumRxDupeFieldNumber = 9;
+    private uint numRxDupe_;
+    /// <summary>
+    ///
+    /// Number of received packets that were duplicates (due to multiple nodes relaying).
+    /// If this number is high, there are nodes in the mesh relaying packets when it's unnecessary, for example due to the ROUTER/REPEATER role.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumRxDupe {
+      get { return numRxDupe_; }
+      set {
+        numRxDupe_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_tx_relay" field.</summary>
+    public const int NumTxRelayFieldNumber = 10;
+    private uint numTxRelay_;
+    /// <summary>
+    ///
+    /// Number of packets we transmitted that were a relay for others (not originating from ourselves).
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumTxRelay {
+      get { return numTxRelay_; }
+      set {
+        numTxRelay_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_tx_relay_canceled" field.</summary>
+    public const int NumTxRelayCanceledFieldNumber = 11;
+    private uint numTxRelayCanceled_;
+    /// <summary>
+    ///
+    /// Number of times we canceled a packet to be relayed, because someone else did it before us.
+    /// This will always be zero for ROUTERs/REPEATERs. If this number is high, some other node(s) is/are relaying faster than you.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumTxRelayCanceled {
+      get { return numTxRelayCanceled_; }
+      set {
+        numTxRelayCanceled_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "heap_total_bytes" field.</summary>
+    public const int HeapTotalBytesFieldNumber = 12;
+    private uint heapTotalBytes_;
+    /// <summary>
+    ///
+    /// Number of bytes used in the heap
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint HeapTotalBytes {
+      get { return heapTotalBytes_; }
+      set {
+        heapTotalBytes_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "heap_free_bytes" field.</summary>
+    public const int HeapFreeBytesFieldNumber = 13;
+    private uint heapFreeBytes_;
+    /// <summary>
+    ///
+    /// Number of bytes free in the heap
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint HeapFreeBytes {
+      get { return heapFreeBytes_; }
+      set {
+        heapFreeBytes_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "num_tx_dropped" field.</summary>
+    public const int NumTxDroppedFieldNumber = 14;
+    private uint numTxDropped_;
+    /// <summary>
+    ///
+    /// Number of packets that were dropped because the transmit queue was full.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NumTxDropped {
+      get { return numTxDropped_; }
+      set {
+        numTxDropped_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "noise_floor" field.</summary>
+    public const int NoiseFloorFieldNumber = 15;
+    private int noiseFloor_;
+    /// <summary>
+    ///
+    /// Noise floor value measured in dBm
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int NoiseFloor {
+      get { return noiseFloor_; }
+      set {
+        noiseFloor_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as LocalStats);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(LocalStats other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (UptimeSeconds != other.UptimeSeconds) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(ChannelUtilization, other.ChannelUtilization)) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(AirUtilTx, other.AirUtilTx)) return false;
+      if (NumPacketsTx != other.NumPacketsTx) return false;
+      if (NumPacketsRx != other.NumPacketsRx) return false;
+      if (NumPacketsRxBad != other.NumPacketsRxBad) return false;
+      if (NumOnlineNodes != other.NumOnlineNodes) return false;
+      if (NumTotalNodes != other.NumTotalNodes) return false;
+      if (NumRxDupe != other.NumRxDupe) return false;
+      if (NumTxRelay != other.NumTxRelay) return false;
+      if (NumTxRelayCanceled != other.NumTxRelayCanceled) return false;
+      if (HeapTotalBytes != other.HeapTotalBytes) return false;
+      if (HeapFreeBytes != other.HeapFreeBytes) return false;
+      if (NumTxDropped != other.NumTxDropped) return false;
+      if (NoiseFloor != other.NoiseFloor) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (UptimeSeconds != 0) hash ^= UptimeSeconds.GetHashCode();
+      if (ChannelUtilization != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(ChannelUtilization);
+      if (AirUtilTx != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(AirUtilTx);
+      if (NumPacketsTx != 0) hash ^= NumPacketsTx.GetHashCode();
+      if (NumPacketsRx != 0) hash ^= NumPacketsRx.GetHashCode();
+      if (NumPacketsRxBad != 0) hash ^= NumPacketsRxBad.GetHashCode();
+      if (NumOnlineNodes != 0) hash ^= NumOnlineNodes.GetHashCode();
+      if (NumTotalNodes != 0) hash ^= NumTotalNodes.GetHashCode();
+      if (NumRxDupe != 0) hash ^= NumRxDupe.GetHashCode();
+      if (NumTxRelay != 0) hash ^= NumTxRelay.GetHashCode();
+      if (NumTxRelayCanceled != 0) hash ^= NumTxRelayCanceled.GetHashCode();
+      if (HeapTotalBytes != 0) hash ^= HeapTotalBytes.GetHashCode();
+      if (HeapFreeBytes != 0) hash ^= HeapFreeBytes.GetHashCode();
+      if (NumTxDropped != 0) hash ^= NumTxDropped.GetHashCode();
+      if (NoiseFloor != 0) hash ^= NoiseFloor.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (UptimeSeconds != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(UptimeSeconds);
+      }
+      if (ChannelUtilization != 0F) {
+        output.WriteRawTag(21);
+        output.WriteFloat(ChannelUtilization);
+      }
+      if (AirUtilTx != 0F) {
+        output.WriteRawTag(29);
+        output.WriteFloat(AirUtilTx);
+      }
+      if (NumPacketsTx != 0) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(NumPacketsTx);
+      }
+      if (NumPacketsRx != 0) {
+        output.WriteRawTag(40);
+        output.WriteUInt32(NumPacketsRx);
+      }
+      if (NumPacketsRxBad != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(NumPacketsRxBad);
+      }
+      if (NumOnlineNodes != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(NumOnlineNodes);
+      }
+      if (NumTotalNodes != 0) {
+        output.WriteRawTag(64);
+        output.WriteUInt32(NumTotalNodes);
+      }
+      if (NumRxDupe != 0) {
+        output.WriteRawTag(72);
+        output.WriteUInt32(NumRxDupe);
+      }
+      if (NumTxRelay != 0) {
+        output.WriteRawTag(80);
+        output.WriteUInt32(NumTxRelay);
+      }
+      if (NumTxRelayCanceled != 0) {
+        output.WriteRawTag(88);
+        output.WriteUInt32(NumTxRelayCanceled);
+      }
+      if (HeapTotalBytes != 0) {
+        output.WriteRawTag(96);
+        output.WriteUInt32(HeapTotalBytes);
+      }
+      if (HeapFreeBytes != 0) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(HeapFreeBytes);
+      }
+      if (NumTxDropped != 0) {
+        output.WriteRawTag(112);
+        output.WriteUInt32(NumTxDropped);
+      }
+      if (NoiseFloor != 0) {
+        output.WriteRawTag(120);
+        output.WriteInt32(NoiseFloor);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (UptimeSeconds != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(UptimeSeconds);
+      }
+      if (ChannelUtilization != 0F) {
+        output.WriteRawTag(21);
+        output.WriteFloat(ChannelUtilization);
+      }
+      if (AirUtilTx != 0F) {
+        output.WriteRawTag(29);
+        output.WriteFloat(AirUtilTx);
+      }
+      if (NumPacketsTx != 0) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(NumPacketsTx);
+      }
+      if (NumPacketsRx != 0) {
+        output.WriteRawTag(40);
+        output.WriteUInt32(NumPacketsRx);
+      }
+      if (NumPacketsRxBad != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(NumPacketsRxBad);
+      }
+      if (NumOnlineNodes != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(NumOnlineNodes);
+      }
+      if (NumTotalNodes != 0) {
+        output.WriteRawTag(64);
+        output.WriteUInt32(NumTotalNodes);
+      }
+      if (NumRxDupe != 0) {
+        output.WriteRawTag(72);
+        output.WriteUInt32(NumRxDupe);
+      }
+      if (NumTxRelay != 0) {
+        output.WriteRawTag(80);
+        output.WriteUInt32(NumTxRelay);
+      }
+      if (NumTxRelayCanceled != 0) {
+        output.WriteRawTag(88);
+        output.WriteUInt32(NumTxRelayCanceled);
+      }
+      if (HeapTotalBytes != 0) {
+        output.WriteRawTag(96);
+        output.WriteUInt32(HeapTotalBytes);
+      }
+      if (HeapFreeBytes != 0) {
+        output.WriteRawTag(104);
+        output.WriteUInt32(HeapFreeBytes);
+      }
+      if (NumTxDropped != 0) {
+        output.WriteRawTag(112);
+        output.WriteUInt32(NumTxDropped);
+      }
+      if (NoiseFloor != 0) {
+        output.WriteRawTag(120);
+        output.WriteInt32(NoiseFloor);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (UptimeSeconds != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(UptimeSeconds);
+      }
+      if (ChannelUtilization != 0F) {
+        size += 1 + 4;
+      }
+      if (AirUtilTx != 0F) {
+        size += 1 + 4;
+      }
+      if (NumPacketsTx != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumPacketsTx);
+      }
+      if (NumPacketsRx != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumPacketsRx);
+      }
+      if (NumPacketsRxBad != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumPacketsRxBad);
+      }
+      if (NumOnlineNodes != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumOnlineNodes);
+      }
+      if (NumTotalNodes != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumTotalNodes);
+      }
+      if (NumRxDupe != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumRxDupe);
+      }
+      if (NumTxRelay != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumTxRelay);
+      }
+      if (NumTxRelayCanceled != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumTxRelayCanceled);
+      }
+      if (HeapTotalBytes != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(HeapTotalBytes);
+      }
+      if (HeapFreeBytes != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(HeapFreeBytes);
+      }
+      if (NumTxDropped != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NumTxDropped);
+      }
+      if (NoiseFloor != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(NoiseFloor);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(LocalStats other) {
+      if (other == null) {
+        return;
+      }
+      if (other.UptimeSeconds != 0) {
+        UptimeSeconds = other.UptimeSeconds;
+      }
+      if (other.ChannelUtilization != 0F) {
+        ChannelUtilization = other.ChannelUtilization;
+      }
+      if (other.AirUtilTx != 0F) {
+        AirUtilTx = other.AirUtilTx;
+      }
+      if (other.NumPacketsTx != 0) {
+        NumPacketsTx = other.NumPacketsTx;
+      }
+      if (other.NumPacketsRx != 0) {
+        NumPacketsRx = other.NumPacketsRx;
+      }
+      if (other.NumPacketsRxBad != 0) {
+        NumPacketsRxBad = other.NumPacketsRxBad;
+      }
+      if (other.NumOnlineNodes != 0) {
+        NumOnlineNodes = other.NumOnlineNodes;
+      }
+      if (other.NumTotalNodes != 0) {
+        NumTotalNodes = other.NumTotalNodes;
+      }
+      if (other.NumRxDupe != 0) {
+        NumRxDupe = other.NumRxDupe;
+      }
+      if (other.NumTxRelay != 0) {
+        NumTxRelay = other.NumTxRelay;
+      }
+      if (other.NumTxRelayCanceled != 0) {
+        NumTxRelayCanceled = other.NumTxRelayCanceled;
+      }
+      if (other.HeapTotalBytes != 0) {
+        HeapTotalBytes = other.HeapTotalBytes;
+      }
+      if (other.HeapFreeBytes != 0) {
+        HeapFreeBytes = other.HeapFreeBytes;
+      }
+      if (other.NumTxDropped != 0) {
+        NumTxDropped = other.NumTxDropped;
+      }
+      if (other.NoiseFloor != 0) {
+        NoiseFloor = other.NoiseFloor;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            UptimeSeconds = input.ReadUInt32();
+            break;
+          }
+          case 21: {
+            ChannelUtilization = input.ReadFloat();
+            break;
+          }
+          case 29: {
+            AirUtilTx = input.ReadFloat();
+            break;
+          }
+          case 32: {
+            NumPacketsTx = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            NumPacketsRx = input.ReadUInt32();
+            break;
+          }
+          case 48: {
+            NumPacketsRxBad = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            NumOnlineNodes = input.ReadUInt32();
+            break;
+          }
+          case 64: {
+            NumTotalNodes = input.ReadUInt32();
+            break;
+          }
+          case 72: {
+            NumRxDupe = input.ReadUInt32();
+            break;
+          }
+          case 80: {
+            NumTxRelay = input.ReadUInt32();
+            break;
+          }
+          case 88: {
+            NumTxRelayCanceled = input.ReadUInt32();
+            break;
+          }
+          case 96: {
+            HeapTotalBytes = input.ReadUInt32();
+            break;
+          }
+          case 104: {
+            HeapFreeBytes = input.ReadUInt32();
+            break;
+          }
+          case 112: {
+            NumTxDropped = input.ReadUInt32();
+            break;
+          }
+          case 120: {
+            NoiseFloor = input.ReadInt32();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            UptimeSeconds = input.ReadUInt32();
+            break;
+          }
+          case 21: {
+            ChannelUtilization = input.ReadFloat();
+            break;
+          }
+          case 29: {
+            AirUtilTx = input.ReadFloat();
+            break;
+          }
+          case 32: {
+            NumPacketsTx = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            NumPacketsRx = input.ReadUInt32();
+            break;
+          }
+          case 48: {
+            NumPacketsRxBad = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            NumOnlineNodes = input.ReadUInt32();
+            break;
+          }
+          case 64: {
+            NumTotalNodes = input.ReadUInt32();
+            break;
+          }
+          case 72: {
+            NumRxDupe = input.ReadUInt32();
+            break;
+          }
+          case 80: {
+            NumTxRelay = input.ReadUInt32();
+            break;
+          }
+          case 88: {
+            NumTxRelayCanceled = input.ReadUInt32();
+            break;
+          }
+          case 96: {
+            HeapTotalBytes = input.ReadUInt32();
+            break;
+          }
+          case 104: {
+            HeapFreeBytes = input.ReadUInt32();
+            break;
+          }
+          case 112: {
+            NumTxDropped = input.ReadUInt32();
+            break;
+          }
+          case 120: {
+            NoiseFloor = input.ReadInt32();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  ///
+  /// Traffic management statistics for mesh network optimization
+  /// </summary>
+  public sealed partial class TrafficManagementStats : pb::IMessage<TrafficManagementStats>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<TrafficManagementStats> _parser = new pb::MessageParser<TrafficManagementStats>(() => new TrafficManagementStats());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<TrafficManagementStats> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[5]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public TrafficManagementStats() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public TrafficManagementStats(TrafficManagementStats other) : this() {
+      packetsInspected_ = other.packetsInspected_;
+      positionDedupDrops_ = other.positionDedupDrops_;
+      nodeinfoCacheHits_ = other.nodeinfoCacheHits_;
+      rateLimitDrops_ = other.rateLimitDrops_;
+      unknownPacketDrops_ = other.unknownPacketDrops_;
+      hopExhaustedPackets_ = other.hopExhaustedPackets_;
+      routerHopsPreserved_ = other.routerHopsPreserved_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public TrafficManagementStats Clone() {
+      return new TrafficManagementStats(this);
+    }
+
+    /// <summary>Field number for the "packets_inspected" field.</summary>
+    public const int PacketsInspectedFieldNumber = 1;
+    private uint packetsInspected_;
+    /// <summary>
+    ///
+    /// Total number of packets inspected by traffic management
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint PacketsInspected {
+      get { return packetsInspected_; }
+      set {
+        packetsInspected_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "position_dedup_drops" field.</summary>
+    public const int PositionDedupDropsFieldNumber = 2;
+    private uint positionDedupDrops_;
+    /// <summary>
+    ///
+    /// Number of position packets dropped due to deduplication
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint PositionDedupDrops {
+      get { return positionDedupDrops_; }
+      set {
+        positionDedupDrops_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "nodeinfo_cache_hits" field.</summary>
+    public const int NodeinfoCacheHitsFieldNumber = 3;
+    private uint nodeinfoCacheHits_;
+    /// <summary>
+    ///
+    /// Number of NodeInfo requests answered from cache
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint NodeinfoCacheHits {
+      get { return nodeinfoCacheHits_; }
+      set {
+        nodeinfoCacheHits_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "rate_limit_drops" field.</summary>
+    public const int RateLimitDropsFieldNumber = 4;
+    private uint rateLimitDrops_;
+    /// <summary>
+    ///
+    /// Number of packets dropped due to rate limiting
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint RateLimitDrops {
+      get { return rateLimitDrops_; }
+      set {
+        rateLimitDrops_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "unknown_packet_drops" field.</summary>
+    public const int UnknownPacketDropsFieldNumber = 5;
+    private uint unknownPacketDrops_;
+    /// <summary>
+    ///
+    /// Number of unknown/undecryptable packets dropped
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint UnknownPacketDrops {
+      get { return unknownPacketDrops_; }
+      set {
+        unknownPacketDrops_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "hop_exhausted_packets" field.</summary>
+    public const int HopExhaustedPacketsFieldNumber = 6;
+    private uint hopExhaustedPackets_;
+    /// <summary>
+    ///
+    /// Number of packets with hop_limit exhausted for local-only broadcast
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint HopExhaustedPackets {
+      get { return hopExhaustedPackets_; }
+      set {
+        hopExhaustedPackets_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "router_hops_preserved" field.</summary>
+    public const int RouterHopsPreservedFieldNumber = 7;
+    private uint routerHopsPreserved_;
+    /// <summary>
+    ///
+    /// Number of times router hop preservation was applied
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint RouterHopsPreserved {
+      get { return routerHopsPreserved_; }
+      set {
+        routerHopsPreserved_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as TrafficManagementStats);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(TrafficManagementStats other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (PacketsInspected != other.PacketsInspected) return false;
+      if (PositionDedupDrops != other.PositionDedupDrops) return false;
+      if (NodeinfoCacheHits != other.NodeinfoCacheHits) return false;
+      if (RateLimitDrops != other.RateLimitDrops) return false;
+      if (UnknownPacketDrops != other.UnknownPacketDrops) return false;
+      if (HopExhaustedPackets != other.HopExhaustedPackets) return false;
+      if (RouterHopsPreserved != other.RouterHopsPreserved) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (PacketsInspected != 0) hash ^= PacketsInspected.GetHashCode();
+      if (PositionDedupDrops != 0) hash ^= PositionDedupDrops.GetHashCode();
+      if (NodeinfoCacheHits != 0) hash ^= NodeinfoCacheHits.GetHashCode();
+      if (RateLimitDrops != 0) hash ^= RateLimitDrops.GetHashCode();
+      if (UnknownPacketDrops != 0) hash ^= UnknownPacketDrops.GetHashCode();
+      if (HopExhaustedPackets != 0) hash ^= HopExhaustedPackets.GetHashCode();
+      if (RouterHopsPreserved != 0) hash ^= RouterHopsPreserved.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (PacketsInspected != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(PacketsInspected);
+      }
+      if (PositionDedupDrops != 0) {
+        output.WriteRawTag(16);
+        output.WriteUInt32(PositionDedupDrops);
+      }
+      if (NodeinfoCacheHits != 0) {
+        output.WriteRawTag(24);
+        output.WriteUInt32(NodeinfoCacheHits);
+      }
+      if (RateLimitDrops != 0) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(RateLimitDrops);
+      }
+      if (UnknownPacketDrops != 0) {
+        output.WriteRawTag(40);
+        output.WriteUInt32(UnknownPacketDrops);
+      }
+      if (HopExhaustedPackets != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(HopExhaustedPackets);
+      }
+      if (RouterHopsPreserved != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(RouterHopsPreserved);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (PacketsInspected != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(PacketsInspected);
+      }
+      if (PositionDedupDrops != 0) {
+        output.WriteRawTag(16);
+        output.WriteUInt32(PositionDedupDrops);
+      }
+      if (NodeinfoCacheHits != 0) {
+        output.WriteRawTag(24);
+        output.WriteUInt32(NodeinfoCacheHits);
+      }
+      if (RateLimitDrops != 0) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(RateLimitDrops);
+      }
+      if (UnknownPacketDrops != 0) {
+        output.WriteRawTag(40);
+        output.WriteUInt32(UnknownPacketDrops);
+      }
+      if (HopExhaustedPackets != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(HopExhaustedPackets);
+      }
+      if (RouterHopsPreserved != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(RouterHopsPreserved);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (PacketsInspected != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(PacketsInspected);
+      }
+      if (PositionDedupDrops != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(PositionDedupDrops);
+      }
+      if (NodeinfoCacheHits != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(NodeinfoCacheHits);
+      }
+      if (RateLimitDrops != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(RateLimitDrops);
+      }
+      if (UnknownPacketDrops != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(UnknownPacketDrops);
+      }
+      if (HopExhaustedPackets != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(HopExhaustedPackets);
+      }
+      if (RouterHopsPreserved != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(RouterHopsPreserved);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(TrafficManagementStats other) {
+      if (other == null) {
+        return;
+      }
+      if (other.PacketsInspected != 0) {
+        PacketsInspected = other.PacketsInspected;
+      }
+      if (other.PositionDedupDrops != 0) {
+        PositionDedupDrops = other.PositionDedupDrops;
+      }
+      if (other.NodeinfoCacheHits != 0) {
+        NodeinfoCacheHits = other.NodeinfoCacheHits;
+      }
+      if (other.RateLimitDrops != 0) {
+        RateLimitDrops = other.RateLimitDrops;
+      }
+      if (other.UnknownPacketDrops != 0) {
+        UnknownPacketDrops = other.UnknownPacketDrops;
+      }
+      if (other.HopExhaustedPackets != 0) {
+        HopExhaustedPackets = other.HopExhaustedPackets;
+      }
+      if (other.RouterHopsPreserved != 0) {
+        RouterHopsPreserved = other.RouterHopsPreserved;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            PacketsInspected = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            PositionDedupDrops = input.ReadUInt32();
+            break;
+          }
+          case 24: {
+            NodeinfoCacheHits = input.ReadUInt32();
+            break;
+          }
+          case 32: {
+            RateLimitDrops = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            UnknownPacketDrops = input.ReadUInt32();
+            break;
+          }
+          case 48: {
+            HopExhaustedPackets = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            RouterHopsPreserved = input.ReadUInt32();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            PacketsInspected = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            PositionDedupDrops = input.ReadUInt32();
+            break;
+          }
+          case 24: {
+            NodeinfoCacheHits = input.ReadUInt32();
+            break;
+          }
+          case 32: {
+            RateLimitDrops = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            UnknownPacketDrops = input.ReadUInt32();
+            break;
+          }
+          case 48: {
+            HopExhaustedPackets = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            RouterHopsPreserved = input.ReadUInt32();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  ///
+  /// Health telemetry metrics
+  /// </summary>
+  public sealed partial class HealthMetrics : pb::IMessage<HealthMetrics>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<HealthMetrics> _parser = new pb::MessageParser<HealthMetrics>(() => new HealthMetrics());
+    private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<HealthMetrics> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[6]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public HealthMetrics() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public HealthMetrics(HealthMetrics other) : this() {
+      _hasBits0 = other._hasBits0;
+      heartBpm_ = other.heartBpm_;
+      spO2_ = other.spO2_;
+      temperature_ = other.temperature_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public HealthMetrics Clone() {
+      return new HealthMetrics(this);
+    }
+
+    /// <summary>Field number for the "heart_bpm" field.</summary>
+    public const int HeartBpmFieldNumber = 1;
+    private uint heartBpm_;
+    /// <summary>
+    ///
+    /// Heart rate (beats per minute)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint HeartBpm {
+      get { if ((_hasBits0 & 1) != 0) { return heartBpm_; } else { return 0; } }
+      set {
+        _hasBits0 |= 1;
+        heartBpm_ = value;
+      }
+    }
+    /// <summary>Gets whether the "heart_bpm" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasHeartBpm {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "heart_bpm" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearHeartBpm() {
+      _hasBits0 &= ~1;
+    }
+
+    /// <summary>Field number for the "spO2" field.</summary>
+    public const int SpO2FieldNumber = 2;
+    private uint spO2_;
+    /// <summary>
+    ///
+    /// SpO2 (blood oxygen saturation) level
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint SpO2 {
+      get { if ((_hasBits0 & 2) != 0) { return spO2_; } else { return 0; } }
+      set {
+        _hasBits0 |= 2;
+        spO2_ = value;
+      }
+    }
+    /// <summary>Gets whether the "spO2" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasSpO2 {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "spO2" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearSpO2() {
+      _hasBits0 &= ~2;
+    }
+
+    /// <summary>Field number for the "temperature" field.</summary>
+    public const int TemperatureFieldNumber = 3;
+    private float temperature_;
+    /// <summary>
+    ///
+    /// Body temperature in degrees Celsius
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float Temperature {
+      get { if ((_hasBits0 & 4) != 0) { return temperature_; } else { return 0F; } }
+      set {
+        _hasBits0 |= 4;
+        temperature_ = value;
+      }
+    }
+    /// <summary>Gets whether the "temperature" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasTemperature {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "temperature" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearTemperature() {
+      _hasBits0 &= ~4;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as HealthMetrics);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(HealthMetrics other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (HeartBpm != other.HeartBpm) return false;
+      if (SpO2 != other.SpO2) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(Temperature, other.Temperature)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (HasHeartBpm) hash ^= HeartBpm.GetHashCode();
+      if (HasSpO2) hash ^= SpO2.GetHashCode();
+      if (HasTemperature) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(Temperature);
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (HasHeartBpm) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(HeartBpm);
+      }
+      if (HasSpO2) {
+        output.WriteRawTag(16);
+        output.WriteUInt32(SpO2);
+      }
+      if (HasTemperature) {
+        output.WriteRawTag(29);
+        output.WriteFloat(Temperature);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (HasHeartBpm) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(HeartBpm);
+      }
+      if (HasSpO2) {
+        output.WriteRawTag(16);
+        output.WriteUInt32(SpO2);
+      }
+      if (HasTemperature) {
+        output.WriteRawTag(29);
+        output.WriteFloat(Temperature);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (HasHeartBpm) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(HeartBpm);
+      }
+      if (HasSpO2) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(SpO2);
+      }
+      if (HasTemperature) {
+        size += 1 + 4;
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(HealthMetrics other) {
+      if (other == null) {
+        return;
+      }
+      if (other.HasHeartBpm) {
+        HeartBpm = other.HeartBpm;
+      }
+      if (other.HasSpO2) {
+        SpO2 = other.SpO2;
+      }
+      if (other.HasTemperature) {
+        Temperature = other.Temperature;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            HeartBpm = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            SpO2 = input.ReadUInt32();
+            break;
+          }
+          case 29: {
+            Temperature = input.ReadFloat();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            HeartBpm = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            SpO2 = input.ReadUInt32();
+            break;
+          }
+          case 29: {
+            Temperature = input.ReadFloat();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  ///
+  /// Linux host metrics
+  /// </summary>
+  public sealed partial class HostMetrics : pb::IMessage<HostMetrics>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<HostMetrics> _parser = new pb::MessageParser<HostMetrics>(() => new HostMetrics());
+    private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<HostMetrics> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[7]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public HostMetrics() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public HostMetrics(HostMetrics other) : this() {
+      _hasBits0 = other._hasBits0;
+      uptimeSeconds_ = other.uptimeSeconds_;
+      freememBytes_ = other.freememBytes_;
+      diskfree1Bytes_ = other.diskfree1Bytes_;
+      diskfree2Bytes_ = other.diskfree2Bytes_;
+      diskfree3Bytes_ = other.diskfree3Bytes_;
+      load1_ = other.load1_;
+      load5_ = other.load5_;
+      load15_ = other.load15_;
+      userString_ = other.userString_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public HostMetrics Clone() {
+      return new HostMetrics(this);
+    }
+
+    /// <summary>Field number for the "uptime_seconds" field.</summary>
+    public const int UptimeSecondsFieldNumber = 1;
+    private uint uptimeSeconds_;
+    /// <summary>
+    ///
+    /// Host system uptime
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint UptimeSeconds {
+      get { return uptimeSeconds_; }
+      set {
+        uptimeSeconds_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "freemem_bytes" field.</summary>
+    public const int FreememBytesFieldNumber = 2;
+    private ulong freememBytes_;
+    /// <summary>
+    ///
+    /// Host system free memory
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong FreememBytes {
+      get { return freememBytes_; }
+      set {
+        freememBytes_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "diskfree1_bytes" field.</summary>
+    public const int Diskfree1BytesFieldNumber = 3;
+    private ulong diskfree1Bytes_;
+    /// <summary>
+    ///
+    /// Host system disk space free for /
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong Diskfree1Bytes {
+      get { return diskfree1Bytes_; }
+      set {
+        diskfree1Bytes_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "diskfree2_bytes" field.</summary>
+    public const int Diskfree2BytesFieldNumber = 4;
+    private ulong diskfree2Bytes_;
+    /// <summary>
+    ///
+    /// Secondary system disk space free
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong Diskfree2Bytes {
+      get { if ((_hasBits0 & 1) != 0) { return diskfree2Bytes_; } else { return 0UL; } }
+      set {
+        _hasBits0 |= 1;
+        diskfree2Bytes_ = value;
+      }
+    }
+    /// <summary>Gets whether the "diskfree2_bytes" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasDiskfree2Bytes {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "diskfree2_bytes" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearDiskfree2Bytes() {
+      _hasBits0 &= ~1;
+    }
+
+    /// <summary>Field number for the "diskfree3_bytes" field.</summary>
+    public const int Diskfree3BytesFieldNumber = 5;
+    private ulong diskfree3Bytes_;
+    /// <summary>
+    ///
+    /// Tertiary disk space free
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong Diskfree3Bytes {
+      get { if ((_hasBits0 & 2) != 0) { return diskfree3Bytes_; } else { return 0UL; } }
+      set {
+        _hasBits0 |= 2;
+        diskfree3Bytes_ = value;
+      }
+    }
+    /// <summary>Gets whether the "diskfree3_bytes" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasDiskfree3Bytes {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "diskfree3_bytes" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearDiskfree3Bytes() {
+      _hasBits0 &= ~2;
+    }
+
+    /// <summary>Field number for the "load1" field.</summary>
+    public const int Load1FieldNumber = 6;
+    private uint load1_;
+    /// <summary>
+    ///
+    /// Host system one minute load in 1/100ths
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Load1 {
+      get { return load1_; }
+      set {
+        load1_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "load5" field.</summary>
+    public const int Load5FieldNumber = 7;
+    private uint load5_;
+    /// <summary>
+    ///
+    /// Host system five minute load  in 1/100ths
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Load5 {
+      get { return load5_; }
+      set {
+        load5_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "load15" field.</summary>
+    public const int Load15FieldNumber = 8;
+    private uint load15_;
+    /// <summary>
+    ///
+    /// Host system fifteen minute load  in 1/100ths
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Load15 {
+      get { return load15_; }
+      set {
+        load15_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "user_string" field.</summary>
+    public const int UserStringFieldNumber = 9;
+    private string userString_;
+    /// <summary>
+    ///
+    /// Optional User-provided string for arbitrary host system information
+    /// that doesn't make sense as a dedicated entry.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string UserString {
+      get { return userString_ ?? ""; }
+      set {
+        userString_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+    /// <summary>Gets whether the "user_string" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasUserString {
+      get { return userString_ != null; }
+    }
+    /// <summary>Clears the value of the "user_string" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearUserString() {
+      userString_ = null;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as HostMetrics);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(HostMetrics other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (UptimeSeconds != other.UptimeSeconds) return false;
+      if (FreememBytes != other.FreememBytes) return false;
+      if (Diskfree1Bytes != other.Diskfree1Bytes) return false;
+      if (Diskfree2Bytes != other.Diskfree2Bytes) return false;
+      if (Diskfree3Bytes != other.Diskfree3Bytes) return false;
+      if (Load1 != other.Load1) return false;
+      if (Load5 != other.Load5) return false;
+      if (Load15 != other.Load15) return false;
+      if (UserString != other.UserString) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (UptimeSeconds != 0) hash ^= UptimeSeconds.GetHashCode();
+      if (FreememBytes != 0UL) hash ^= FreememBytes.GetHashCode();
+      if (Diskfree1Bytes != 0UL) hash ^= Diskfree1Bytes.GetHashCode();
+      if (HasDiskfree2Bytes) hash ^= Diskfree2Bytes.GetHashCode();
+      if (HasDiskfree3Bytes) hash ^= Diskfree3Bytes.GetHashCode();
+      if (Load1 != 0) hash ^= Load1.GetHashCode();
+      if (Load5 != 0) hash ^= Load5.GetHashCode();
+      if (Load15 != 0) hash ^= Load15.GetHashCode();
+      if (HasUserString) hash ^= UserString.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (UptimeSeconds != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(UptimeSeconds);
+      }
+      if (FreememBytes != 0UL) {
+        output.WriteRawTag(16);
+        output.WriteUInt64(FreememBytes);
+      }
+      if (Diskfree1Bytes != 0UL) {
+        output.WriteRawTag(24);
+        output.WriteUInt64(Diskfree1Bytes);
+      }
+      if (HasDiskfree2Bytes) {
+        output.WriteRawTag(32);
+        output.WriteUInt64(Diskfree2Bytes);
+      }
+      if (HasDiskfree3Bytes) {
+        output.WriteRawTag(40);
+        output.WriteUInt64(Diskfree3Bytes);
+      }
+      if (Load1 != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(Load1);
+      }
+      if (Load5 != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(Load5);
+      }
+      if (Load15 != 0) {
+        output.WriteRawTag(64);
+        output.WriteUInt32(Load15);
+      }
+      if (HasUserString) {
+        output.WriteRawTag(74);
+        output.WriteString(UserString);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (UptimeSeconds != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(UptimeSeconds);
+      }
+      if (FreememBytes != 0UL) {
+        output.WriteRawTag(16);
+        output.WriteUInt64(FreememBytes);
+      }
+      if (Diskfree1Bytes != 0UL) {
+        output.WriteRawTag(24);
+        output.WriteUInt64(Diskfree1Bytes);
+      }
+      if (HasDiskfree2Bytes) {
+        output.WriteRawTag(32);
+        output.WriteUInt64(Diskfree2Bytes);
+      }
+      if (HasDiskfree3Bytes) {
+        output.WriteRawTag(40);
+        output.WriteUInt64(Diskfree3Bytes);
+      }
+      if (Load1 != 0) {
+        output.WriteRawTag(48);
+        output.WriteUInt32(Load1);
+      }
+      if (Load5 != 0) {
+        output.WriteRawTag(56);
+        output.WriteUInt32(Load5);
+      }
+      if (Load15 != 0) {
+        output.WriteRawTag(64);
+        output.WriteUInt32(Load15);
+      }
+      if (HasUserString) {
+        output.WriteRawTag(74);
+        output.WriteString(UserString);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (UptimeSeconds != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(UptimeSeconds);
+      }
+      if (FreememBytes != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(FreememBytes);
+      }
+      if (Diskfree1Bytes != 0UL) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(Diskfree1Bytes);
+      }
+      if (HasDiskfree2Bytes) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(Diskfree2Bytes);
+      }
+      if (HasDiskfree3Bytes) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(Diskfree3Bytes);
+      }
+      if (Load1 != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Load1);
+      }
+      if (Load5 != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Load5);
+      }
+      if (Load15 != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Load15);
+      }
+      if (HasUserString) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(UserString);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(HostMetrics other) {
+      if (other == null) {
+        return;
+      }
+      if (other.UptimeSeconds != 0) {
+        UptimeSeconds = other.UptimeSeconds;
+      }
+      if (other.FreememBytes != 0UL) {
+        FreememBytes = other.FreememBytes;
+      }
+      if (other.Diskfree1Bytes != 0UL) {
+        Diskfree1Bytes = other.Diskfree1Bytes;
+      }
+      if (other.HasDiskfree2Bytes) {
+        Diskfree2Bytes = other.Diskfree2Bytes;
+      }
+      if (other.HasDiskfree3Bytes) {
+        Diskfree3Bytes = other.Diskfree3Bytes;
+      }
+      if (other.Load1 != 0) {
+        Load1 = other.Load1;
+      }
+      if (other.Load5 != 0) {
+        Load5 = other.Load5;
+      }
+      if (other.Load15 != 0) {
+        Load15 = other.Load15;
+      }
+      if (other.HasUserString) {
+        UserString = other.UserString;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            UptimeSeconds = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            FreememBytes = input.ReadUInt64();
+            break;
+          }
+          case 24: {
+            Diskfree1Bytes = input.ReadUInt64();
+            break;
+          }
+          case 32: {
+            Diskfree2Bytes = input.ReadUInt64();
+            break;
+          }
+          case 40: {
+            Diskfree3Bytes = input.ReadUInt64();
+            break;
+          }
+          case 48: {
+            Load1 = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            Load5 = input.ReadUInt32();
+            break;
+          }
+          case 64: {
+            Load15 = input.ReadUInt32();
+            break;
+          }
+          case 74: {
+            UserString = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            UptimeSeconds = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            FreememBytes = input.ReadUInt64();
+            break;
+          }
+          case 24: {
+            Diskfree1Bytes = input.ReadUInt64();
+            break;
+          }
+          case 32: {
+            Diskfree2Bytes = input.ReadUInt64();
+            break;
+          }
+          case 40: {
+            Diskfree3Bytes = input.ReadUInt64();
+            break;
+          }
+          case 48: {
+            Load1 = input.ReadUInt32();
+            break;
+          }
+          case 56: {
+            Load5 = input.ReadUInt32();
+            break;
+          }
+          case 64: {
+            Load15 = input.ReadUInt32();
+            break;
+          }
+          case 74: {
+            UserString = input.ReadString();
+            break;
+          }
         }
       }
     }
@@ -1944,7 +6911,7 @@ namespace Meshtastic.Protobufs {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[4]; }
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[8]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1977,6 +6944,18 @@ namespace Meshtastic.Protobufs {
           break;
         case VariantOneofCase.PowerMetrics:
           PowerMetrics = other.PowerMetrics.Clone();
+          break;
+        case VariantOneofCase.LocalStats:
+          LocalStats = other.LocalStats.Clone();
+          break;
+        case VariantOneofCase.HealthMetrics:
+          HealthMetrics = other.HealthMetrics.Clone();
+          break;
+        case VariantOneofCase.HostMetrics:
+          HostMetrics = other.HostMetrics.Clone();
+          break;
+        case VariantOneofCase.TrafficManagementStats:
+          TrafficManagementStats = other.TrafficManagementStats.Clone();
           break;
       }
 
@@ -2057,7 +7036,7 @@ namespace Meshtastic.Protobufs {
     public const int PowerMetricsFieldNumber = 5;
     /// <summary>
     ///
-    /// Power Metrics 
+    /// Power Metrics
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2069,6 +7048,70 @@ namespace Meshtastic.Protobufs {
       }
     }
 
+    /// <summary>Field number for the "local_stats" field.</summary>
+    public const int LocalStatsFieldNumber = 6;
+    /// <summary>
+    ///
+    /// Local device mesh statistics
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Meshtastic.Protobufs.LocalStats LocalStats {
+      get { return variantCase_ == VariantOneofCase.LocalStats ? (global::Meshtastic.Protobufs.LocalStats) variant_ : null; }
+      set {
+        variant_ = value;
+        variantCase_ = value == null ? VariantOneofCase.None : VariantOneofCase.LocalStats;
+      }
+    }
+
+    /// <summary>Field number for the "health_metrics" field.</summary>
+    public const int HealthMetricsFieldNumber = 7;
+    /// <summary>
+    ///
+    /// Health telemetry metrics
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Meshtastic.Protobufs.HealthMetrics HealthMetrics {
+      get { return variantCase_ == VariantOneofCase.HealthMetrics ? (global::Meshtastic.Protobufs.HealthMetrics) variant_ : null; }
+      set {
+        variant_ = value;
+        variantCase_ = value == null ? VariantOneofCase.None : VariantOneofCase.HealthMetrics;
+      }
+    }
+
+    /// <summary>Field number for the "host_metrics" field.</summary>
+    public const int HostMetricsFieldNumber = 8;
+    /// <summary>
+    ///
+    /// Linux host metrics
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Meshtastic.Protobufs.HostMetrics HostMetrics {
+      get { return variantCase_ == VariantOneofCase.HostMetrics ? (global::Meshtastic.Protobufs.HostMetrics) variant_ : null; }
+      set {
+        variant_ = value;
+        variantCase_ = value == null ? VariantOneofCase.None : VariantOneofCase.HostMetrics;
+      }
+    }
+
+    /// <summary>Field number for the "traffic_management_stats" field.</summary>
+    public const int TrafficManagementStatsFieldNumber = 9;
+    /// <summary>
+    ///
+    /// Traffic management statistics
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Meshtastic.Protobufs.TrafficManagementStats TrafficManagementStats {
+      get { return variantCase_ == VariantOneofCase.TrafficManagementStats ? (global::Meshtastic.Protobufs.TrafficManagementStats) variant_ : null; }
+      set {
+        variant_ = value;
+        variantCase_ = value == null ? VariantOneofCase.None : VariantOneofCase.TrafficManagementStats;
+      }
+    }
+
     private object variant_;
     /// <summary>Enum of possible cases for the "variant" oneof.</summary>
     public enum VariantOneofCase {
@@ -2077,6 +7120,10 @@ namespace Meshtastic.Protobufs {
       EnvironmentMetrics = 3,
       AirQualityMetrics = 4,
       PowerMetrics = 5,
+      LocalStats = 6,
+      HealthMetrics = 7,
+      HostMetrics = 8,
+      TrafficManagementStats = 9,
     }
     private VariantOneofCase variantCase_ = VariantOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2112,6 +7159,10 @@ namespace Meshtastic.Protobufs {
       if (!object.Equals(EnvironmentMetrics, other.EnvironmentMetrics)) return false;
       if (!object.Equals(AirQualityMetrics, other.AirQualityMetrics)) return false;
       if (!object.Equals(PowerMetrics, other.PowerMetrics)) return false;
+      if (!object.Equals(LocalStats, other.LocalStats)) return false;
+      if (!object.Equals(HealthMetrics, other.HealthMetrics)) return false;
+      if (!object.Equals(HostMetrics, other.HostMetrics)) return false;
+      if (!object.Equals(TrafficManagementStats, other.TrafficManagementStats)) return false;
       if (VariantCase != other.VariantCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -2125,6 +7176,10 @@ namespace Meshtastic.Protobufs {
       if (variantCase_ == VariantOneofCase.EnvironmentMetrics) hash ^= EnvironmentMetrics.GetHashCode();
       if (variantCase_ == VariantOneofCase.AirQualityMetrics) hash ^= AirQualityMetrics.GetHashCode();
       if (variantCase_ == VariantOneofCase.PowerMetrics) hash ^= PowerMetrics.GetHashCode();
+      if (variantCase_ == VariantOneofCase.LocalStats) hash ^= LocalStats.GetHashCode();
+      if (variantCase_ == VariantOneofCase.HealthMetrics) hash ^= HealthMetrics.GetHashCode();
+      if (variantCase_ == VariantOneofCase.HostMetrics) hash ^= HostMetrics.GetHashCode();
+      if (variantCase_ == VariantOneofCase.TrafficManagementStats) hash ^= TrafficManagementStats.GetHashCode();
       hash ^= (int) variantCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -2164,6 +7219,22 @@ namespace Meshtastic.Protobufs {
         output.WriteRawTag(42);
         output.WriteMessage(PowerMetrics);
       }
+      if (variantCase_ == VariantOneofCase.LocalStats) {
+        output.WriteRawTag(50);
+        output.WriteMessage(LocalStats);
+      }
+      if (variantCase_ == VariantOneofCase.HealthMetrics) {
+        output.WriteRawTag(58);
+        output.WriteMessage(HealthMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.HostMetrics) {
+        output.WriteRawTag(66);
+        output.WriteMessage(HostMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.TrafficManagementStats) {
+        output.WriteRawTag(74);
+        output.WriteMessage(TrafficManagementStats);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2194,6 +7265,22 @@ namespace Meshtastic.Protobufs {
         output.WriteRawTag(42);
         output.WriteMessage(PowerMetrics);
       }
+      if (variantCase_ == VariantOneofCase.LocalStats) {
+        output.WriteRawTag(50);
+        output.WriteMessage(LocalStats);
+      }
+      if (variantCase_ == VariantOneofCase.HealthMetrics) {
+        output.WriteRawTag(58);
+        output.WriteMessage(HealthMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.HostMetrics) {
+        output.WriteRawTag(66);
+        output.WriteMessage(HostMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.TrafficManagementStats) {
+        output.WriteRawTag(74);
+        output.WriteMessage(TrafficManagementStats);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2218,6 +7305,18 @@ namespace Meshtastic.Protobufs {
       }
       if (variantCase_ == VariantOneofCase.PowerMetrics) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(PowerMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.LocalStats) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(LocalStats);
+      }
+      if (variantCase_ == VariantOneofCase.HealthMetrics) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(HealthMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.HostMetrics) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(HostMetrics);
+      }
+      if (variantCase_ == VariantOneofCase.TrafficManagementStats) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(TrafficManagementStats);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2258,6 +7357,30 @@ namespace Meshtastic.Protobufs {
             PowerMetrics = new global::Meshtastic.Protobufs.PowerMetrics();
           }
           PowerMetrics.MergeFrom(other.PowerMetrics);
+          break;
+        case VariantOneofCase.LocalStats:
+          if (LocalStats == null) {
+            LocalStats = new global::Meshtastic.Protobufs.LocalStats();
+          }
+          LocalStats.MergeFrom(other.LocalStats);
+          break;
+        case VariantOneofCase.HealthMetrics:
+          if (HealthMetrics == null) {
+            HealthMetrics = new global::Meshtastic.Protobufs.HealthMetrics();
+          }
+          HealthMetrics.MergeFrom(other.HealthMetrics);
+          break;
+        case VariantOneofCase.HostMetrics:
+          if (HostMetrics == null) {
+            HostMetrics = new global::Meshtastic.Protobufs.HostMetrics();
+          }
+          HostMetrics.MergeFrom(other.HostMetrics);
+          break;
+        case VariantOneofCase.TrafficManagementStats:
+          if (TrafficManagementStats == null) {
+            TrafficManagementStats = new global::Meshtastic.Protobufs.TrafficManagementStats();
+          }
+          TrafficManagementStats.MergeFrom(other.TrafficManagementStats);
           break;
       }
 
@@ -2316,6 +7439,42 @@ namespace Meshtastic.Protobufs {
             PowerMetrics = subBuilder;
             break;
           }
+          case 50: {
+            global::Meshtastic.Protobufs.LocalStats subBuilder = new global::Meshtastic.Protobufs.LocalStats();
+            if (variantCase_ == VariantOneofCase.LocalStats) {
+              subBuilder.MergeFrom(LocalStats);
+            }
+            input.ReadMessage(subBuilder);
+            LocalStats = subBuilder;
+            break;
+          }
+          case 58: {
+            global::Meshtastic.Protobufs.HealthMetrics subBuilder = new global::Meshtastic.Protobufs.HealthMetrics();
+            if (variantCase_ == VariantOneofCase.HealthMetrics) {
+              subBuilder.MergeFrom(HealthMetrics);
+            }
+            input.ReadMessage(subBuilder);
+            HealthMetrics = subBuilder;
+            break;
+          }
+          case 66: {
+            global::Meshtastic.Protobufs.HostMetrics subBuilder = new global::Meshtastic.Protobufs.HostMetrics();
+            if (variantCase_ == VariantOneofCase.HostMetrics) {
+              subBuilder.MergeFrom(HostMetrics);
+            }
+            input.ReadMessage(subBuilder);
+            HostMetrics = subBuilder;
+            break;
+          }
+          case 74: {
+            global::Meshtastic.Protobufs.TrafficManagementStats subBuilder = new global::Meshtastic.Protobufs.TrafficManagementStats();
+            if (variantCase_ == VariantOneofCase.TrafficManagementStats) {
+              subBuilder.MergeFrom(TrafficManagementStats);
+            }
+            input.ReadMessage(subBuilder);
+            TrafficManagementStats = subBuilder;
+            break;
+          }
         }
       }
     #endif
@@ -2369,6 +7528,723 @@ namespace Meshtastic.Protobufs {
             }
             input.ReadMessage(subBuilder);
             PowerMetrics = subBuilder;
+            break;
+          }
+          case 50: {
+            global::Meshtastic.Protobufs.LocalStats subBuilder = new global::Meshtastic.Protobufs.LocalStats();
+            if (variantCase_ == VariantOneofCase.LocalStats) {
+              subBuilder.MergeFrom(LocalStats);
+            }
+            input.ReadMessage(subBuilder);
+            LocalStats = subBuilder;
+            break;
+          }
+          case 58: {
+            global::Meshtastic.Protobufs.HealthMetrics subBuilder = new global::Meshtastic.Protobufs.HealthMetrics();
+            if (variantCase_ == VariantOneofCase.HealthMetrics) {
+              subBuilder.MergeFrom(HealthMetrics);
+            }
+            input.ReadMessage(subBuilder);
+            HealthMetrics = subBuilder;
+            break;
+          }
+          case 66: {
+            global::Meshtastic.Protobufs.HostMetrics subBuilder = new global::Meshtastic.Protobufs.HostMetrics();
+            if (variantCase_ == VariantOneofCase.HostMetrics) {
+              subBuilder.MergeFrom(HostMetrics);
+            }
+            input.ReadMessage(subBuilder);
+            HostMetrics = subBuilder;
+            break;
+          }
+          case 74: {
+            global::Meshtastic.Protobufs.TrafficManagementStats subBuilder = new global::Meshtastic.Protobufs.TrafficManagementStats();
+            if (variantCase_ == VariantOneofCase.TrafficManagementStats) {
+              subBuilder.MergeFrom(TrafficManagementStats);
+            }
+            input.ReadMessage(subBuilder);
+            TrafficManagementStats = subBuilder;
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  ///
+  /// NAU7802 Telemetry configuration, for saving to flash
+  /// </summary>
+  public sealed partial class Nau7802Config : pb::IMessage<Nau7802Config>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<Nau7802Config> _parser = new pb::MessageParser<Nau7802Config>(() => new Nau7802Config());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<Nau7802Config> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[9]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Nau7802Config() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Nau7802Config(Nau7802Config other) : this() {
+      zeroOffset_ = other.zeroOffset_;
+      calibrationFactor_ = other.calibrationFactor_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Nau7802Config Clone() {
+      return new Nau7802Config(this);
+    }
+
+    /// <summary>Field number for the "zeroOffset" field.</summary>
+    public const int ZeroOffsetFieldNumber = 1;
+    private int zeroOffset_;
+    /// <summary>
+    ///
+    /// The offset setting for the NAU7802
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int ZeroOffset {
+      get { return zeroOffset_; }
+      set {
+        zeroOffset_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "calibrationFactor" field.</summary>
+    public const int CalibrationFactorFieldNumber = 2;
+    private float calibrationFactor_;
+    /// <summary>
+    ///
+    /// The calibration factor for the NAU7802
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public float CalibrationFactor {
+      get { return calibrationFactor_; }
+      set {
+        calibrationFactor_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as Nau7802Config);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(Nau7802Config other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (ZeroOffset != other.ZeroOffset) return false;
+      if (!pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.Equals(CalibrationFactor, other.CalibrationFactor)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (ZeroOffset != 0) hash ^= ZeroOffset.GetHashCode();
+      if (CalibrationFactor != 0F) hash ^= pbc::ProtobufEqualityComparers.BitwiseSingleEqualityComparer.GetHashCode(CalibrationFactor);
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (ZeroOffset != 0) {
+        output.WriteRawTag(8);
+        output.WriteInt32(ZeroOffset);
+      }
+      if (CalibrationFactor != 0F) {
+        output.WriteRawTag(21);
+        output.WriteFloat(CalibrationFactor);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (ZeroOffset != 0) {
+        output.WriteRawTag(8);
+        output.WriteInt32(ZeroOffset);
+      }
+      if (CalibrationFactor != 0F) {
+        output.WriteRawTag(21);
+        output.WriteFloat(CalibrationFactor);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (ZeroOffset != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(ZeroOffset);
+      }
+      if (CalibrationFactor != 0F) {
+        size += 1 + 4;
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(Nau7802Config other) {
+      if (other == null) {
+        return;
+      }
+      if (other.ZeroOffset != 0) {
+        ZeroOffset = other.ZeroOffset;
+      }
+      if (other.CalibrationFactor != 0F) {
+        CalibrationFactor = other.CalibrationFactor;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            ZeroOffset = input.ReadInt32();
+            break;
+          }
+          case 21: {
+            CalibrationFactor = input.ReadFloat();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            ZeroOffset = input.ReadInt32();
+            break;
+          }
+          case 21: {
+            CalibrationFactor = input.ReadFloat();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  ///
+  /// SEN5X State, for saving to flash
+  /// </summary>
+  public sealed partial class SEN5XState : pb::IMessage<SEN5XState>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<SEN5XState> _parser = new pb::MessageParser<SEN5XState>(() => new SEN5XState());
+    private pb::UnknownFieldSet _unknownFields;
+    private int _hasBits0;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<SEN5XState> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Meshtastic.Protobufs.TelemetryReflection.Descriptor.MessageTypes[10]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SEN5XState() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SEN5XState(SEN5XState other) : this() {
+      _hasBits0 = other._hasBits0;
+      lastCleaningTime_ = other.lastCleaningTime_;
+      lastCleaningValid_ = other.lastCleaningValid_;
+      oneShotMode_ = other.oneShotMode_;
+      vocStateTime_ = other.vocStateTime_;
+      vocStateValid_ = other.vocStateValid_;
+      vocStateArray_ = other.vocStateArray_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public SEN5XState Clone() {
+      return new SEN5XState(this);
+    }
+
+    /// <summary>Field number for the "last_cleaning_time" field.</summary>
+    public const int LastCleaningTimeFieldNumber = 1;
+    private uint lastCleaningTime_;
+    /// <summary>
+    ///
+    /// Last cleaning time for SEN5X
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint LastCleaningTime {
+      get { return lastCleaningTime_; }
+      set {
+        lastCleaningTime_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "last_cleaning_valid" field.</summary>
+    public const int LastCleaningValidFieldNumber = 2;
+    private bool lastCleaningValid_;
+    /// <summary>
+    ///
+    /// Last cleaning time for SEN5X - valid flag
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool LastCleaningValid {
+      get { return lastCleaningValid_; }
+      set {
+        lastCleaningValid_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "one_shot_mode" field.</summary>
+    public const int OneShotModeFieldNumber = 3;
+    private bool oneShotMode_;
+    /// <summary>
+    ///
+    /// Config flag for one-shot mode (see admin.proto)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool OneShotMode {
+      get { return oneShotMode_; }
+      set {
+        oneShotMode_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "voc_state_time" field.</summary>
+    public const int VocStateTimeFieldNumber = 4;
+    private uint vocStateTime_;
+    /// <summary>
+    ///
+    /// Last VOC state time for SEN55
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint VocStateTime {
+      get { if ((_hasBits0 & 1) != 0) { return vocStateTime_; } else { return 0; } }
+      set {
+        _hasBits0 |= 1;
+        vocStateTime_ = value;
+      }
+    }
+    /// <summary>Gets whether the "voc_state_time" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasVocStateTime {
+      get { return (_hasBits0 & 1) != 0; }
+    }
+    /// <summary>Clears the value of the "voc_state_time" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearVocStateTime() {
+      _hasBits0 &= ~1;
+    }
+
+    /// <summary>Field number for the "voc_state_valid" field.</summary>
+    public const int VocStateValidFieldNumber = 5;
+    private bool vocStateValid_;
+    /// <summary>
+    ///
+    /// Last VOC state validity flag for SEN55
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool VocStateValid {
+      get { if ((_hasBits0 & 2) != 0) { return vocStateValid_; } else { return false; } }
+      set {
+        _hasBits0 |= 2;
+        vocStateValid_ = value;
+      }
+    }
+    /// <summary>Gets whether the "voc_state_valid" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasVocStateValid {
+      get { return (_hasBits0 & 2) != 0; }
+    }
+    /// <summary>Clears the value of the "voc_state_valid" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearVocStateValid() {
+      _hasBits0 &= ~2;
+    }
+
+    /// <summary>Field number for the "voc_state_array" field.</summary>
+    public const int VocStateArrayFieldNumber = 6;
+    private ulong vocStateArray_;
+    /// <summary>
+    ///
+    /// VOC state array (8x uint8t) for SEN55
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ulong VocStateArray {
+      get { if ((_hasBits0 & 4) != 0) { return vocStateArray_; } else { return 0UL; } }
+      set {
+        _hasBits0 |= 4;
+        vocStateArray_ = value;
+      }
+    }
+    /// <summary>Gets whether the "voc_state_array" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasVocStateArray {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "voc_state_array" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearVocStateArray() {
+      _hasBits0 &= ~4;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as SEN5XState);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(SEN5XState other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (LastCleaningTime != other.LastCleaningTime) return false;
+      if (LastCleaningValid != other.LastCleaningValid) return false;
+      if (OneShotMode != other.OneShotMode) return false;
+      if (VocStateTime != other.VocStateTime) return false;
+      if (VocStateValid != other.VocStateValid) return false;
+      if (VocStateArray != other.VocStateArray) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (LastCleaningTime != 0) hash ^= LastCleaningTime.GetHashCode();
+      if (LastCleaningValid != false) hash ^= LastCleaningValid.GetHashCode();
+      if (OneShotMode != false) hash ^= OneShotMode.GetHashCode();
+      if (HasVocStateTime) hash ^= VocStateTime.GetHashCode();
+      if (HasVocStateValid) hash ^= VocStateValid.GetHashCode();
+      if (HasVocStateArray) hash ^= VocStateArray.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (LastCleaningTime != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(LastCleaningTime);
+      }
+      if (LastCleaningValid != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(LastCleaningValid);
+      }
+      if (OneShotMode != false) {
+        output.WriteRawTag(24);
+        output.WriteBool(OneShotMode);
+      }
+      if (HasVocStateTime) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(VocStateTime);
+      }
+      if (HasVocStateValid) {
+        output.WriteRawTag(40);
+        output.WriteBool(VocStateValid);
+      }
+      if (HasVocStateArray) {
+        output.WriteRawTag(49);
+        output.WriteFixed64(VocStateArray);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (LastCleaningTime != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(LastCleaningTime);
+      }
+      if (LastCleaningValid != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(LastCleaningValid);
+      }
+      if (OneShotMode != false) {
+        output.WriteRawTag(24);
+        output.WriteBool(OneShotMode);
+      }
+      if (HasVocStateTime) {
+        output.WriteRawTag(32);
+        output.WriteUInt32(VocStateTime);
+      }
+      if (HasVocStateValid) {
+        output.WriteRawTag(40);
+        output.WriteBool(VocStateValid);
+      }
+      if (HasVocStateArray) {
+        output.WriteRawTag(49);
+        output.WriteFixed64(VocStateArray);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (LastCleaningTime != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(LastCleaningTime);
+      }
+      if (LastCleaningValid != false) {
+        size += 1 + 1;
+      }
+      if (OneShotMode != false) {
+        size += 1 + 1;
+      }
+      if (HasVocStateTime) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(VocStateTime);
+      }
+      if (HasVocStateValid) {
+        size += 1 + 1;
+      }
+      if (HasVocStateArray) {
+        size += 1 + 8;
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(SEN5XState other) {
+      if (other == null) {
+        return;
+      }
+      if (other.LastCleaningTime != 0) {
+        LastCleaningTime = other.LastCleaningTime;
+      }
+      if (other.LastCleaningValid != false) {
+        LastCleaningValid = other.LastCleaningValid;
+      }
+      if (other.OneShotMode != false) {
+        OneShotMode = other.OneShotMode;
+      }
+      if (other.HasVocStateTime) {
+        VocStateTime = other.VocStateTime;
+      }
+      if (other.HasVocStateValid) {
+        VocStateValid = other.VocStateValid;
+      }
+      if (other.HasVocStateArray) {
+        VocStateArray = other.VocStateArray;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            LastCleaningTime = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            LastCleaningValid = input.ReadBool();
+            break;
+          }
+          case 24: {
+            OneShotMode = input.ReadBool();
+            break;
+          }
+          case 32: {
+            VocStateTime = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            VocStateValid = input.ReadBool();
+            break;
+          }
+          case 49: {
+            VocStateArray = input.ReadFixed64();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            LastCleaningTime = input.ReadUInt32();
+            break;
+          }
+          case 16: {
+            LastCleaningValid = input.ReadBool();
+            break;
+          }
+          case 24: {
+            OneShotMode = input.ReadBool();
+            break;
+          }
+          case 32: {
+            VocStateTime = input.ReadUInt32();
+            break;
+          }
+          case 40: {
+            VocStateValid = input.ReadBool();
+            break;
+          }
+          case 49: {
+            VocStateArray = input.ReadFixed64();
             break;
           }
         }

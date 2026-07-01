@@ -64,3 +64,6 @@ keystore.properties
 # ---- Local app data / settings dumps ----
 settings.json
 devices.json
+
+# ---- Vendored protobuf SOURCE (cloned from meshtastic/protobufs to regenerate Generated/*.cs; not committed) ----
+c-sharp-master/protobufs/

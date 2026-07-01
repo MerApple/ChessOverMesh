@@ -134,6 +134,11 @@ public readonly record struct MeshNodePosition(uint Num, string Name, double Lat
 /// "" when unknown. LastHeard is when the device last heard from it (epoch seconds, 0 if unknown).</summary>
 public readonly record struct MeshNode(uint Num, string LongName, string ShortName, bool IsSelf, string Role = "", long LastHeard = 0, string HwModel = "")
 {
+    // Device NodeDB flags + mesh distance, surfaced for the node list marker and "show all info".
+    public bool IsFavorite { get; init; }
+    public bool IsIgnored { get; init; }
+    public uint? HopsAway { get; init; }
+
     public string Display =>
         string.IsNullOrWhiteSpace(LongName) && string.IsNullOrWhiteSpace(ShortName)
             ? $"!{Num:x8}"
@@ -155,6 +160,12 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly DeviceStateContainer _state = new();
     private IReadOnlyList<MeshChannel>? _seededChannels;
     private readonly Dictionary<uint, string> _nameCache = new();   // node num -> name, seeded from disk cache
+    private readonly Dictionary<uint, string> _shortNameCache = new();   // node num -> short name, seeded from disk cache
+    private readonly Dictionary<uint, bool> _favoriteCache = new();      // node num -> device "favorite" flag
+    private readonly Dictionary<uint, bool> _ignoredCache = new();       // node num -> device "ignored" flag
+    private readonly Dictionary<uint, uint> _hopsAwayCache = new();      // node num -> hops away (mesh distance)
+    private readonly Dictionary<uint, long> _lastHeardCache = new();     // node num -> last-heard (epoch s), standalone
+    private readonly Dictionary<uint, (ByteString Key, DateTime When)> _sessionPasskeys = new();   // remote-admin session passkeys captured from admin responses
     private readonly Dictionary<uint, string> _roleCache = new();   // node num -> device role, seeded from disk cache
     private readonly Dictionary<uint, string> _hwCache = new();     // node num -> hardware model name, seeded from disk cache
     private readonly Dictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)> _positionCache = new();   // node num -> position + times, seeded from disk
@@ -250,7 +261,8 @@ public sealed class MeshtasticHttpClient : IDisposable
                      IReadOnlyDictionary<uint, string>? nodeNames = null,
                      IReadOnlyDictionary<uint, string>? nodeRoles = null,
                      IReadOnlyDictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)>? nodePositions = null,
-                     IReadOnlyDictionary<uint, string>? nodeHw = null)
+                     IReadOnlyDictionary<uint, string>? nodeHw = null,
+                     IReadOnlyDictionary<uint, string>? nodeShortNames = null)
     {
         _seededChannels = channels.ToList();
         MyNodeNum = myNodeNum;
@@ -258,6 +270,11 @@ public sealed class MeshtasticHttpClient : IDisposable
         {
             _nameCache.Clear();
             foreach (var kv in nodeNames) _nameCache[kv.Key] = kv.Value;
+        }
+        if (nodeShortNames != null)
+        {
+            _shortNameCache.Clear();
+            foreach (var kv in nodeShortNames) _shortNameCache[kv.Key] = kv.Value;
         }
         if (nodeRoles != null)
         {
@@ -283,9 +300,19 @@ public sealed class MeshtasticHttpClient : IDisposable
     public void SeedNodes(IReadOnlyDictionary<uint, string>? nodeNames = null,
                           IReadOnlyDictionary<uint, string>? nodeRoles = null,
                           IReadOnlyDictionary<uint, string>? nodeHw = null,
-                          IReadOnlyDictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)>? nodePositions = null)
+                          IReadOnlyDictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)>? nodePositions = null,
+                          IReadOnlyDictionary<uint, string>? nodeShortNames = null,
+                          IReadOnlyDictionary<uint, bool>? nodeFavorites = null,
+                          IReadOnlyDictionary<uint, bool>? nodeIgnored = null,
+                          IReadOnlyDictionary<uint, uint>? nodeHopsAway = null,
+                          IReadOnlyDictionary<uint, long>? nodeLastHeard = null)
     {
         if (nodeNames != null) foreach (var kv in nodeNames) _nameCache[kv.Key] = kv.Value;
+        if (nodeShortNames != null) foreach (var kv in nodeShortNames) _shortNameCache[kv.Key] = kv.Value;
+        if (nodeFavorites != null) foreach (var kv in nodeFavorites) _favoriteCache[kv.Key] = kv.Value;
+        if (nodeIgnored != null) foreach (var kv in nodeIgnored) _ignoredCache[kv.Key] = kv.Value;
+        if (nodeHopsAway != null) foreach (var kv in nodeHopsAway) _hopsAwayCache[kv.Key] = kv.Value;
+        if (nodeLastHeard != null) foreach (var kv in nodeLastHeard) _lastHeardCache[kv.Key] = kv.Value;
         if (nodeRoles != null) foreach (var kv in nodeRoles) _roleCache[kv.Key] = kv.Value;
         if (nodeHw != null) foreach (var kv in nodeHw) _hwCache[kv.Key] = kv.Value;
         if (nodePositions != null) foreach (var kv in nodePositions) _positionCache[kv.Key] = kv.Value;
@@ -300,6 +327,47 @@ public sealed class MeshtasticHttpClient : IDisposable
             string name = NameOf(n.User?.LongName, n.User?.ShortName);
             if (name.Length > 0) map[n.Num] = name;
         }
+        return map;
+    }
+
+    /// <summary>node-num → short name for every node whose short name is known (cached + live), for caching.</summary>
+    public IReadOnlyDictionary<uint, string> GetNodeShortNameMap()
+    {
+        var map = new Dictionary<uint, string>(_shortNameCache);   // keep cached short names, let live data win
+        foreach (var n in _state.Nodes)
+            if (!string.IsNullOrWhiteSpace(n.User?.ShortName)) map[n.Num] = n.User!.ShortName;
+        return map;
+    }
+
+    /// <summary>node-num → device "favorite" flag (cached + live; only true entries kept), for caching.</summary>
+    public IReadOnlyDictionary<uint, bool> GetNodeFavoriteMap()
+    {
+        var map = new Dictionary<uint, bool>(_favoriteCache);
+        foreach (var n in _state.Nodes) if (n.IsFavorite) map[n.Num] = true; else map.Remove(n.Num);
+        return map.Where(kv => kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
+    /// <summary>node-num → device "ignored" flag (cached + live; only true entries kept), for caching.</summary>
+    public IReadOnlyDictionary<uint, bool> GetNodeIgnoredMap()
+    {
+        var map = new Dictionary<uint, bool>(_ignoredCache);
+        foreach (var n in _state.Nodes) if (n.IsIgnored) map[n.Num] = true; else map.Remove(n.Num);
+        return map.Where(kv => kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
+    /// <summary>node-num → hops away (cached + live), for caching.</summary>
+    public IReadOnlyDictionary<uint, uint> GetNodeHopsAwayMap()
+    {
+        var map = new Dictionary<uint, uint>(_hopsAwayCache);
+        foreach (var n in _state.Nodes) if (n.HasHopsAway) map[n.Num] = n.HopsAway;
+        return map;
+    }
+
+    /// <summary>node-num → last-heard epoch seconds (cached + live), for caching a standalone last-heard.</summary>
+    public IReadOnlyDictionary<uint, long> GetNodeLastHeardMap()
+    {
+        var map = new Dictionary<uint, long>(_lastHeardCache);
+        foreach (var n in _state.Nodes) if (n.LastHeard > 0) map[n.Num] = n.LastHeard;
         return map;
     }
 
@@ -410,6 +478,7 @@ public sealed class MeshtasticHttpClient : IDisposable
     public string GetNodeInfoText(uint num)
     {
         var node = GetNodes().FirstOrDefault(n => n.Num == num);
+        var ni = _state.Nodes.FirstOrDefault(x => x.Num == num);   // live NodeInfo (null for cached-only nodes)
         var lines = new List<string> { $"Number: !{num:x8}  ({num})" };
         if (!string.IsNullOrWhiteSpace(node.LongName)) lines.Add($"Name: {node.LongName}");
         if (!string.IsNullOrWhiteSpace(node.ShortName)) lines.Add($"Short name: {node.ShortName}");
@@ -417,6 +486,25 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (hw.Length > 0) lines.Add($"Hardware: {hw}");
         if (!string.IsNullOrEmpty(node.Role)) lines.Add($"Role: {node.Role}");
         if (num == MyNodeNum) lines.Add("This is your own node.");
+        // Device NodeDB flags + mesh distance.
+        if (node.IsFavorite) lines.Add("Favorite: yes");
+        if (node.IsIgnored) lines.Add("Ignored (device): yes");
+        if (node.HopsAway is uint ha) lines.Add($"Hops away: {ha}");
+        if (ni?.ViaMqtt == true) lines.Add("Heard via MQTT: yes");
+        if (ni != null && ni.Channel > 0) lines.Add($"Heard on channel: {ni.Channel}");
+        // User identity extras (public key / MAC / licensed / messagability) — live nodes only.
+        if (ni?.User is { } u)
+        {
+            if (!u.PublicKey.IsEmpty)
+            {
+                var pk = u.PublicKey.ToByteArray();
+                lines.Add($"Public key: {Convert.ToHexString(pk, 0, Math.Min(4, pk.Length)).ToLowerInvariant()}… ({pk.Length} bytes)");
+            }
+            if (!u.Macaddr.IsEmpty)
+                lines.Add($"MAC: {string.Join(":", u.Macaddr.ToByteArray().Select(b => b.ToString("x2")))}");
+            if (u.IsLicensed) lines.Add("Licensed (ham) operator: yes");
+            if (u.HasIsUnmessagable && u.IsUnmessagable) lines.Add("Direct messages: not supported by this node");
+        }
         if (node.LastHeard > 0)
             lines.Add($"Last heard: {DateTimeOffset.FromUnixTimeSeconds(node.LastHeard).LocalDateTime:yyyy-MM-dd HH:mm:ss}");
         if (GetSignal(num) is { } s)
@@ -425,6 +513,8 @@ public sealed class MeshtasticHttpClient : IDisposable
             sig = s.Hops switch { 0 => $"{sig} · direct", null => sig, 1 => $"via 1 hop · {sig}", var h => $"via {h} hops · {sig}" };
             lines.Add($"Signal: {sig}");
         }
+        else if (ni != null && ni.Snr != 0)
+            lines.Add($"Signal (device-reported): SNR {ni.Snr:0.#} dB");
         var pos = GetNodePositions().FirstOrDefault(p => p.Num == num);
         if (pos.Num != 0 && (pos.Latitude != 0 || pos.Longitude != 0))
         {
@@ -433,12 +523,19 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (pos.PositionTime > 0)
                 lines.Add($"Position time: {DateTimeOffset.FromUnixTimeSeconds(pos.PositionTime).LocalDateTime:yyyy-MM-dd HH:mm:ss}");
         }
+        // Extended GPS detail from the raw live Position (altitude / sats / speed / precision).
+        if (ni?.Position is { } p)
+        {
+            if (p.Altitude != 0) lines.Add($"Altitude: {p.Altitude} m");
+            if (p.SatsInView > 0) lines.Add($"Satellites in view: {p.SatsInView}");
+            if (p.GroundSpeed > 0)
+                lines.Add($"Ground speed: {p.GroundSpeed} m/s" + (p.GroundTrack > 0 ? $" · heading {p.GroundTrack / 1e5:0.#}°" : ""));
+            if (p.PrecisionBits > 0) lines.Add($"Position precision: {p.PrecisionBits} bits");
+        }
         var env = GetEnvironmentHistory(num);
         if (env.Count > 0)
             lines.Add($"Latest telemetry: {EnvSummaryText(env[^1])}  (@ {env[^1].Timestamp:HH:mm:ss})");
-        // Battery, from the node's DeviceMetrics (>100 = powered/charging, no battery). Available for any node that
-        // has reported device telemetry, including our own.
-        var ni = _state.Nodes.FirstOrDefault(x => x.Num == num);
+        // Battery + device utilization, from the node's DeviceMetrics (>100 = powered/charging, no battery).
         if (ni?.DeviceMetrics is { } dm)
         {
             var batt = new List<string>();
@@ -446,6 +543,9 @@ public sealed class MeshtasticHttpClient : IDisposable
             else if (dm.BatteryLevel > 0) batt.Add($"{dm.BatteryLevel}%");
             if (dm.Voltage > 0) batt.Add($"{dm.Voltage:0.##} V");
             if (batt.Count > 0) lines.Add($"Battery: {string.Join(" · ", batt)}");
+            if (dm.HasChannelUtilization) lines.Add($"Channel utilization: {dm.ChannelUtilization:0.#}%");
+            if (dm.HasAirUtilTx) lines.Add($"Air-time TX: {dm.AirUtilTx:0.#}%");
+            if (dm.HasUptimeSeconds && dm.UptimeSeconds > 0) lines.Add($"Uptime: {FormatUptime(dm.UptimeSeconds)}");
         }
         // Firmware version — only the local (connected) device reports it, via its metadata.
         if (num == MyNodeNum && FirmwareVersion is { } fw)
@@ -453,6 +553,14 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (GetNoiseFloor(num) is int nf)
             lines.Add($"Noise floor: {nf} dBm");
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string FormatUptime(uint seconds)
+    {
+        var t = TimeSpan.FromSeconds(seconds);
+        if (t.TotalDays >= 1) return $"{(int)t.TotalDays}d {t.Hours}h {t.Minutes}m";
+        if (t.TotalHours >= 1) return $"{(int)t.TotalHours}h {t.Minutes}m";
+        return $"{t.Minutes}m {t.Seconds}s";
     }
 
     private static string EnvSummaryText(MeshEnvironment e)
@@ -490,6 +598,7 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (rxTime > 0) node.LastHeard = rxTime;
         var name = NameOf(user.LongName, user.ShortName);
         if (name.Length > 0) _nameCache[num] = name;
+        if (!string.IsNullOrWhiteSpace(user.ShortName)) _shortNameCache[num] = user.ShortName;
         var role = RoleName(user.Role);
         if (role.Length > 0) _roleCache[num] = role;
         var hw = HwName(user.HwModel);
@@ -571,14 +680,25 @@ public sealed class MeshtasticHttpClient : IDisposable
                 n.Num == MyNodeNum, RoleName(n.User?.Role), n.LastHeard,
                 // Prefer the live hardware model; fall back to a cached value for nodes whose latest packet
                 // carried no User (e.g. a position-only update).
-                n.User != null && HwName(n.User.HwModel) is { Length: > 0 } hw ? hw : _hwCache.GetValueOrDefault(n.Num, string.Empty)));
+                n.User != null && HwName(n.User.HwModel) is { Length: > 0 } hw ? hw : _hwCache.GetValueOrDefault(n.Num, string.Empty))
+            {
+                IsFavorite = n.IsFavorite,
+                IsIgnored = n.IsIgnored,
+                HopsAway = n.HasHopsAway ? n.HopsAway : (uint?)(_hopsAwayCache.TryGetValue(n.Num, out var ha) ? ha : null),
+            });
         var liveNums = _state.Nodes.Select(n => n.Num).ToHashSet();
         var cached = _nameCache
             .Where(kv => !liveNums.Contains(kv.Key))                       // live data wins
-            .Select(kv => new MeshNode(kv.Key, kv.Value, string.Empty, kv.Key == MyNodeNum,
+            .Select(kv => new MeshNode(kv.Key, kv.Value, _shortNameCache.GetValueOrDefault(kv.Key, string.Empty), kv.Key == MyNodeNum,
                 _roleCache.GetValueOrDefault(kv.Key, string.Empty),
-                _positionCache.TryGetValue(kv.Key, out var pc) ? pc.LastHeard : 0,   // cached last-heard, if we have it
-                _hwCache.GetValueOrDefault(kv.Key, string.Empty)));
+                _lastHeardCache.TryGetValue(kv.Key, out var lh) ? lh
+                    : (_positionCache.TryGetValue(kv.Key, out var pc) ? pc.LastHeard : 0),   // standalone, else via position
+                _hwCache.GetValueOrDefault(kv.Key, string.Empty))
+            {
+                IsFavorite = _favoriteCache.GetValueOrDefault(kv.Key),
+                IsIgnored = _ignoredCache.GetValueOrDefault(kv.Key),
+                HopsAway = _hopsAwayCache.TryGetValue(kv.Key, out var ha) ? ha : (uint?)null,
+            });
         return live.Concat(cached)
             .OrderByDescending(n => n.IsSelf)
             .ThenBy(n => n.LongName, StringComparer.OrdinalIgnoreCase)
@@ -844,9 +964,24 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// Environment telemetry isn't stored in the device's node DB, so this on-demand request — or catching a
     /// node's periodic broadcast — is the only way to obtain it. Returns the sent packet id.
     /// </summary>
-    public async Task<uint> RequestTelemetryAsync(uint dest, CancellationToken ct = default)
+    public Task<uint> RequestTelemetryAsync(uint dest, CancellationToken ct = default)
+        => RequestTelemetryVariantAsync(dest, new Telemetry { EnvironmentMetrics = new EnvironmentMetrics() }, ct);
+
+    /// <summary>Requests a node's device metrics (battery/voltage/utilization/uptime). The reply is merged into
+    /// the node DB (see ReceiveAsync) so "show all info" reflects it. Returns the sent packet id.</summary>
+    public Task<uint> RequestDeviceMetricsAsync(uint dest, CancellationToken ct = default)
+        => RequestTelemetryVariantAsync(dest, new Telemetry { DeviceMetrics = new DeviceMetrics() }, ct);
+
+    /// <summary>Requests a node's air-quality metrics (particulate/CO2, if it has such a sensor).</summary>
+    public Task<uint> RequestAirQualityAsync(uint dest, CancellationToken ct = default)
+        => RequestTelemetryVariantAsync(dest, new Telemetry { AirQualityMetrics = new AirQualityMetrics() }, ct);
+
+    /// <summary>Requests a node's power metrics (channel voltages/currents, if it has an INA sensor).</summary>
+    public Task<uint> RequestPowerMetricsAsync(uint dest, CancellationToken ct = default)
+        => RequestTelemetryVariantAsync(dest, new Telemetry { PowerMetrics = new PowerMetrics() }, ct);
+
+    private async Task<uint> RequestTelemetryVariantAsync(uint dest, Telemetry request, CancellationToken ct)
     {
-        var request = new Telemetry { EnvironmentMetrics = new EnvironmentMetrics() };
         var packet = new MeshPacket
         {
             Channel = _utilityChannel ?? ChannelForNode(dest),
@@ -1088,6 +1223,11 @@ public sealed class MeshtasticHttpClient : IDisposable
         var node = _state.Nodes.FirstOrDefault(n => n.Num == nodeNum);
         if (node != null) _state.Nodes.Remove(node);
         _nameCache.Remove(nodeNum);
+        _shortNameCache.Remove(nodeNum);
+        _favoriteCache.Remove(nodeNum);
+        _ignoredCache.Remove(nodeNum);
+        _hopsAwayCache.Remove(nodeNum);
+        _lastHeardCache.Remove(nodeNum);
         _roleCache.Remove(nodeNum);
         _hwCache.Remove(nodeNum);
         _positionCache.Remove(nodeNum);
@@ -1111,6 +1251,101 @@ public sealed class MeshtasticHttpClient : IDisposable
             Decoded = new Data { Portnum = PortNum.AdminApp, Payload = new AdminMessage { ShutdownSeconds = seconds }.ToByteString() },
         };
         return WriteToRadioAsync(new ToRadioMessageFactory().CreateMeshPacketMessage(packet), ct);
+    }
+
+    /// <summary>Marks a node as a favorite (or clears it) in the device's node DB via set_favorite_node /
+    /// remove_favorite_node admin. Updates the in-memory state + cache so the UI reflects it immediately.
+    /// Targets the local (connected) device.</summary>
+    public Task SetFavoriteNodeAsync(uint nodeNum, bool favorite, CancellationToken ct = default)
+    {
+        var admin = favorite ? new AdminMessage { SetFavoriteNode = nodeNum }
+                             : new AdminMessage { RemoveFavoriteNode = nodeNum };
+        var node = _state.Nodes.FirstOrDefault(n => n.Num == nodeNum);
+        if (node != null) node.IsFavorite = favorite;
+        _favoriteCache[nodeNum] = favorite;
+        return SendLocalAdminAsync(admin, ct);
+    }
+
+    /// <summary>Marks a node as ignored (or clears it) in the device's node DB via set_ignored_node /
+    /// remove_ignored_node admin. This is the DEVICE-level ignore (distinct from the app-side DM "Block").</summary>
+    public Task SetIgnoredNodeAsync(uint nodeNum, bool ignored, CancellationToken ct = default)
+    {
+        var admin = ignored ? new AdminMessage { SetIgnoredNode = nodeNum }
+                            : new AdminMessage { RemoveIgnoredNode = nodeNum };
+        var node = _state.Nodes.FirstOrDefault(n => n.Num == nodeNum);
+        if (node != null) node.IsIgnored = ignored;
+        _ignoredCache[nodeNum] = ignored;
+        return SendLocalAdminAsync(admin, ct);
+    }
+
+    // Sends a prebuilt AdminMessage to the local device (fire-and-forget), mirroring ShutdownAsync's direct build.
+    private Task SendLocalAdminAsync(AdminMessage admin, CancellationToken ct)
+    {
+        var packet = new MeshPacket
+        {
+            Channel = _state.GetAdminChannelIndex(),
+            WantAck = false,
+            To = _destination ?? (MyNodeNum != 0 ? MyNodeNum : 0u),
+            Id = (uint)Random.Shared.Next(1, int.MaxValue),   // a real random packet id (avoid the 0/constant-id mesh-dedup trap)
+            HopLimit = _state.GetHopLimitOrDefault(),
+            Decoded = new Data { Portnum = PortNum.AdminApp, Payload = admin.ToByteString() },
+        };
+        return WriteToRadioAsync(new ToRadioMessageFactory().CreateMeshPacketMessage(packet), ct);
+    }
+
+    // ---- Remote admin (targets ANOTHER node over the admin channel) ----------------------------------------
+    // Modern firmware requires a session passkey for admin mutations. We first prompt one with a
+    // get_device_metadata request, capture the passkey from the reply (in ReceiveAsync, as the poll loop drains),
+    // then stamp it into the mutating admin. Requires a shared admin channel (named "admin") on BOTH nodes.
+    // NOTE: this path is unverified without a second node to test against.
+
+    public Task<string?> RemoteRebootAsync(uint target, int seconds = 5, CancellationToken ct = default)
+        => RemoteAdminAsync(target, new AdminMessage { RebootSeconds = seconds }, ct);
+    public Task<string?> RemoteShutdownAsync(uint target, int seconds = 5, CancellationToken ct = default)
+        => RemoteAdminAsync(target, new AdminMessage { ShutdownSeconds = seconds }, ct);
+    public Task<string?> RemoteFactoryResetAsync(uint target, CancellationToken ct = default)
+        => RemoteAdminAsync(target, new AdminMessage { FactoryResetDevice = 1 }, ct);
+    public Task<string?> RemoteNodeDbResetAsync(uint target, CancellationToken ct = default)
+        => RemoteAdminAsync(target, new AdminMessage { NodedbReset = true }, ct);
+    public Task<string?> RemoteSetOwnerAsync(uint target, User owner, CancellationToken ct = default)
+        => RemoteAdminAsync(target, new AdminMessage { SetOwner = owner }, ct);
+
+    /// <summary>Runs a mutating admin against a REMOTE node: fetch a session passkey (get_device_metadata), then
+    /// send the admin stamped with it. Returns null on success, or an error string. Requires a shared admin
+    /// channel with the target node.</summary>
+    public async Task<string?> RemoteAdminAsync(uint target, AdminMessage mutating, CancellationToken ct = default)
+    {
+        _sessionPasskeys.Remove(target);
+        await SendRemoteAdminAsync(target, new AdminMessage { GetDeviceMetadataRequest = true }, wantResponse: true, ct).ConfigureAwait(false);
+        // The passkey arrives on a later /fromradio drain (the app's poll loop), so wait for the cache to fill.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(12);
+        ByteString? key = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (_sessionPasskeys.TryGetValue(target, out var pk)) { key = pk.Key; break; }
+            await Task.Delay(300, ct).ConfigureAwait(false);
+        }
+        if (key == null)
+            return "No session passkey received — is a shared admin channel (named \"admin\") configured on both nodes, and is the target in range?";
+        mutating.SessionPasskey = key;
+        var id = await SendRemoteAdminAsync(target, mutating, wantResponse: false, ct).ConfigureAwait(false);
+        var err = await AwaitRoutingAckAsync(id, TimeSpan.FromSeconds(8), ct).ConfigureAwait(false);
+        return err is { } e && e != Routing.Types.Error.None ? e.ToString() : null;
+    }
+
+    private async Task<uint> SendRemoteAdminAsync(uint target, AdminMessage admin, bool wantResponse, CancellationToken ct)
+    {
+        var packet = new MeshPacket
+        {
+            Channel = _state.GetAdminChannelIndex(),
+            WantAck = true,
+            To = target,
+            Id = (uint)Random.Shared.Next(1, int.MaxValue),   // a real random packet id (avoid the 0/constant-id mesh-dedup trap)
+            HopLimit = _state.GetHopLimitOrDefault(),
+            Decoded = new Data { Portnum = PortNum.AdminApp, Payload = admin.ToByteString(), WantResponse = wantResponse },
+        };
+        await WriteToRadioAsync(new ToRadioMessageFactory().CreateMeshPacketMessage(packet), ct).ConfigureAwait(false);
+        return packet.Id;
     }
 
     // Begin → Set → (best-effort ack) → Commit, matching the channel write path. An explicit routing error
@@ -1339,6 +1574,14 @@ public sealed class MeshtasticHttpClient : IDisposable
                     if (hist.Count > MaxEnvironmentHistory) hist.RemoveAt(0);
                     telemetryNodes.Add(pkt.From);
                 }
+                // Device metrics (battery/voltage/utilization/uptime) — merge into the node DB so "show all info"
+                // reflects a requested or broadcast refresh, for any node (including our own).
+                else if (tel.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
+                {
+                    var node = _state.Nodes.FirstOrDefault(n => n.Num == pkt.From);
+                    if (node != null) node.DeviceMetrics = tel.DeviceMetrics;
+                    telemetryNodes.Add(pkt.From);
+                }
                 // LocalStats (Telemetry field 6) carries noise_floor (field 15, dBm) — not modeled by the bundled
                 // protobuf, so read it from the raw payload. Surfaced so the UI can show the requested noise floor.
                 else if (ReadInt32SubField(decoded.Payload.ToByteArray(), 6, 15) is int noise)
@@ -1365,6 +1608,20 @@ public sealed class MeshtasticHttpClient : IDisposable
                     var node = _state.Nodes.FirstOrDefault(n => n.Num == pkt.From);
                     if (node != null) node.Position = p;   // keep the live node DB in sync when we do know the node
                 }
+                continue;
+            }
+
+            // Admin responses (e.g. to our remote get_device_metadata) carry a session_passkey we must echo on the
+            // next mutating admin to that node. Capture it so remote-admin ops can proceed.
+            if (decoded.Portnum == PortNum.AdminApp)
+            {
+                try
+                {
+                    var am = AdminMessage.Parser.ParseFrom(decoded.Payload);
+                    if (!am.SessionPasskey.IsEmpty) _sessionPasskeys[pkt.From] = (am.SessionPasskey, DateTime.UtcNow);
+                    AdminActivity?.Invoke($"← Admin from {DescribeNode(pkt.From)}: {DescribeAdmin(am)}");
+                }
+                catch { /* not a parseable admin response */ }
                 continue;
             }
 
@@ -1995,9 +2252,38 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (_ownSentOrder.Count > 512) _ownSentIds.Remove(_ownSentOrder.Dequeue());
     }
 
+    /// <summary>Raised for every admin message this client SENDS ("→ …") or RECEIVES ("← …"), with a
+    /// human-readable description, so the app can log admin activity in system messages. May fire off the UI
+    /// thread — subscribers should marshal to the UI thread.</summary>
+    public event Action<string>? AdminActivity;
+
+    // Human-readable label for an admin message (its oneof variant, plus the target node for node-directed ones).
+    private static string DescribeAdmin(AdminMessage a)
+    {
+        var c = a.PayloadVariantCase;
+        if (c == AdminMessage.PayloadVariantOneofCase.None)
+            return a.SessionPasskey.IsEmpty ? "(empty)" : "session key";
+        string extra = c switch
+        {
+            AdminMessage.PayloadVariantOneofCase.SetFavoriteNode => $" !{a.SetFavoriteNode:x8}",
+            AdminMessage.PayloadVariantOneofCase.RemoveFavoriteNode => $" !{a.RemoveFavoriteNode:x8}",
+            AdminMessage.PayloadVariantOneofCase.SetIgnoredNode => $" !{a.SetIgnoredNode:x8}",
+            AdminMessage.PayloadVariantOneofCase.RemoveIgnoredNode => $" !{a.RemoveIgnoredNode:x8}",
+            AdminMessage.PayloadVariantOneofCase.RemoveByNodenum => $" !{a.RemoveByNodenum:x8}",
+            _ => "",
+        };
+        return c + extra;
+    }
+
     private async Task WriteToRadioAsync(ToRadio toRadio, CancellationToken ct)
     {
         if (toRadio.Packet is { } p && p.Id != 0) RecordOwnSend(p.Id);
+        // Surface outgoing admin messages so the app can log them (fired before the write, on the caller's thread).
+        if (AdminActivity != null && toRadio.Packet?.Decoded is { Portnum: PortNum.AdminApp } dsent)
+        {
+            try { AdminActivity($"→ Admin to {DescribeNode(toRadio.Packet.To)}: {DescribeAdmin(AdminMessage.Parser.ParseFrom(dsent.Payload))}"); }
+            catch { /* unparseable admin payload — skip logging */ }
+        }
         _state.AddToRadio(toRadio);
         await _transport.WriteAsync(toRadio.ToByteArray(), ct).ConfigureAwait(false);
     }

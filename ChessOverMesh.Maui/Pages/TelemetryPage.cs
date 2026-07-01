@@ -33,6 +33,13 @@ public sealed class TelemetryPage : ContentPage
 
         var requestBtn = new Button { Text = "Request telemetry", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         requestBtn.Clicked += OnRequest;
+        var metricsBtn = new Button { Text = "Request battery/metrics", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        metricsBtn.Clicked += async (_, _) =>
+        {
+            _status.Text = $"Requesting device metrics from {_target.Display}…";
+            try { await _main.RequestDeviceMetricsForAsync(_target.Num); _status.Text = $"Requested device metrics from {_target.Display} — reply refreshes the info above."; }
+            catch (Exception ex) { _status.Text = $"Request failed: {ex.Message}"; }
+        };
         var deleteBtn = new Button { Text = "Delete", HeightRequest = 40, Padding = new Thickness(10, 0) };
         deleteBtn.Clicked += OnDelete;
         var copyBtn = new Button { Text = "Copy", HeightRequest = 40, Padding = new Thickness(10, 0) };
@@ -62,7 +69,7 @@ public sealed class TelemetryPage : ContentPage
             catch (Exception ex) { _status.Text = $"Request failed: {ex.Message}"; }
         };
         var actions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Direction = Microsoft.Maui.Layouts.FlexDirection.Row };
-        actions.Add(infoBtn); actions.Add(posBtn); actions.Add(requestBtn); actions.Add(traceBtn); actions.Add(noiseBtn);
+        actions.Add(infoBtn); actions.Add(posBtn); actions.Add(requestBtn); actions.Add(metricsBtn); actions.Add(traceBtn); actions.Add(noiseBtn);
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 8 };
         root.Add(_header);

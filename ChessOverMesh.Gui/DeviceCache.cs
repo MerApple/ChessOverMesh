@@ -76,6 +76,11 @@ internal static class DeviceCache
         public List<CachedChannel> Channels { get; set; } = new();
         public Dictionary<uint, ChannelOptions> ChannelOptions { get; set; } = new();   // channel index -> last-set options
         public Dictionary<uint, string> NodeNames { get; set; } = new();
+        public Dictionary<uint, string> NodeShortNames { get; set; } = new();   // node num -> short name (e.g. "ABCD")
+        public Dictionary<uint, bool> NodeFavorites { get; set; } = new();     // node num -> device "favorite" flag
+        public Dictionary<uint, bool> NodeIgnored { get; set; } = new();       // node num -> device "ignored" flag
+        public Dictionary<uint, uint> NodeHopsAway { get; set; } = new();      // node num -> hops away (mesh distance)
+        public Dictionary<uint, long> NodeLastHeard { get; set; } = new();     // node num -> last-heard epoch seconds
         public Dictionary<uint, string> NodeRoles { get; set; } = new();     // node num -> device role (Client/Router/…)
         public Dictionary<uint, string> NodeHw { get; set; } = new();        // node num -> hardware model (Heltec V3/…)
         public Dictionary<uint, CachedPosition> Positions { get; set; } = new();   // node num -> last-known position
@@ -138,7 +143,12 @@ internal static class DeviceCache
     public static void Save(string host, IEnumerable<MeshChannel> channels, uint nodeNum,
                             IReadOnlyDictionary<uint, string>? nodeNames = null,
                             IReadOnlyDictionary<uint, string>? nodeRoles = null,
-                            IReadOnlyDictionary<uint, string>? nodeHw = null)
+                            IReadOnlyDictionary<uint, string>? nodeHw = null,
+                            IReadOnlyDictionary<uint, string>? nodeShortNames = null,
+                            IReadOnlyDictionary<uint, bool>? nodeFavorites = null,
+                            IReadOnlyDictionary<uint, bool>? nodeIgnored = null,
+                            IReadOnlyDictionary<uint, uint>? nodeHopsAway = null,
+                            IReadOnlyDictionary<uint, long>? nodeLastHeard = null)
     {
         try
         {
@@ -154,6 +164,21 @@ internal static class DeviceCache
                 NodeNames = nodeNames != null
                     ? new Dictionary<uint, string>(nodeNames)
                     : existing?.NodeNames ?? new Dictionary<uint, string>(),
+                NodeShortNames = nodeShortNames != null
+                    ? new Dictionary<uint, string>(nodeShortNames)
+                    : existing?.NodeShortNames ?? new Dictionary<uint, string>(),
+                NodeFavorites = nodeFavorites != null
+                    ? new Dictionary<uint, bool>(nodeFavorites)
+                    : existing?.NodeFavorites ?? new Dictionary<uint, bool>(),
+                NodeIgnored = nodeIgnored != null
+                    ? new Dictionary<uint, bool>(nodeIgnored)
+                    : existing?.NodeIgnored ?? new Dictionary<uint, bool>(),
+                NodeHopsAway = nodeHopsAway != null
+                    ? new Dictionary<uint, uint>(nodeHopsAway)
+                    : existing?.NodeHopsAway ?? new Dictionary<uint, uint>(),
+                NodeLastHeard = nodeLastHeard != null
+                    ? new Dictionary<uint, long>(nodeLastHeard)
+                    : existing?.NodeLastHeard ?? new Dictionary<uint, long>(),
                 NodeRoles = nodeRoles != null
                     ? new Dictionary<uint, string>(nodeRoles)
                     : existing?.NodeRoles ?? new Dictionary<uint, string>(),
@@ -262,6 +287,11 @@ internal static class DeviceCache
             var entry = all.GetValueOrDefault(host);
             if (entry == null) return;
             entry.NodeNames.Remove(nodeNum);
+            entry.NodeShortNames.Remove(nodeNum);
+            entry.NodeFavorites.Remove(nodeNum);
+            entry.NodeIgnored.Remove(nodeNum);
+            entry.NodeHopsAway.Remove(nodeNum);
+            entry.NodeLastHeard.Remove(nodeNum);
             entry.NodeRoles.Remove(nodeNum);
             entry.NodeHw.Remove(nodeNum);
             entry.Positions.Remove(nodeNum);

@@ -24,21 +24,27 @@ namespace Meshtastic.Protobufs {
     static PortnumsReflection() {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
-            "ChltZXNodGFzdGljL3BvcnRudW1zLnByb3RvEgptZXNodGFzdGljKugDCgdQ",
+            "ChltZXNodGFzdGljL3BvcnRudW1zLnByb3RvEgptZXNodGFzdGljKv0FCgdQ",
             "b3J0TnVtEg8KC1VOS05PV05fQVBQEAASFAoQVEVYVF9NRVNTQUdFX0FQUBAB",
             "EhcKE1JFTU9URV9IQVJEV0FSRV9BUFAQAhIQCgxQT1NJVElPTl9BUFAQAxIQ",
             "CgxOT0RFSU5GT19BUFAQBBIPCgtST1VUSU5HX0FQUBAFEg0KCUFETUlOX0FQ",
             "UBAGEh8KG1RFWFRfTUVTU0FHRV9DT01QUkVTU0VEX0FQUBAHEhAKDFdBWVBP",
             "SU5UX0FQUBAIEg0KCUFVRElPX0FQUBAJEhgKFERFVEVDVElPTl9TRU5TT1Jf",
-            "QVBQEAoSDQoJUkVQTFlfQVBQECASEQoNSVBfVFVOTkVMX0FQUBAhEhIKDlBB",
-            "WENPVU5URVJfQVBQECISDgoKU0VSSUFMX0FQUBBAEhUKEVNUT1JFX0ZPUldB",
-            "UkRfQVBQEEESEgoOUkFOR0VfVEVTVF9BUFAQQhIRCg1URUxFTUVUUllfQVBQ",
-            "EEMSCwoHWlBTX0FQUBBEEhEKDVNJTVVMQVRPUl9BUFAQRRISCg5UUkFDRVJP",
-            "VVRFX0FQUBBGEhQKEE5FSUdIQk9SSU5GT19BUFAQRxIQCgtQUklWQVRFX0FQ",
-            "UBCAAhITCg5BVEFLX0ZPUldBUkRFUhCBAhIICgNNQVgQ/wNCXQoTY29tLmdl",
-            "ZWtzdmlsbGUubWVzaEIIUG9ydG51bXNaImdpdGh1Yi5jb20vbWVzaHRhc3Rp",
-            "Yy9nby9nZW5lcmF0ZWSqAhRNZXNodGFzdGljLlByb3RvYnVmc7oCAGIGcHJv",
-            "dG8z"));
+            "QVBQEAoSDQoJQUxFUlRfQVBQEAsSGAoUS0VZX1ZFUklGSUNBVElPTl9BUFAQ",
+            "DBIUChBSRU1PVEVfU0hFTExfQVBQEA0SDQoJUkVQTFlfQVBQECASEQoNSVBf",
+            "VFVOTkVMX0FQUBAhEhIKDlBBWENPVU5URVJfQVBQECISHgoaU1RPUkVfRk9S",
+            "V0FSRF9QTFVTUExVU19BUFAQIxITCg9OT0RFX1NUQVRVU19BUFAQJBIOCgpT",
+            "RVJJQUxfQVBQEEASFQoRU1RPUkVfRk9SV0FSRF9BUFAQQRISCg5SQU5HRV9U",
+            "RVNUX0FQUBBCEhEKDVRFTEVNRVRSWV9BUFAQQxILCgdaUFNfQVBQEEQSEQoN",
+            "U0lNVUxBVE9SX0FQUBBFEhIKDlRSQUNFUk9VVEVfQVBQEEYSFAoQTkVJR0hC",
+            "T1JJTkZPX0FQUBBHEg8KC0FUQUtfUExVR0lOEEgSEgoOTUFQX1JFUE9SVF9B",
+            "UFAQSRITCg9QT1dFUlNUUkVTU19BUFAQShISCg5MT1JBV0FOX0JSSURHRRBL",
+            "EhgKFFJFVElDVUxVTV9UVU5ORUxfQVBQEEwSDwoLQ0FZRU5ORV9BUFAQTRIS",
+            "Cg5BVEFLX1BMVUdJTl9WMhBOEhIKDkdST1VQQUxBUk1fQVBQEHASEAoLUFJJ",
+            "VkFURV9BUFAQgAISEwoOQVRBS19GT1JXQVJERVIQgQISCAoDTUFYEP8DQl4K",
+            "FG9yZy5tZXNodGFzdGljLnByb3RvQghQb3J0bnVtc1oiZ2l0aHViLmNvbS9t",
+            "ZXNodGFzdGljL2dvL2dlbmVyYXRlZKoCFE1lc2h0YXN0aWMuUHJvdG9idWZz",
+            "ugIAYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Meshtastic.Protobufs.PortNum), }, null, null));
@@ -89,28 +95,28 @@ namespace Meshtastic.Protobufs {
     /// <summary>
     ///
     /// The built-in position messaging app.
-    /// Payload is a [Position](/docs/developers/protobufs/api#position) message
+    /// Payload is a Position message.
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("POSITION_APP")] PositionApp = 3,
     /// <summary>
     ///
     /// The built-in user info app.
-    /// Payload is a [User](/docs/developers/protobufs/api#user) message
+    /// Payload is a User message.
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("NODEINFO_APP")] NodeinfoApp = 4,
     /// <summary>
     ///
     /// Protocol control packets for mesh protocol use.
-    /// Payload is a [Routing](/docs/developers/protobufs/api#routing) message
+    /// Payload is a Routing message.
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("ROUTING_APP")] RoutingApp = 5,
     /// <summary>
     ///
     /// Admin control packets.
-    /// Payload is a [AdminMessage](/docs/developers/protobufs/api#adminmessage) message
+    /// Payload is a AdminMessage message.
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("ADMIN_APP")] AdminApp = 6,
@@ -126,7 +132,7 @@ namespace Meshtastic.Protobufs {
     /// <summary>
     ///
     /// Waypoint payloads.
-    /// Payload is a [Waypoint](/docs/developers/protobufs/api#waypoint) message
+    /// Payload is a Waypoint message.
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("WAYPOINT_APP")] WaypointApp = 8,
@@ -147,6 +153,21 @@ namespace Meshtastic.Protobufs {
     [pbr::OriginalName("DETECTION_SENSOR_APP")] DetectionSensorApp = 10,
     /// <summary>
     ///
+    /// Same as Text Message but used for critical alerts.
+    /// </summary>
+    [pbr::OriginalName("ALERT_APP")] AlertApp = 11,
+    /// <summary>
+    ///
+    /// Module/port for handling key verification requests.
+    /// </summary>
+    [pbr::OriginalName("KEY_VERIFICATION_APP")] KeyVerificationApp = 12,
+    /// <summary>
+    ///
+    /// Module/port for handling primitive remote shell access.
+    /// </summary>
+    [pbr::OriginalName("REMOTE_SHELL_APP")] RemoteShellApp = 13,
+    /// <summary>
+    ///
     /// Provides a 'ping' service that replies to any packet it receives.
     /// Also serves as a small example module.
     /// ENCODING: ASCII Plaintext
@@ -164,6 +185,22 @@ namespace Meshtastic.Protobufs {
     /// ENCODING: protobuf
     /// </summary>
     [pbr::OriginalName("PAXCOUNTER_APP")] PaxcounterApp = 34,
+    /// <summary>
+    ///
+    /// Store and Forward++ module included in the firmware
+    /// ENCODING: protobuf
+    /// This module is specifically for Native Linux nodes, and provides a Git-style
+    /// chain of messages.
+    /// </summary>
+    [pbr::OriginalName("STORE_FORWARD_PLUSPLUS_APP")] StoreForwardPlusplusApp = 35,
+    /// <summary>
+    ///
+    /// Node Status module
+    /// ENCODING: protobuf
+    /// This module allows setting an extra string of status for a node.
+    /// Broadcasts on change and on a timer, possibly once a day.
+    /// </summary>
+    [pbr::OriginalName("NODE_STATUS_APP")] NodeStatusApp = 36,
     /// <summary>
     ///
     /// Provides a hardware serial interface to send and receive from the Meshtastic network.
@@ -215,7 +252,7 @@ namespace Meshtastic.Protobufs {
     /// <summary>
     ///
     /// Provides a traceroute functionality to show the route a packet towards
-    /// a certain destination would take on the mesh.
+    /// a certain destination would take on the mesh. Contains a RouteDiscovery message as payload.
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("TRACEROUTE_APP")] TracerouteApp = 70,
@@ -225,6 +262,55 @@ namespace Meshtastic.Protobufs {
     /// ENCODING: Protobuf
     /// </summary>
     [pbr::OriginalName("NEIGHBORINFO_APP")] NeighborinfoApp = 71,
+    /// <summary>
+    ///
+    /// ATAK Plugin
+    /// Portnum for payloads from the official Meshtastic ATAK plugin
+    /// </summary>
+    [pbr::OriginalName("ATAK_PLUGIN")] AtakPlugin = 72,
+    /// <summary>
+    ///
+    /// Provides unencrypted information about a node for consumption by a map via MQTT
+    /// </summary>
+    [pbr::OriginalName("MAP_REPORT_APP")] MapReportApp = 73,
+    /// <summary>
+    ///
+    /// PowerStress based monitoring support (for automated power consumption testing)
+    /// </summary>
+    [pbr::OriginalName("POWERSTRESS_APP")] PowerstressApp = 74,
+    /// <summary>
+    ///
+    /// LoraWAN Payload Transport
+    /// ENCODING: compact binary LoRaWAN uplink (10-byte RF metadata + PHY payload) - see LoRaWANBridgeModule
+    /// </summary>
+    [pbr::OriginalName("LORAWAN_BRIDGE")] LorawanBridge = 75,
+    /// <summary>
+    ///
+    /// Reticulum Network Stack Tunnel App
+    /// ENCODING: Fragmented RNS Packet. Handled by Meshtastic RNS interface
+    /// </summary>
+    [pbr::OriginalName("RETICULUM_TUNNEL_APP")] ReticulumTunnelApp = 76,
+    /// <summary>
+    ///
+    /// App for transporting Cayenne Low Power Payload, popular for LoRaWAN sensor nodes. Offers ability to send
+    /// arbitrary telemetry over meshtastic that is not covered by telemetry.proto
+    /// ENCODING: CayenneLLP
+    /// </summary>
+    [pbr::OriginalName("CAYENNE_APP")] CayenneApp = 77,
+    /// <summary>
+    ///
+    /// ATAK Plugin V2
+    /// Portnum for payloads from the official Meshtastic ATAK plugin using
+    /// TAKPacketV2 with zstd dictionary compression.
+    /// </summary>
+    [pbr::OriginalName("ATAK_PLUGIN_V2")] AtakPluginV2 = 78,
+    /// <summary>
+    ///
+    /// GroupAlarm integration
+    /// Used for transporting GroupAlarm-related messages between Meshtastic nodes
+    /// and companion applications/services.
+    /// </summary>
+    [pbr::OriginalName("GROUPALARM_APP")] GroupalarmApp = 112,
     /// <summary>
     ///
     /// Private applications should use portnums >= 256.

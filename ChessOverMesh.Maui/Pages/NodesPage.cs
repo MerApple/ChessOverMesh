@@ -41,7 +41,7 @@ public sealed class NodesPage : ContentPage
     bool _dirty;   // a NodesChanged arrived; the next timer tick recomputes the list
 
     // The sort modes, matching the desktop nodes window.
-    static readonly string[] SortModes = { "Name", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" };
+    static readonly string[] SortModes = { "Name", "Favorite", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" };
 
     public NodesPage(MainPage main)
     {
@@ -154,10 +154,29 @@ public sealed class NodesPage : ContentPage
         // offer the manual broadcasts (announce this node / its position to the whole mesh).
         var opts = new List<string> { "Show all info", "Open in Google Maps" };
         if (n.IsSelf) { opts.Add("Broadcast my node info"); opts.Add("Broadcast my position"); }
-        else opts.Add("Remove from device");
+        else
+        {
+            opts.Add(n.IsFavorite ? "Remove favorite" : "Mark as favorite");
+            opts.Add(n.IsIgnored ? "Un-ignore on device" : "Ignore on device");
+            opts.Add("Remote admin…");
+            opts.Add("Remove from device");
+        }
         string choice = await DisplayActionSheet(n.Display, "Cancel", null, opts.ToArray());
         switch (choice)
         {
+            case "Mark as favorite":
+            case "Remove favorite":
+                try { await _main.SetFavoriteNodeAsync(n.Num, !n.IsFavorite); _status.Text = $"{(n.IsFavorite ? "Removed favorite" : "Marked favorite")}: {n.Display}"; }
+                catch (Exception ex) { _status.Text = $"Favorite failed: {ex.Message}"; }
+                break;
+            case "Ignore on device":
+            case "Un-ignore on device":
+                try { await _main.SetIgnoredNodeAsync(n.Num, !n.IsIgnored); _status.Text = $"{(n.IsIgnored ? "Un-ignored" : "Ignored")} {n.Display} on the device."; }
+                catch (Exception ex) { _status.Text = $"Ignore failed: {ex.Message}"; }
+                break;
+            case "Remote admin…":
+                await ShowRemoteAdminMenuAsync(n);
+                break;
             case "Remove from device":
                 bool ok = await DisplayAlert("Remove node",
                     $"Remove {n.Display} from the device's node database?\n\nUse this when the node reinstalled its firmware and direct messages stopped working (its stored public key is stale). After removal the device re-learns the node — and its new key — the next time it hears from it.",
@@ -191,6 +210,33 @@ public sealed class NodesPage : ContentPage
         }
     }
 
+    // Remote-admin submenu: send admin commands to ANOTHER node (needs a shared "admin" channel on both nodes).
+    async Task ShowRemoteAdminMenuAsync(MeshNode n)
+    {
+        string choice = await DisplayActionSheet($"Remote admin — {n.Display}", "Cancel", null,
+            "Reboot", "Shut down", "Reset node DB", "Factory reset");
+        var (action, warn) = choice switch
+        {
+            "Reboot" => ("reboot", "Reboots this remote node in a few seconds."),
+            "Shut down" => ("shutdown", "Shuts this remote node down — it must be powered on again by hand."),
+            "Reset node DB" => ("nodedb", "Clears this remote node's list of known nodes."),
+            "Factory reset" => ("factory", "FACTORY-RESETS this remote node — ALL its settings are wiped. This cannot be undone."),
+            _ => (null, null),
+        };
+        if (action == null) return;
+        bool ok = await DisplayAlert($"Remote {action}?",
+            $"{warn}\n\nTarget: {n.Display}\n\nRemote admin needs a shared channel named \"admin\" on BOTH this node and the target. Continue?",
+            "Send", "Cancel");
+        if (!ok) return;
+        _status.Text = $"Sending remote {action} to {n.Display}… (negotiating session key)";
+        try
+        {
+            var err = await _main.RemoteAdminAsync(n.Num, action);
+            _status.Text = err == null ? $"Remote {action} sent to {n.Display}." : $"Remote {action} failed: {err}";
+        }
+        catch (Exception ex) { _status.Text = $"Remote {action} failed: {ex.Message}"; }
+    }
+
     void SetBusy(bool busy) { _updateBtn.IsEnabled = !busy; _search.IsEnabled = !busy; }
 
     // Recomputes the filtered/sorted node set and reconciles it into _items, reusing the existing view-model per
@@ -214,6 +260,7 @@ public sealed class NodesPage : ContentPage
         var ordered = filtered.OrderByDescending(n => n.IsSelf);
         ordered = mode switch
         {
+            "Favorite"    => ordered.ThenByDescending(n => n.IsFavorite),   // favorites first (after self)
             "Type"        => ordered.ThenBy(n => string.IsNullOrEmpty(n.Role) ? "￿" : n.Role, StringComparer.OrdinalIgnoreCase),
             "Hardware"    => ordered.ThenBy(n => string.IsNullOrEmpty(n.HwModel) ? "￿" : n.HwModel, StringComparer.OrdinalIgnoreCase),
             "Heard"       => ordered.ThenByDescending(n => n.LastHeard),                       // most recently heard first
@@ -265,7 +312,7 @@ public sealed class NodesPage : ContentPage
         }
     }
 
-    string NameText(MeshNode n) => (n.IsSelf ? "★ " : "") + n.Display;
+    string NameText(MeshNode n) => (n.IsSelf ? "★ " : "") + (n.IsFavorite ? "⭐ " : "") + (n.IsIgnored ? "🚫 " : "") + n.Display;
 
     string Detail(MeshNode n)
     {
