@@ -36,6 +36,16 @@ public sealed class ColorSettingsPage : ContentPage
             new Choice("Relayed (rebroadcast heard)", () => Palette.Relayed, v => { Palette.Relayed = v; AppSettings.RelayedColor = Hex(v); }, Color.FromRgb(0x80,0xCB,0xC4)),
             new Choice("Old cached messages", () => Palette.Cached, v => { Palette.Cached = v; AppSettings.CachedColor = Hex(v); }, Color.FromRgb(0x9E,0x9E,0x9E)),
             new Choice("Failed / warning", () => Palette.Warning, v => { Palette.Warning = v; AppSettings.WarningColor = Hex(v); }, Color.FromRgb(0xFF,0x6B,0x6B)),
+            // System-message categories (System messages only — these don't affect chat).
+            new Choice("System · Game", () => Palette.SysGame, v => { Palette.SysGame = v; AppSettings.SysGameColor = Hex(v); }, Color.FromRgb(0xE0,0xE0,0xE0)),
+            new Choice("System · Connection", () => Palette.SysConnection, v => { Palette.SysConnection = v; AppSettings.SysConnectionColor = Hex(v); }, Color.FromRgb(0x80,0xCB,0xC4)),
+            new Choice("System · Nodes", () => Palette.SysNodes, v => { Palette.SysNodes = v; AppSettings.SysNodesColor = Hex(v); }, Color.FromRgb(0x7F,0xC8,0xE8)),
+            new Choice("System · Position", () => Palette.SysPosition, v => { Palette.SysPosition = v; AppSettings.SysPositionColor = Hex(v); }, Color.FromRgb(0xA5,0xD6,0xA7)),
+            new Choice("System · Telemetry", () => Palette.SysTelemetry, v => { Palette.SysTelemetry = v; AppSettings.SysTelemetryColor = Hex(v); }, Color.FromRgb(0xC5,0xA3,0xFF)),
+            new Choice("System · Traceroute", () => Palette.SysTraceroute, v => { Palette.SysTraceroute = v; AppSettings.SysTracerouteColor = Hex(v); }, Color.FromRgb(0xFF,0xCC,0x80)),
+            new Choice("System · Admin", () => Palette.SysAdmin, v => { Palette.SysAdmin = v; AppSettings.SysAdminColor = Hex(v); }, Color.FromRgb(0xFF,0xD5,0x4F)),
+            new Choice("System · Requests", () => Palette.SysRequests, v => { Palette.SysRequests = v; AppSettings.SysRequestsColor = Hex(v); }, Color.FromRgb(0xF4,0x8F,0xB1)),
+            new Choice("System · Warnings", () => Palette.SysWarnings, v => { Palette.SysWarnings = v; AppSettings.SysWarningsColor = Hex(v); }, Color.FromRgb(0xFF,0x6B,0x6B)),
         };
 
         var root = new VerticalStackLayout { Padding = 14, Spacing = 10 };

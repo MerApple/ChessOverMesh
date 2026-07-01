@@ -141,7 +141,17 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="System messages" Foreground="#FFB0B0B0" FontWeight="Bold" Margin="0,0,0,4"/>
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <TextBlock Text="System messages" Foreground="#FFB0B0B0" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button x:Name="SystemFilterBtn" Content="Filter ▾" HorizontalAlignment="Right" Height="20" Padding="8,0"
+                            Click="SystemFilterBtn_Click" ToolTip="Show or hide types of system messages"/>
+                    <Popup x:Name="SystemFilterPopup" PlacementTarget="{Binding ElementName=SystemFilterBtn}" Placement="Bottom"
+                           StaysOpen="False" AllowsTransparency="True">
+                        <Border Background="#FF2D2D30" BorderBrush="#FF3F3F46" BorderThickness="1" Padding="8">
+                            <StackPanel x:Name="SystemFilterPanel"/>
+                        </Border>
+                    </Popup>
+                </Grid>
                 <ListBox x:Name="SystemList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
                          BorderThickness="0" FontFamily="Consolas" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
@@ -155,6 +165,11 @@
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Visible}" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>

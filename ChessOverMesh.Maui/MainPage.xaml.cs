@@ -122,6 +122,9 @@ public partial class MainPage : ContentPage
     // The Chat tab registers itself here so a chat font/size change also restyles its TX composer.
     internal ChatTabPage? ChatTab;
 
+    // System-message categories hidden by the filter.
+    readonly HashSet<SysCategory> _hiddenSysCats = new();
+
     sealed record ChannelItem(uint Index, string Label);
 
     readonly List<string> _moveHistory = new();
@@ -223,6 +226,7 @@ public partial class MainPage : ContentPage
         Render();
         SelectTab(TabMoves, MovesView);
         ApplyChessboardVisibility();
+        LoadSystemFilter();
 
         _pollTimer = Dispatcher.CreateTimer();
         _pollTimer.Interval = TimeSpan.FromSeconds(2.5);
@@ -257,7 +261,30 @@ public partial class MainPage : ContentPage
         Palette.Relayed = ParseHex(AppSettings.RelayedColor) ?? Palette.Relayed;
         Palette.Cached = ParseHex(AppSettings.CachedColor) ?? Palette.Cached;
         Palette.Warning = ParseHex(AppSettings.WarningColor) ?? Palette.Warning;
+
+        Palette.SysGame = ParseHex(AppSettings.SysGameColor) ?? Palette.SysGame;
+        Palette.SysConnection = ParseHex(AppSettings.SysConnectionColor) ?? Palette.SysConnection;
+        Palette.SysNodes = ParseHex(AppSettings.SysNodesColor) ?? Palette.SysNodes;
+        Palette.SysPosition = ParseHex(AppSettings.SysPositionColor) ?? Palette.SysPosition;
+        Palette.SysTelemetry = ParseHex(AppSettings.SysTelemetryColor) ?? Palette.SysTelemetry;
+        Palette.SysTraceroute = ParseHex(AppSettings.SysTracerouteColor) ?? Palette.SysTraceroute;
+        Palette.SysAdmin = ParseHex(AppSettings.SysAdminColor) ?? Palette.SysAdmin;
+        Palette.SysRequests = ParseHex(AppSettings.SysRequestsColor) ?? Palette.SysRequests;
+        Palette.SysWarnings = ParseHex(AppSettings.SysWarningsColor) ?? Palette.SysWarnings;
     }
+
+    internal static Color SysCategoryColor(SysCategory cat) => cat switch
+    {
+        SysCategory.Connection => Palette.SysConnection,
+        SysCategory.Nodes => Palette.SysNodes,
+        SysCategory.Position => Palette.SysPosition,
+        SysCategory.Telemetry => Palette.SysTelemetry,
+        SysCategory.Traceroute => Palette.SysTraceroute,
+        SysCategory.Admin => Palette.SysAdmin,
+        SysCategory.Requests => Palette.SysRequests,
+        SysCategory.Warnings => Palette.SysWarnings,
+        _ => Palette.SysGame,
+    };
 
     static Color? ParseHex(string? hex)
     {
@@ -516,7 +543,8 @@ public partial class MainPage : ContentPage
             await mesh.InitializeAsync(cts.Token);
             _mesh?.Dispose();
             _mesh = mesh; mesh = null;
-            _mesh.AdminActivity += OnAdminActivity;   // log admin messages (sent/received) to system messages
+            _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
+            _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) AppSettings.LastHost = cacheKey;
             DeviceCache.Save(cacheKey, _mesh.GetAvailableChannels(), _mesh.MyNodeNum);
@@ -838,10 +866,14 @@ public partial class MainPage : ContentPage
         catch (Exception ex) { Status($"Copy failed: {ex.Message}"); }
     }
 
+    async void OnSystemFilterClicked(object? sender, EventArgs e)
+        => await Navigation.PushModalAsync(new SystemFilterPage(this));
+
     void SelectTab(Button tab, CollectionView view)
     {
         MovesView.IsVisible = view == MovesView;
         SystemView.IsVisible = view == SystemView;
+        SystemFilterBtn.IsVisible = view == SystemView;   // the filter only applies to the System list
         foreach (var t in new[] { TabMoves, TabSystem })
         {
             bool selected = t == tab;
@@ -1383,7 +1415,7 @@ public partial class MainPage : ContentPage
         if (!_connected) return;
         string host = _currentHost;
         var rebuildBle = _reconnectBle;   // Disconnect() leaves this intact so auto-reconnect can rebuild the link
-        AddSystem(Stamp() + "— Connection to the device was lost (it may have been turned off, slept, or left the network). —", Palette.Warning);
+        AddSystem(Stamp() + "— Connection to the device was lost (it may have been turned off, slept, or left the network). —", Palette.Warning, SysCategory.Connection);
         Disconnect("Connection lost.");
         // Auto-reconnect works for WiFi (reconnect to the host) and BLE (rebuild the GATT link).
         bool canReconnect = (_transportIsIp && host.Length > 0) || rebuildBle != null;
@@ -1410,7 +1442,7 @@ public partial class MainPage : ContentPage
     {
         _autoReconnecting = true;
         _autoReconnectHost = host;
-        AddSystem(Stamp() + $"— Auto-reconnect on: retrying every {ReconnectIntervalSeconds}s. Disconnect to cancel. —", Palette.Warning);
+        AddSystem(Stamp() + $"— Auto-reconnect on: retrying every {ReconnectIntervalSeconds}s. Disconnect to cancel. —", Palette.Warning, SysCategory.Connection);
         ApplyConnectionState();
         _autoReconnectTimer!.Start();
         _ = TryAutoReconnectAsync();   // first attempt right away; the timer counts down to the next one
@@ -1457,7 +1489,7 @@ public partial class MainPage : ContentPage
         _autoReconnecting = false;
         _autoReconnectTimer!.Stop();
         _reconnectCountdown = 0;
-        if (reconnected) AddSystem(Stamp() + "— Reconnected. —");
+        if (reconnected) AddSystem(Stamp() + "— Reconnected. —", cat: SysCategory.Connection);
         else Status("Auto-reconnect cancelled — tap Connect to reconnect.");
         ApplyConnectionState();
     }
@@ -1517,7 +1549,7 @@ public partial class MainPage : ContentPage
     {
         if (_rxStallWarned) return;
         _rxStallWarned = true;
-        AddSystem(Stamp() + $"— {reason} If messages stop appearing, tap Nodes to update and resync with the device. —", Palette.Warning);
+        AddSystem(Stamp() + $"— {reason} If messages stop appearing, tap Nodes to update and resync with the device. —", Palette.Warning, SysCategory.Connection);
         Status("Reception may have stalled — tap Nodes to update and resync.");
     }
 
@@ -1695,7 +1727,7 @@ public partial class MainPage : ContentPage
                     SendChatAck(msg.PacketId, msg.Channel, ackSignal);
                     if (keywordAck)   // log keyword-triggered acks so range-test pings are visible even with channel acks off
                         AddSystem(Stamp() + $"Keyword auto-ack sent to {_mesh?.DescribeNode(msg.FromNode)} on channel {msg.Channel}" +
-                            (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".");
+                            (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".", cat: SysCategory.Warnings);
                     _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;
                     if (_chatHoldTimer != null) { _chatHoldTimer.Stop(); _chatHoldTimer.Interval = ChatSendDelay + TimeSpan.FromMilliseconds(200); _chatHoldTimer.Start(); }
                 }
@@ -2135,9 +2167,12 @@ public partial class MainPage : ContentPage
 
     public Task<uint> RequestDeviceMetricsForAsync(uint num) => _mesh?.RequestDeviceMetricsAsync(num) ?? Task.FromResult(0u);
 
-    /// <summary>Logs an admin message (sent "→" or received "←") to system messages. Marshals to the main thread
-    /// since the mesh client may raise this off the poll thread.</summary>
-    void OnAdminActivity(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text));
+    /// <summary>Logs an admin message (sent/received) to system messages, tagged Admin. Marshals to the main
+    /// thread since the mesh client may raise this off the poll thread.</summary>
+    void OnAdminActivity(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Admin));
+
+    /// <summary>Logs an incoming request another node made of us (position/telemetry/noise-floor), tagged Requests.</summary>
+    void OnIncomingRequest(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Requests));
 
     /// <summary>Persists the node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     void SaveNodeCache()
@@ -2408,7 +2443,7 @@ public partial class MainPage : ContentPage
         {
             if (t.IsRequest)   // someone traced us — the firmware auto-replies; just note it in the system log
             {
-                AddSystem(Stamp() + $"Traceroute request received from {_mesh?.DescribeNode(t.Node)} — the device is replying.");
+                AddSystem(Stamp() + $"Traceroute request received from {_mesh?.DescribeNode(t.Node)} — the device is replying.", cat: SysCategory.Requests);
                 continue;
             }
             if (_tracerouteWaiters.TryGetValue(t.Node, out var waiter)) waiter(t);
@@ -2418,7 +2453,7 @@ public partial class MainPage : ContentPage
             foreach (var pos in result.Positions)
             {
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
-                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.");
+                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", cat: SysCategory.Position);
             }
         if (result.Positions.Count > 0)
         {
@@ -2436,14 +2471,14 @@ public partial class MainPage : ContentPage
         }
         // Noise floor replies (requested via the node info page): log them and refresh any open node page.
         foreach (var nf in result.NoiseFloors)
-            AddSystem(Stamp() + $"Noise floor for {(nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}")}: {nf.NoiseFloorDbm} dBm");
+            AddSystem(Stamp() + $"Noise floor for {(nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}")}: {nf.NoiseFloorDbm} dBm", cat: SysCategory.Telemetry);
         if (result.NoiseFloors.Count > 0) { _telemetryRefresh?.Invoke(); NodesChanged?.Invoke(); StateChanged?.Invoke(); }   // StateChanged → Device tab noise-floor row
 
         // New-node / node-info events in the system log (optional).
         if (AppSettings.ShowNewNodeInfo)
         {
             foreach (var nn in result.NewNodes)
-                AddSystem(Stamp() + $"New node heard: {(nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}")}.");
+                AddSystem(Stamp() + $"New node heard: {(nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}")}.", cat: SysCategory.Nodes);
             foreach (var ni in result.NodeInfos)
             {
                 string who = ni.Name.Length > 0 ? ni.Name : $"!{ni.Node:x8}";
@@ -2451,7 +2486,7 @@ public partial class MainPage : ContentPage
                 // it's an answer/announcement carrying that node's info.
                 AddSystem(Stamp() + (ni.IsRequest
                     ? $"Node info request received from {who} — replying with ours."
-                    : $"Node info received from {who}."));
+                    : $"Node info received from {who}."), cat: SysCategory.Nodes);
             }
         }
         if (result.NodeInfos.Count > 0 || result.NewNodes.Count > 0)
@@ -2916,7 +2951,15 @@ public partial class MainPage : ContentPage
     }
 
     LogEntry AddMove(string text, Color? color = null) => Append(_moves, MovesView, text, color, _movesFamily, _movesSize);
-    LogEntry AddSystem(string text, Color? color = null) => Append(_system, SystemView, text, color, _systemFamily, _systemSize);
+    LogEntry AddSystem(string text, Color? color = null, SysCategory cat = SysCategory.Game)
+    {
+        // No explicit colour → use the category colour (game-flow rows that later show ack status pass an
+        // explicit Pending/Acked/Warning colour, so status still wins there).
+        var entry = Append(_system, SystemView, text, color ?? SysCategoryColor(cat), _systemFamily, _systemSize);
+        entry.Category = cat;
+        entry.Visible = !_hiddenSysCats.Contains(cat);
+        return entry;
+    }
     // Chat has its own bottom tab now (no in-panel CollectionView here), so pass no view to scroll.
     LogEntry AddChat(string text, Color? color = null) => Append(_chat, null, text, color, _chatFamily, _chatSize);
 
@@ -2932,6 +2975,25 @@ public partial class MainPage : ContentPage
             if (_reactions.TryGetValue(entry.PacketId, out var early)) entry.Reactions = FormatReactions(early);
         }
         return entry;
+    }
+
+    /// <summary>The categories currently hidden (so the filter page can show the toggle states).</summary>
+    public IReadOnlyCollection<SysCategory> HiddenSysCats => _hiddenSysCats;
+
+    // Loads the hidden system-message categories from settings.
+    void LoadSystemFilter()
+    {
+        _hiddenSysCats.Clear();
+        foreach (var name in (AppSettings.SystemFilterHidden ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (Enum.TryParse<SysCategory>(name, out var c)) _hiddenSysCats.Add(c);
+    }
+
+    /// <summary>Shows/hides a system-message category live (re-stamps every current row) and persists the choice.</summary>
+    public void SetSystemCategoryHidden(SysCategory cat, bool hidden)
+    {
+        if (hidden) _hiddenSysCats.Add(cat); else _hiddenSysCats.Remove(cat);
+        foreach (var e in _system) e.Visible = !_hiddenSysCats.Contains(e.Category);
+        AppSettings.SystemFilterHidden = string.Join(",", _hiddenSysCats);
     }
 
     static LogEntry Append(ObservableCollection<LogEntry> list, CollectionView? view, string text, Color? color,

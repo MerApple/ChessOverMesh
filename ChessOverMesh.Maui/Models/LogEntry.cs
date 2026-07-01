@@ -4,6 +4,9 @@ using Microsoft.Maui.Graphics;
 
 namespace ChessOverMesh.Maui;
 
+/// <summary>Category of a System-messages line, used by the per-type filter.</summary>
+public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Warnings }
+
 /// <summary>A move/system/chat list row whose text and colour update live (e.g. when an ack arrives).
 /// MAUI port of the desktop LogEntry — bound by a CollectionView DataTemplate.</summary>
 public sealed class LogEntry : INotifyPropertyChanged
@@ -61,6 +64,9 @@ public sealed class LogEntry : INotifyPropertyChanged
     // For a DM row, the other node (conversation peer); 0 for channel/system rows. Used by the RX view filter.
     public uint DmPeer;
 
+    // For system rows: the message category, so the System-messages filter can show/hide by type.
+    public SysCategory Category = SysCategory.Game;
+
     // For a received chat row: the message text shown after the "<name>: " prefix. Kept so the row can be
     // re-rendered with the sender's real name once that node's info arrives (it first shows as "!hex"). Null otherwise.
     public string? ChatNameBody;
@@ -102,4 +108,15 @@ public static class Palette
     public static Color Relayed { get; set; } = Color.FromRgb(0x80, 0xCB, 0xC4);   // teal — rebroadcast heard
     public static Color Cached  { get; set; } = Color.FromRgb(0x9E, 0x9E, 0x9E);   // grey — old cached history
     public static Color Warning { get; set; } = Color.FromRgb(0xFF, 0x6B, 0x6B);   // red — failed/warning
+
+    // Per-system-message-category colours (System messages only — chat is never coloured by these).
+    public static Color SysGame       { get; set; } = Color.FromRgb(0xE0, 0xE0, 0xE0);   // white/grey
+    public static Color SysConnection { get; set; } = Color.FromRgb(0x80, 0xCB, 0xC4);   // teal
+    public static Color SysNodes      { get; set; } = Color.FromRgb(0x7F, 0xC8, 0xE8);   // light blue
+    public static Color SysPosition   { get; set; } = Color.FromRgb(0xA5, 0xD6, 0xA7);   // green
+    public static Color SysTelemetry  { get; set; } = Color.FromRgb(0xC5, 0xA3, 0xFF);   // lavender
+    public static Color SysTraceroute { get; set; } = Color.FromRgb(0xFF, 0xCC, 0x80);   // orange
+    public static Color SysAdmin      { get; set; } = Color.FromRgb(0xFF, 0xD5, 0x4F);   // gold
+    public static Color SysRequests   { get; set; } = Color.FromRgb(0xF4, 0x8F, 0xB1);   // pink
+    public static Color SysWarnings   { get; set; } = Color.FromRgb(0xFF, 0x6B, 0x6B);   // red
 }

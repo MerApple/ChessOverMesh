@@ -1565,6 +1565,22 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (decoded.Portnum == PortNum.TelemetryApp)
             {
                 var tel = Telemetry.Parser.ParseFrom(decoded.Payload);
+                // An incoming telemetry REQUEST (want_response) aimed at us — the firmware answers it; surface it
+                // and don't treat the empty request payload as a reading.
+                if (decoded.WantResponse && pkt.To == MyNodeNum && pkt.From != MyNodeNum)
+                {
+                    string kind = tel.VariantCase switch
+                    {
+                        Telemetry.VariantOneofCase.LocalStats => "Noise floor",
+                        Telemetry.VariantOneofCase.DeviceMetrics => "Device metrics",
+                        Telemetry.VariantOneofCase.EnvironmentMetrics => "Environment telemetry",
+                        Telemetry.VariantOneofCase.AirQualityMetrics => "Air-quality telemetry",
+                        Telemetry.VariantOneofCase.PowerMetrics => "Power telemetry",
+                        _ => "Telemetry",
+                    };
+                    IncomingRequest?.Invoke($"{kind} request received from {DescribeNode(pkt.From)} — the device is replying.");
+                    continue;
+                }
                 if (tel.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
                 {
                     var em = tel.EnvironmentMetrics;
@@ -1599,6 +1615,10 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (decoded.Portnum == PortNum.PositionApp && pkt.From != MyNodeNum)
             {
                 var p = Position.Parser.ParseFrom(decoded.Payload);
+                // An incoming position REQUEST (want_response) aimed at us — the firmware answers it; surface it.
+                // (Still store any position it carries, for the rare "exchange positions" case.)
+                if (decoded.WantResponse && pkt.To == MyNodeNum)
+                    IncomingRequest?.Invoke($"Position request received from {DescribeNode(pkt.From)} — the device is replying.");
                 if (p.LatitudeI != 0 || p.LongitudeI != 0)   // ignore an empty/precision-stripped position
                 {
                     positions.Add(new MeshPositionReport(pkt.From, DescribeNode(pkt.From), p.LatitudeI / 1e7, p.LongitudeI / 1e7));
@@ -2256,6 +2276,11 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// human-readable description, so the app can log admin activity in system messages. May fire off the UI
     /// thread — subscribers should marshal to the UI thread.</summary>
     public event Action<string>? AdminActivity;
+
+    /// <summary>Raised when another node sends US a request the firmware auto-answers (position / telemetry /
+    /// noise-floor), with a human-readable description, so the app can log it in system messages. May fire off
+    /// the UI thread — subscribers should marshal to the UI thread.</summary>
+    public event Action<string>? IncomingRequest;
 
     // Human-readable label for an admin message (its oneof variant, plus the target node for node-directed ones).
     private static string DescribeAdmin(AdminMessage a)

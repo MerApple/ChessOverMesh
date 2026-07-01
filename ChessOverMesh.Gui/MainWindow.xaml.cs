@@ -18,6 +18,9 @@ using GameColor = ChessOverMesh.Chess.Color;
 
 namespace ChessOverMesh.Gui;
 
+/// <summary>Category of a System-messages line, used by the per-type filter.</summary>
+public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Warnings }
+
 public partial class MainWindow : Window
 {
     // ---- Palette ----
@@ -143,6 +146,7 @@ public partial class MainWindow : Window
     private bool _showSignal = true;             // show RSSI/SNR/hops on received chat lines
     private bool _isProxy;                        // connected through Meshtastic.Proxy (proxy:// link), not a device
     private DateTime _suppressAcksUntil;          // don't auto-ack until this time (covers the proxy backfill burst)
+    private readonly HashSet<SysCategory> _hiddenSysCats = new();   // system-message categories hidden by the filter
     private readonly HashSet<uint> _chatAckOn = new();   // channels where chat acks are on (default off; chess always acks)
     private readonly HashSet<uint> _chatAckSignalOn = new();   // channels whose chat ack also reports RSSI/SNR/hops
     // Per-channel auto-ack keywords: a received message whose (lowercased) text contains any of these triggers a
@@ -273,6 +277,9 @@ public partial class MainWindow : Window
         // For a DM row, the other node (the conversation peer); 0 for channel/system rows. Used by the RX filter.
         public uint DmPeer;
 
+        // For system rows: the message category, so the System-messages filter can show/hide by type.
+        public SysCategory Category = SysCategory.Game;
+
         // Whether this row is shown (the RX filter can hide a channel/DM's rows). Notifies so the list updates live.
         private bool _visible = true;
         public bool Visible
@@ -319,6 +326,41 @@ public partial class MainWindow : Window
     internal static readonly SolidColorBrush AckedText = new(DefAckedColor);
     internal static readonly SolidColorBrush RelayedText = new(DefRelayedColor);
     internal static readonly SolidColorBrush CachedText = new(DefCachedColor);
+
+    // Per-system-message-category colours (System messages only — chat is never coloured by these). Mutable so
+    // the Color/Fonts window recolours existing system rows live via the shared brush, mirroring the type colours.
+    private static readonly MediaColor DefSysGame = MediaColor.FromRgb(0xE0, 0xE0, 0xE0);        // white/grey
+    private static readonly MediaColor DefSysConnection = MediaColor.FromRgb(0x80, 0xCB, 0xC4);  // teal
+    private static readonly MediaColor DefSysNodes = MediaColor.FromRgb(0x7F, 0xC8, 0xE8);       // light blue
+    private static readonly MediaColor DefSysPosition = MediaColor.FromRgb(0xA5, 0xD6, 0xA7);    // green
+    private static readonly MediaColor DefSysTelemetry = MediaColor.FromRgb(0xC5, 0xA3, 0xFF);   // lavender
+    private static readonly MediaColor DefSysTraceroute = MediaColor.FromRgb(0xFF, 0xCC, 0x80);  // orange
+    private static readonly MediaColor DefSysAdmin = MediaColor.FromRgb(0xFF, 0xD5, 0x4F);       // gold
+    private static readonly MediaColor DefSysRequests = MediaColor.FromRgb(0xF4, 0x8F, 0xB1);    // pink
+    private static readonly MediaColor DefSysWarnings = MediaColor.FromRgb(0xFF, 0x6B, 0x6B);    // red
+    private static readonly SolidColorBrush SysGameText = new(DefSysGame);
+    private static readonly SolidColorBrush SysConnectionText = new(DefSysConnection);
+    private static readonly SolidColorBrush SysNodesText = new(DefSysNodes);
+    private static readonly SolidColorBrush SysPositionText = new(DefSysPosition);
+    private static readonly SolidColorBrush SysTelemetryText = new(DefSysTelemetry);
+    private static readonly SolidColorBrush SysTracerouteText = new(DefSysTraceroute);
+    private static readonly SolidColorBrush SysAdminText = new(DefSysAdmin);
+    private static readonly SolidColorBrush SysRequestsText = new(DefSysRequests);
+    private static readonly SolidColorBrush SysWarningsText = new(DefSysWarnings);
+
+    private static SolidColorBrush SysCategoryBrush(SysCategory cat) => cat switch
+    {
+        SysCategory.Connection => SysConnectionText,
+        SysCategory.Nodes => SysNodesText,
+        SysCategory.Position => SysPositionText,
+        SysCategory.Telemetry => SysTelemetryText,
+        SysCategory.Traceroute => SysTracerouteText,
+        SysCategory.Admin => SysAdminText,
+        SysCategory.Requests => SysRequestsText,
+        SysCategory.Warnings => SysWarningsText,
+        _ => SysGameText,
+    };
+
     private static readonly Brush CounterNormal = Frozen(MediaColor.FromRgb(0xB0, 0xB0, 0xB0));
     private static Brush Frozen(MediaColor c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
 
@@ -363,6 +405,8 @@ public partial class MainWindow : Window
         BuildBoard();
         Render();
         ApplyChessboardVisibility();
+        LoadSystemFilter();
+        BuildSystemFilterPanel();
 
         _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         _pollTimer.Tick += async (_, _) => await PollAsync();
@@ -484,6 +528,16 @@ public partial class MainWindow : Window
         RelayedText.Color = ParseHex(AppSettings.RelayedColor) ?? DefRelayedColor;
         CachedText.Color = ParseHex(AppSettings.CachedColor) ?? DefCachedColor;
         WarningText.Color = ParseHex(AppSettings.WarningColor) ?? DefWarningColor;
+
+        SysGameText.Color = ParseHex(AppSettings.SysGameColor) ?? DefSysGame;
+        SysConnectionText.Color = ParseHex(AppSettings.SysConnectionColor) ?? DefSysConnection;
+        SysNodesText.Color = ParseHex(AppSettings.SysNodesColor) ?? DefSysNodes;
+        SysPositionText.Color = ParseHex(AppSettings.SysPositionColor) ?? DefSysPosition;
+        SysTelemetryText.Color = ParseHex(AppSettings.SysTelemetryColor) ?? DefSysTelemetry;
+        SysTracerouteText.Color = ParseHex(AppSettings.SysTracerouteColor) ?? DefSysTraceroute;
+        SysAdminText.Color = ParseHex(AppSettings.SysAdminColor) ?? DefSysAdmin;
+        SysRequestsText.Color = ParseHex(AppSettings.SysRequestsColor) ?? DefSysRequests;
+        SysWarningsText.Color = ParseHex(AppSettings.SysWarningsColor) ?? DefSysWarnings;
     }
 
     private void OpenColorSettings()
@@ -497,6 +551,16 @@ public partial class MainWindow : Window
             new("Relayed (rebroadcast heard)", RelayedText, DefRelayedColor, c => AppSettings.RelayedColor = ToHex(c)),
             new("Old cached messages",      CachedText, DefCachedColor, c => AppSettings.CachedColor = ToHex(c)),
             new("Failed / warning",         WarningText, DefWarningColor, c => AppSettings.WarningColor = ToHex(c)),
+            // System-message categories (System messages only — these don't affect chat).
+            new("System · Game",       SysGameText, DefSysGame, c => AppSettings.SysGameColor = ToHex(c)),
+            new("System · Connection", SysConnectionText, DefSysConnection, c => AppSettings.SysConnectionColor = ToHex(c)),
+            new("System · Nodes",      SysNodesText, DefSysNodes, c => AppSettings.SysNodesColor = ToHex(c)),
+            new("System · Position",   SysPositionText, DefSysPosition, c => AppSettings.SysPositionColor = ToHex(c)),
+            new("System · Telemetry",  SysTelemetryText, DefSysTelemetry, c => AppSettings.SysTelemetryColor = ToHex(c)),
+            new("System · Traceroute", SysTracerouteText, DefSysTraceroute, c => AppSettings.SysTracerouteColor = ToHex(c)),
+            new("System · Admin",      SysAdminText, DefSysAdmin, c => AppSettings.SysAdminColor = ToHex(c)),
+            new("System · Requests",   SysRequestsText, DefSysRequests, c => AppSettings.SysRequestsColor = ToHex(c)),
+            new("System · Warnings",   SysWarningsText, DefSysWarnings, c => AppSettings.SysWarningsColor = ToHex(c)),
         };
         var fonts = new List<FontChoice>
         {
@@ -778,7 +842,8 @@ public partial class MainWindow : Window
 
         _mesh?.Dispose();
         _mesh = client;
-        _mesh.AdminActivity += OnAdminActivity;   // log admin messages (sent/received) to system messages
+        _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
+        _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
         _currentHost = host;
         _probeHost = probeHost;
         _probePort = probePort;
@@ -2150,9 +2215,12 @@ public partial class MainWindow : Window
 
     // ---- Board construction & rendering ----------------------------------------------
 
-    /// <summary>Logs an admin message (sent "→" or received "←") to system messages. Marshals to the UI thread
-    /// since the mesh client may raise this off the poll thread.</summary>
-    private void OnAdminActivity(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text));
+    /// <summary>Logs an admin message (sent/received) to system messages, tagged Admin. Marshals to the UI
+    /// thread since the mesh client may raise this off the poll thread.</summary>
+    private void OnAdminActivity(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Admin));
+
+    /// <summary>Logs an incoming request another node made of us (position/telemetry/noise-floor), tagged Requests.</summary>
+    private void OnIncomingRequest(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Requests));
 
     /// <summary>Persists the current node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     private void SaveNodeCache()
@@ -2649,7 +2717,7 @@ public partial class MainWindow : Window
     {
         if (!_connected) return;   // already torn down
         string host = _currentHost;
-        AddSystemWarning(Stamp() + "— Connection to the device was lost (it may have been turned off or left the network). —");
+        AddSystemWarning(Stamp() + "— Connection to the device was lost (it may have been turned off or left the network). —", SysCategory.Connection);
         Disconnect("Connection lost.");
         if (AppSettings.AutoReconnect && host.Length > 0)
             StartAutoReconnect(host);
@@ -2665,7 +2733,7 @@ public partial class MainWindow : Window
     {
         _autoReconnecting = true;
         _autoReconnectHost = host;
-        AddSystemWarning(Stamp() + $"— Auto-reconnect on: retrying every {ReconnectIntervalSeconds}s. Click Cancel to stop. —");
+        AddSystemWarning(Stamp() + $"— Auto-reconnect on: retrying every {ReconnectIntervalSeconds}s. Click Cancel to stop. —", SysCategory.Connection);
         ApplyConnectionState();
         _autoReconnectTimer.Start();
         _ = TryAutoReconnectAsync();   // first attempt right away; the timer counts down to the next one
@@ -2708,7 +2776,7 @@ public partial class MainWindow : Window
         _autoReconnecting = false;
         _autoReconnectTimer.Stop();
         _reconnectCountdown = 0;
-        if (reconnected) AddSystem(Stamp() + "— Reconnected. —");
+        if (reconnected) AddSystem(Stamp() + "— Reconnected. —", SysCategory.Connection);
         else Status("Auto-reconnect cancelled — click Connect to reconnect.");
         ApplyConnectionState();
     }
@@ -2775,7 +2843,7 @@ public partial class MainWindow : Window
             if (t.IsRequest)   // someone traced us — the firmware auto-replies; just note it in the log
             {
                 string reqLine = $"Traceroute request received from {_mesh.DescribeNode(t.Node)} — the device is replying.";
-                AddSystem(Stamp() + reqLine);
+                AddSystem(Stamp() + reqLine, SysCategory.Requests);
                 _nodeDiagHandler?.Invoke(reqLine);
                 continue;
             }
@@ -2785,7 +2853,7 @@ public partial class MainWindow : Window
             if (t.Route.Count == 0 || t.Route[^1] != t.Node) parts.Add(_mesh.DescribeNode(t.Node));
             int hops = Math.Max(0, parts.Count - 1);
             string line = $"Traceroute to {_mesh.DescribeNode(t.Node)}: {string.Join(" → ", parts)}  ({hops} hop{(hops == 1 ? "" : "s")})";
-            AddSystem(Stamp() + line);
+            AddSystem(Stamp() + line, SysCategory.Traceroute);
             // Deliver to the open traceroute window for this node; otherwise fall back to the Nodes status line.
             if (_tracerouteWaiters.TryGetValue(t.Node, out var waiter)) waiter(t);
             else _nodeDiagHandler?.Invoke(line);
@@ -2799,7 +2867,7 @@ public partial class MainWindow : Window
             string line = ni.IsRequest
                 ? $"Node info request received from {name} — replying with ours."
                 : $"Node info received from {name}.";
-            if (AppSettings.ShowNewNodeInfo) AddSystem(Stamp() + line);
+            if (AppSettings.ShowNewNodeInfo) AddSystem(Stamp() + line, SysCategory.Nodes);
             _nodeDiagHandler?.Invoke(line);
         }
 
@@ -2808,7 +2876,7 @@ public partial class MainWindow : Window
         {
             string name = nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}";
             string line = $"New node heard: {name}.";
-            if (AppSettings.ShowNewNodeInfo) AddSystem(Stamp() + line);
+            if (AppSettings.ShowNewNodeInfo) AddSystem(Stamp() + line, SysCategory.Nodes);
             _nodeDiagHandler?.Invoke(line);
         }
 
@@ -2822,7 +2890,7 @@ public partial class MainWindow : Window
             foreach (var pos in r.Positions)
             {
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
-                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.");
+                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", SysCategory.Position);
             }
 
         // Noise floor replies (requested via the node info window): log them and refresh any open node window.
@@ -2830,7 +2898,7 @@ public partial class MainWindow : Window
         {
             string name = nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}";
             string line = $"Noise floor for {name}: {nf.NoiseFloorDbm} dBm";
-            AddSystem(Stamp() + line);
+            AddSystem(Stamp() + line, SysCategory.Telemetry);
             _nodeDiagHandler?.Invoke(line);
         }
         if (r.NoiseFloors.Count > 0) { _nodesRefresh?.Invoke(); _telemetryRefresh?.Invoke(); }
@@ -2882,7 +2950,7 @@ public partial class MainWindow : Window
     /// The caller (<see cref="CheckReceptionStall"/>) rate-limits how often this is shown.</summary>
     private void WarnReceptionStall(string reason)
     {
-        AddSystemWarning(Stamp() + $"— {reason} If the device was restarted, click Nodes… → Update nodes to resync with it. —");
+        AddSystemWarning(Stamp() + $"— {reason} If the device was restarted, click Nodes… → Update nodes to resync with it. —", SysCategory.Connection);
         Status("No messages received recently — if the device was restarted, click Nodes… → Update nodes to resync.");
     }
 
@@ -3085,7 +3153,7 @@ public partial class MainWindow : Window
                 SendChatAck(msg.PacketId, msg.Channel, ackSignal);   // tell the sender we received it (on its channel)
                 if (keywordAck)   // log keyword-triggered acks so range-test pings are visible even with channel acks off
                     AddSystem(Stamp() + $"Keyword auto-ack sent to {_mesh?.DescribeNode(msg.FromNode)} on channel {msg.Channel}" +
-                        (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".");
+                        (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".", SysCategory.Warnings);
                 _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;   // let that ack send before we chat
                 if (_chatHoldTimer != null)   // grey out Send now; re-enable when the hold ends
                 {
@@ -3649,11 +3717,76 @@ public partial class MainWindow : Window
         return entry;
     }
 
-    /// <summary>Logs a system/event message to the right-panel "System messages" list (never the chat).</summary>
-    private LogEntry AddSystem(string line) => Append(SystemList, line);
+    /// <summary>Logs a system/event message to the right-panel "System messages" list (never the chat), tagged
+    /// with a category so the per-type filter can show/hide it.</summary>
+    private LogEntry AddSystem(string line, SysCategory cat = SysCategory.Game) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat);
 
-    /// <summary>Logs a system/event message in red (for warnings/errors).</summary>
-    private LogEntry AddSystemWarning(string line) => Append(SystemList, line, WarningText);
+    /// <summary>Logs a system/event message using its category colour (the Warnings default is red). Game-flow
+    /// rows that later show ack status override their own colour afterward, so status still wins there.</summary>
+    private LogEntry AddSystemWarning(string line, SysCategory cat = SysCategory.Warnings) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat);
+
+    // Stamps a system row's category and initial visibility (hidden if its category is filtered out).
+    private LogEntry TagSystem(LogEntry entry, SysCategory cat)
+    {
+        entry.Category = cat;
+        entry.Visible = !_hiddenSysCats.Contains(cat);
+        return entry;
+    }
+
+    // Loads the hidden system-message categories from settings into _hiddenSysCats.
+    private void LoadSystemFilter()
+    {
+        _hiddenSysCats.Clear();
+        foreach (var name in (AppSettings.SystemFilterHidden ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (Enum.TryParse<SysCategory>(name, out var c)) _hiddenSysCats.Add(c);
+    }
+
+    // Shows/hides a category live (re-stamps every current system row's visibility) and persists the choice.
+    private void SetSystemCategoryHidden(SysCategory cat, bool hidden)
+    {
+        if (hidden) _hiddenSysCats.Add(cat); else _hiddenSysCats.Remove(cat);
+        foreach (LogEntry e in SystemList.Items) e.Visible = !_hiddenSysCats.Contains(e.Category);
+        AppSettings.SystemFilterHidden = string.Join(",", _hiddenSysCats);
+    }
+
+    private void SystemFilterBtn_Click(object sender, RoutedEventArgs e) => SystemFilterPopup.IsOpen = !SystemFilterPopup.IsOpen;
+
+    private static string SysCategoryLabel(SysCategory c) => c switch
+    {
+        SysCategory.Nodes => "Nodes (node info)",
+        SysCategory.Requests => "Requests from others",
+        SysCategory.Warnings => "Warnings & notices",
+        _ => c.ToString(),
+    };
+
+    // Builds the filter popup: an All/None row plus one checkbox per category (checked = shown).
+    private void BuildSystemFilterPanel()
+    {
+        SystemFilterPanel.Children.Clear();
+        var allNone = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+        var allBtn = new Button { Content = "All", Width = 46, Height = 22, Margin = new Thickness(0, 0, 4, 0) };
+        var noneBtn = new Button { Content = "None", Width = 46, Height = 22 };
+        allNone.Children.Add(allBtn);
+        allNone.Children.Add(noneBtn);
+        SystemFilterPanel.Children.Add(allNone);
+
+        var boxes = new List<CheckBox>();
+        foreach (SysCategory cat in Enum.GetValues(typeof(SysCategory)))
+        {
+            var c = cat;
+            var cb = new CheckBox
+            {
+                Content = SysCategoryLabel(cat), Foreground = NormalText, Margin = new Thickness(0, 2, 0, 2),
+                IsChecked = !_hiddenSysCats.Contains(cat),
+            };
+            cb.Checked += (_, _) => SetSystemCategoryHidden(c, false);
+            cb.Unchecked += (_, _) => SetSystemCategoryHidden(c, true);
+            boxes.Add(cb);
+            SystemFilterPanel.Children.Add(cb);
+        }
+        allBtn.Click += (_, _) => { foreach (var cb in boxes) cb.IsChecked = true; };
+        noneBtn.Click += (_, _) => { foreach (var cb in boxes) cb.IsChecked = false; };
+    }
 
     /// <summary>Appends a row to a log list. Auto-scrolls to the new row only when the list was already
     /// at the bottom — so if you've scrolled up to read history, incoming rows don't yank you down.</summary>
@@ -4023,7 +4156,7 @@ public partial class MainWindow : Window
             var err = await mesh.SetDeviceTimeAsync((uint)nowS);
             AddSystem(Stamp() + (err == null
                 ? $"Device clock was ~{ahead} ahead - corrected from this computer."
-                : $"Couldn't correct the device clock (~{ahead} ahead): {err}"));
+                : $"Couldn't correct the device clock (~{ahead} ahead): {err}"), SysCategory.Connection);
         }
         catch { /* best-effort - time sync never blocks the connection */ }
     }

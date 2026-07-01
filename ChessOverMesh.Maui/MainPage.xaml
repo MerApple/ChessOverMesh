@@ -27,10 +27,11 @@
 
         <!-- Moves / System panel (chat has its own bottom tab) -->
         <Grid Grid.Row="2" RowDefinitions="Auto,*">
-            <Grid x:Name="TabButtons" Grid.Row="0" ColumnDefinitions="*,*,Auto" ColumnSpacing="4" Margin="0,2,0,4">
+            <Grid x:Name="TabButtons" Grid.Row="0" ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="4" Margin="0,2,0,4">
                 <Button x:Name="TabMoves"  Grid.Column="0" Text="Moves"  Clicked="OnTabClicked" HeightRequest="34" FontSize="13"/>
                 <Button x:Name="TabSystem" Grid.Column="1" Text="System" Clicked="OnTabClicked" HeightRequest="34" FontSize="13"/>
-                <Button x:Name="CopyLogBtn" Grid.Column="2" Text="Copy" Clicked="OnCopyLogClicked" HeightRequest="34" FontSize="13" Padding="12,0"/>
+                <Button x:Name="SystemFilterBtn" Grid.Column="2" Text="Filter" Clicked="OnSystemFilterClicked" HeightRequest="34" FontSize="13" Padding="10,0" IsVisible="False"/>
+                <Button x:Name="CopyLogBtn" Grid.Column="3" Text="Copy" Clicked="OnCopyLogClicked" HeightRequest="34" FontSize="13" Padding="12,0"/>
             </Grid>
 
             <Border Grid.Row="1" BackgroundColor="#1A1A1A" StrokeThickness="0" Padding="2">
@@ -45,7 +46,7 @@
                     <CollectionView x:Name="SystemView" IsVisible="False">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="local:LogEntry">
-                                <Label Text="{Binding Text}" TextColor="{Binding TextColor}" FontFamily="{Binding FontFamily}" FontSize="{Binding FontSize}" Padding="4,2"/>
+                                <Label Text="{Binding Text}" TextColor="{Binding TextColor}" FontFamily="{Binding FontFamily}" FontSize="{Binding FontSize}" Padding="4,2" IsVisible="{Binding Visible}"/>
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
                     </CollectionView>

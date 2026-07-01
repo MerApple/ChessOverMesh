@@ -17,6 +17,7 @@ internal static class AppSettings
         public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
         public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages + chat only
+        public string? SystemFilterHidden { get; set; }         // CSV of SysCategory names hidden in the system-messages filter
         // Notification sounds: file path per category ("" = off, null = not chosen yet → a default is used),
         // and 0–100 volume.
         public string? ChessSoundPath { get; set; }
@@ -30,6 +31,16 @@ internal static class AppSettings
         public string? RelayedColor { get; set; }
         public string? CachedColor { get; set; }
         public string? WarningColor { get; set; }
+        // Per-system-message-category colours ("#RRGGBB"; null = built-in default).
+        public string? SysGameColor { get; set; }
+        public string? SysConnectionColor { get; set; }
+        public string? SysNodesColor { get; set; }
+        public string? SysPositionColor { get; set; }
+        public string? SysTelemetryColor { get; set; }
+        public string? SysTracerouteColor { get; set; }
+        public string? SysAdminColor { get; set; }
+        public string? SysRequestsColor { get; set; }
+        public string? SysWarningsColor { get; set; }
 
         // Per-list text font (null family = built-in default) and size, for the moves / system / chat lists.
         public string? MovesFont { get; set; }
@@ -131,6 +142,13 @@ internal static class AppSettings
         set => Mutate(d => d.ShowChessboard = value);
     }
 
+    /// <summary>CSV of system-message category names the user has hidden in the System-messages filter.</summary>
+    public static string? SystemFilterHidden
+    {
+        get => Load().SystemFilterHidden;
+        set => Mutate(d => d.SystemFilterHidden = value);
+    }
+
     // Notification sound per category: null until the user has chosen (caller substitutes a default).
     public static string? ChessSoundPath { get => Load().ChessSoundPath; set => Mutate(d => d.ChessSoundPath = value); }
     public static string? ChatSoundPath { get => Load().ChatSoundPath; set => Mutate(d => d.ChatSoundPath = value); }
@@ -144,6 +162,17 @@ internal static class AppSettings
     public static string? RelayedColor { get => Load().RelayedColor; set => Mutate(d => d.RelayedColor = value); }
     public static string? CachedColor { get => Load().CachedColor; set => Mutate(d => d.CachedColor = value); }
     public static string? WarningColor { get => Load().WarningColor; set => Mutate(d => d.WarningColor = value); }
+
+    // Per-system-message-category colours.
+    public static string? SysGameColor { get => Load().SysGameColor; set => Mutate(d => d.SysGameColor = value); }
+    public static string? SysConnectionColor { get => Load().SysConnectionColor; set => Mutate(d => d.SysConnectionColor = value); }
+    public static string? SysNodesColor { get => Load().SysNodesColor; set => Mutate(d => d.SysNodesColor = value); }
+    public static string? SysPositionColor { get => Load().SysPositionColor; set => Mutate(d => d.SysPositionColor = value); }
+    public static string? SysTelemetryColor { get => Load().SysTelemetryColor; set => Mutate(d => d.SysTelemetryColor = value); }
+    public static string? SysTracerouteColor { get => Load().SysTracerouteColor; set => Mutate(d => d.SysTracerouteColor = value); }
+    public static string? SysAdminColor { get => Load().SysAdminColor; set => Mutate(d => d.SysAdminColor = value); }
+    public static string? SysRequestsColor { get => Load().SysRequestsColor; set => Mutate(d => d.SysRequestsColor = value); }
+    public static string? SysWarningsColor { get => Load().SysWarningsColor; set => Mutate(d => d.SysWarningsColor = value); }
 
     // Per-list text font family (null = default) and size.
     public static string? MovesFont { get => Load().MovesFont; set => Mutate(d => d.MovesFont = value); }
