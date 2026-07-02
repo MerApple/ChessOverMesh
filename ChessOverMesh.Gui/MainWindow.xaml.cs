@@ -2361,6 +2361,10 @@ public partial class MainWindow : Window
         MovesRow.Height = show ? new GridLength(2, GridUnitType.Star) : new GridLength(0);
         MovesRow.MinHeight = show ? 70 : 0;
         MovesSplitterRow.Height = show ? GridLength.Auto : new GridLength(0);
+
+        // The "Chess" (new game) button only makes sense when the board is shown. Its enabled state is still
+        // driven separately by the connection status.
+        StartBtn.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void BuildBoard()

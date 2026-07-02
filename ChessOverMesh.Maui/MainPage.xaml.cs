@@ -2666,6 +2666,7 @@ public partial class MainPage : ContentPage
     public async void OpenSystemMessages() => await Navigation.PushModalAsync(new SystemMessagesPage());
     public async void OpenSystemSettings() => await Navigation.PushModalAsync(new SystemSettingsPage(this));
     public async void OpenChatSettings() => await Navigation.PushModalAsync(new ChatSettingsPage(this));
+    public async void OpenChessSettings() => await Navigation.PushModalAsync(new ChessSettingsPage(this));
 
 
     void MarkAcked(MeshAck ack)

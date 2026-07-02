@@ -35,21 +35,6 @@ public sealed class SystemSettingsPage : ContentPage
             TextColor = Dim, FontSize = 11,
         });
 
-        var boardSwitch = new Switch { IsToggled = AppSettings.ShowChessboard, VerticalOptions = LayoutOptions.Center };
-        boardSwitch.Toggled += (_, e) =>
-        {
-            AppSettings.ShowChessboard = e.Value;
-            _main.ApplyChessboardVisibility();
-            (Shell.Current as AppShell)?.RefreshChessTabTitle();
-        };
-        root.Add(Row(boardSwitch, "Show chessboard"));
-        root.Add(new Label
-        {
-            Text = "Show the chessboard. When off, the chess tab is renamed “System messages” and shows only " +
-                   "system messages.",
-            TextColor = Dim, FontSize = 11,
-        });
-
         var limitEntry = new Entry { Text = AppSettings.SystemMessageLimit.ToString(), Keyboard = Keyboard.Numeric,
             TextColor = Fg, WidthRequest = 90, HorizontalOptions = LayoutOptions.Start };
         void ApplyLimit()

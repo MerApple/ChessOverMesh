@@ -21,6 +21,7 @@ public sealed class SettingsTabPage : ContentPage
         stack.Add(Section("Channels", needsConnection: true, _main.OpenChannels));
         stack.Add(Section("Colours", needsConnection: false, _main.OpenColours));
         stack.Add(Section("Sound", needsConnection: false, _main.OpenSound));
+        stack.Add(Section("Chess settings", needsConnection: false, _main.OpenChessSettings));
         stack.Add(Section("Chat messages", needsConnection: false, _main.OpenChatSettings));
         stack.Add(Section("System messages", needsConnection: false, _main.OpenSystemMessages));
         stack.Add(Section("System settings", needsConnection: false, _main.OpenSystemSettings));

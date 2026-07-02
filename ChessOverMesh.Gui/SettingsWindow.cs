@@ -65,7 +65,7 @@ internal sealed class SettingsWindow : Window
             "Choose the notification sound and volume for moves and chat",
             openSound, true));
         root.Children.Add(Section("Chess settings",
-            "Chess board options, such as the rainbow move effect",
+            "Chess board options: whether the chessboard is shown, and the rainbow move effect",
             openChess, true));
         root.Children.Add(Section("Connection settings",
             "Keep-alive heartbeat and auto-reconnect for the device connection",

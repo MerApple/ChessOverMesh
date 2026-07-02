@@ -4,7 +4,7 @@ using System.Windows.Media;
 
 namespace ChessOverMesh.Gui;
 
-/// <summary>Chess board options. Currently just the rainbow move effect (off by default).</summary>
+/// <summary>Chess board options: whether the board is shown, and the rainbow move effect (off by default).</summary>
 internal sealed class ChessSettingsWindow : Window
 {
     private static readonly Brush Bg = new SolidColorBrush(Color.FromRgb(0x2D, 0x2D, 0x30));
@@ -27,6 +27,35 @@ internal sealed class ChessSettingsWindow : Window
         Background = Bg;
 
         var root = new StackPanel { Margin = new Thickness(14) };
+
+        // Show chessboard applies immediately (unlike the rainbow effect, which is read on OK) so the board
+        // shows/hides live behind the dialog.
+        var board = new CheckBox
+        {
+            Content = "Show chessboard",
+            Foreground = Fg,
+            IsChecked = AppSettings.ShowChessboard,
+            Margin = new Thickness(0, 0, 0, 6),
+        };
+        board.Checked += (_, _) =>
+        {
+            AppSettings.ShowChessboard = true;
+            (Owner as MainWindow)?.ApplyChessboardVisibility();
+        };
+        board.Unchecked += (_, _) =>
+        {
+            AppSettings.ShowChessboard = false;
+            (Owner as MainWindow)?.ApplyChessboardVisibility();
+        };
+        root.Children.Add(board);
+        root.Children.Add(new TextBlock
+        {
+            Text = "Show the chessboard and moves, and the “Chess” button. When off, the board is hidden " +
+                   "and only system messages and channel chat are shown.",
+            Foreground = Dim,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14),
+        });
 
         _rainbow = new CheckBox
         {
