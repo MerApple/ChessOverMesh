@@ -26,7 +26,7 @@
 
             <Label Text="App key (selected) — optional AES layered on the channel PSK:" TextColor="#E0E0E0" Margin="0,6,0,0"/>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                <Entry x:Name="AppKeyBox" Grid.Column="0" IsEnabled="False" TextColor="#E0E0E0" Placeholder="passphrase"/>
+                <Entry x:Name="AppKeyBox" Grid.Column="0" IsEnabled="False" IsPassword="True" TextColor="#E0E0E0" Placeholder="passphrase"/>
                 <Button x:Name="SetKeyBtn" Grid.Column="1" Text="Set key" Clicked="OnSetKey" IsEnabled="False" MinimumHeightRequest="38" Padding="10,0"/>
             </Grid>
             <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">

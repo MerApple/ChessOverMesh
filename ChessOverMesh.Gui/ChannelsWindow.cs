@@ -29,7 +29,7 @@ internal sealed class ChannelsWindow : Window
     private readonly ListBox _list = new() { Background = Panel, Foreground = Fg, BorderThickness = new Thickness(0), Height = 140 };
     private readonly TextBox _nameBox = new() { MinHeight = 24, MinWidth = 110 };
     private readonly TextBox _pskBox = new() { MinHeight = 24, MinWidth = 140 };
-    private readonly TextBox _appKeyBox = new() { MinHeight = 24, MinWidth = 160, IsEnabled = false };
+    private readonly PasswordBox _appKeyBox = new() { MinHeight = 24, MinWidth = 160, IsEnabled = false };   // masked — it's a secret
     private readonly TextBox _triggerBox = new() { MinHeight = 24, MinWidth = 230, IsEnabled = false };
     private readonly TextBox _pskShow = new() { MinHeight = 24, MinWidth = 250, IsReadOnly = true, Foreground = Dim, Background = Panel, BorderThickness = new Thickness(0) };
     private readonly ComboBox _chessCombo = new() { MinHeight = 24, MinWidth = 220 };
@@ -328,7 +328,7 @@ internal sealed class ChannelsWindow : Window
         _setKeyBtn.IsEnabled = has && !_busy;
         _ackCheck.IsEnabled = has && !_busy;
         _deleteBtn.IsEnabled = !_busy && _list.SelectedItem is ChannelRow { Index: > 0 };
-        _appKeyBox.Text = _list.SelectedItem is ChannelRow keyRow ? DeviceCache.GetChannelKey(_host, keyRow.Index) : "";
+        _appKeyBox.Password = _list.SelectedItem is ChannelRow keyRow ? DeviceCache.GetChannelKey(_host, keyRow.Index) : "";
         _triggerBox.IsEnabled = _setTriggerBtn.IsEnabled = has && !_busy;
         _triggerBox.Text = _list.SelectedItem is ChannelRow trigRow
             ? string.Join(", ", DeviceCache.GetAckTriggers(_host).GetValueOrDefault(trigRow.Index) ?? new List<string>())
@@ -380,9 +380,9 @@ internal sealed class ChannelsWindow : Window
     private void SetKey_Click(object sender, RoutedEventArgs e)
     {
         if (_list.SelectedItem is not ChannelRow row) return;
-        DeviceCache.SetChannelKey(_host, row.Index, _appKeyBox.Text);   // persisted (DPAPI), "" clears it
-        _mesh.SetChannelKey(row.Index, _appKeyBox.Text);                // apply immediately
-        Status(_appKeyBox.Text.Length > 0
+        DeviceCache.SetChannelKey(_host, row.Index, _appKeyBox.Password);   // persisted (DPAPI), "" clears it
+        _mesh.SetChannelKey(row.Index, _appKeyBox.Password);                // apply immediately
+        Status(_appKeyBox.Password.Length > 0
             ? $"App key set for channel [{row.Index}]."
             : $"App key cleared for channel [{row.Index}].", false);
     }
