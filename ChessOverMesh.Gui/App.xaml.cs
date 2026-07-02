@@ -14,13 +14,14 @@ public partial class App : Application
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
             new RoutedEventHandler((s, _) => { if (s is Window w) w.FontSize = AppSettings.UiTextSize; }));
 
-        // Context menus live in their own popup and default to the Windows system-menu font instead of inheriting
-        // the window's size, so the UiTextSize applied above never reaches them. Setting FontSize on the ContextMenu
-        // alone is not enough: its MenuItems sit in the menu's own popup and keep the system menu font rather than
-        // inheriting from the parent, so we set the size on each MenuItem explicitly (recursing into submenus like
-        // "React"). Loaded fires each time a menu opens, so this covers every ContextMenu in the app (chat / system /
-        // moves / nodes, XAML or code-built) and picks up a changed setting the next time the menu is opened.
-        EventManager.RegisterClassHandler(typeof(ContextMenu), FrameworkElement.LoadedEvent,
+        // Context menus don't follow the window's UI text size. A ContextMenu is a logical child of the control it's
+        // attached to (the chat / system / moves / nodes list), so it INHERITS that list's own — deliberately small —
+        // content FontSize, not the window size. Worse, a ContextMenu never raises Loaded, so an earlier Loaded-based
+        // handler here never ran. Use Opened instead: it fires every time a menu opens, so we re-apply UiTextSize to
+        // the menu and — because the items keep inheriting the small list size — to each MenuItem explicitly,
+        // recursing into submenus (e.g. "React"). This covers every ContextMenu in the app, XAML or code-built, and
+        // picks up a changed setting the next time the menu is opened.
+        EventManager.RegisterClassHandler(typeof(ContextMenu), ContextMenu.OpenedEvent,
             new RoutedEventHandler((s, _) =>
             {
                 if (s is not ContextMenu cm) return;
@@ -31,7 +32,7 @@ public partial class App : Application
     }
 
     /// <summary>Sets FontSize on every MenuItem in the collection, recursing into submenus, so items pick up the
-    /// app UI text size instead of the default Windows system-menu font.</summary>
+    /// app UI text size instead of inheriting the attached list's small content font.</summary>
     private static void ApplyMenuFontSize(ItemCollection items, double size)
     {
         foreach (object item in items)
