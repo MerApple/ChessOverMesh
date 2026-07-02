@@ -139,8 +139,10 @@ internal sealed class SystemSettingsWindow : Window
         };
         removeBtn.Click += (_, _) =>
         {
-            if (!ThemedDialog.Confirm(this, "Remove the cache password for this device? Its cache will be stored unencrypted.",
-                    "Remove cache password")) return;
+            // Removing the password keeps the cached data but stores it in plaintext, so require the current
+            // password first (unlike deleting the cache, which destroys the data and needs no password). Unlock
+            // also loads the session key so SetPassword("") decrypts the existing cache before re-writing it.
+            if (!PromptCurrentPassword(this, c => DeviceCache.Unlock(host, c))) return;
             DeviceCache.SetPassword(host, "");
             RefreshCacheState();
         };
@@ -210,5 +212,43 @@ internal sealed class SystemSettingsWindow : Window
         w.Content = panel;
         w.Loaded += (_, _) => (cur ?? p1).Focus();
         return w.ShowDialog() == true ? (string?)w.Tag : null;
+    }
+
+    /// <summary>Modal that asks for the current cache password before an operation that would expose the cache
+    /// (removing the password → storing it unencrypted). Won't return true until <paramref name="verify"/> accepts
+    /// the entered password. Returns false on cancel.</summary>
+    private static bool PromptCurrentPassword(Window owner, Func<string, bool> verify)
+    {
+        var w = new Window
+        {
+            Title = "Remove cache password", Owner = owner, Width = 360, SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = Bg,
+        };
+        var panel = new StackPanel { Margin = new Thickness(14) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Enter the current password to store this device's cache unencrypted.",
+            Foreground = Fg, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8),
+        });
+        panel.Children.Add(new TextBlock { Text = "Current password:", Foreground = Fg });
+        var cur = new PasswordBox { MinWidth = 260, Margin = new Thickness(0, 2, 0, 0) };
+        panel.Children.Add(cur);
+        var err = new TextBlock { Foreground = Red, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+        panel.Children.Add(err);
+
+        var btns = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        var ok = new Button { Content = "Remove", MinWidth = 80, MinHeight = 26, IsDefault = true, Margin = new Thickness(0, 0, 6, 0) };
+        ok.Click += (_, _) =>
+        {
+            if (!verify(cur.Password)) { err.Text = "Current password is incorrect."; err.Visibility = Visibility.Visible; return; }
+            w.DialogResult = true;
+        };
+        var cancel = new Button { Content = "Cancel", MinWidth = 70, MinHeight = 26, IsCancel = true };
+        btns.Children.Add(ok);
+        btns.Children.Add(cancel);
+        panel.Children.Add(btns);
+        w.Content = panel;
+        w.Loaded += (_, _) => cur.Focus();
+        return w.ShowDialog() == true;
     }
 }

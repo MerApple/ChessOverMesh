@@ -135,9 +135,13 @@ public sealed class SystemSettingsPage : ContentPage
         };
         removePwBtn.Clicked += async (_, _) =>
         {
-            bool ok = await DisplayAlert("Remove cache password",
-                "Remove the cache password for this device? Its cache will be stored unencrypted.", "Remove", "Cancel");
-            if (!ok) return;
+            // Removing the password keeps the cached data but stores it in plaintext, so require the current
+            // password first (unlike deleting the cache, which destroys the data and needs no password). Unlock
+            // also loads the session key so SetPassword("") decrypts the existing cache before re-writing it.
+            string? cur = await DisplayPromptAsync("Remove cache password",
+                "Enter the current password to store this device's cache unencrypted.", "Remove", "Cancel");
+            if (string.IsNullOrEmpty(cur)) return;
+            if (!DeviceCache.Unlock(host, cur)) { await DisplayAlert("Incorrect password", "The current password is incorrect.", "OK"); return; }
             DeviceCache.SetPassword(host, "");
             RefreshCacheState();
         };
