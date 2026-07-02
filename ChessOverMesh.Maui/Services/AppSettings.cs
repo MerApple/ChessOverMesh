@@ -17,6 +17,8 @@ internal static class AppSettings
         public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
         public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages only
+        public int ChatMessageLimit { get; set; } = 100;        // max chat messages kept per channel (cache + on-screen)
+        public int SystemMessageLimit { get; set; } = 200;      // max system messages kept on screen
         public string? SystemFilterHidden { get; set; }         // CSV of SysCategory names hidden in the system-messages filter
         public string? ChessSoundPath { get; set; }
         public string? ChatSoundPath { get; set; }
@@ -45,6 +47,8 @@ internal static class AppSettings
         public double SystemSize { get; set; } = 13;
         public string? ChatFont { get; set; }
         public double ChatSize { get; set; } = 15;
+        public string? NodesFont { get; set; }
+        public double NodesSize { get; set; } = 13;
     }
 
     private static readonly string FilePath =
@@ -81,6 +85,8 @@ internal static class AppSettings
     public static bool ShowNewNodeInfo { get => Load().ShowNewNodeInfo; set => Mutate(d => d.ShowNewNodeInfo = value); }
     public static bool CacheMessages { get => Load().CacheMessages; set => Mutate(d => d.CacheMessages = value); }
     public static bool ShowChessboard { get => Load().ShowChessboard; set => Mutate(d => d.ShowChessboard = value); }
+    public static int ChatMessageLimit { get => Load().ChatMessageLimit; set => Mutate(d => d.ChatMessageLimit = value); }
+    public static int SystemMessageLimit { get => Load().SystemMessageLimit; set => Mutate(d => d.SystemMessageLimit = value); }
     public static string? SystemFilterHidden { get => Load().SystemFilterHidden; set => Mutate(d => d.SystemFilterHidden = value); }
     public static string? ChessSoundPath { get => Load().ChessSoundPath; set => Mutate(d => d.ChessSoundPath = value); }
     public static string? ChatSoundPath { get => Load().ChatSoundPath; set => Mutate(d => d.ChatSoundPath = value); }
@@ -108,4 +114,6 @@ internal static class AppSettings
     public static double SystemSize { get => Load().SystemSize; set => Mutate(d => d.SystemSize = value); }
     public static string? ChatFont { get => Load().ChatFont; set => Mutate(d => d.ChatFont = value); }
     public static double ChatSize { get => Load().ChatSize; set => Mutate(d => d.ChatSize = value); }
+    public static string? NodesFont { get => Load().NodesFont; set => Mutate(d => d.NodesFont = value); }
+    public static double NodesSize { get => Load().NodesSize; set => Mutate(d => d.NodesSize = value); }
 }

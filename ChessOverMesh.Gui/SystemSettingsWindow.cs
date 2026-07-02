@@ -83,6 +83,27 @@ internal sealed class SystemSettingsWindow : Window
             Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
         });
 
+        // Max system messages kept on screen.
+        var limitRow = new StackPanel { Orientation = Orientation.Horizontal };
+        limitRow.Children.Add(new TextBlock { Text = "Max system messages:", Foreground = Fg, VerticalAlignment = VerticalAlignment.Center });
+        var limitBox = new TextBox { Width = 70, Margin = new Thickness(8, 0, 0, 0), Text = AppSettings.SystemMessageLimit.ToString() };
+        limitBox.LostFocus += (_, _) =>
+        {
+            if (int.TryParse(limitBox.Text, out var n) && n > 0)
+            {
+                AppSettings.SystemMessageLimit = n;
+                (Owner as MainWindow)?.TrimSystemMessages();
+            }
+            limitBox.Text = AppSettings.SystemMessageLimit.ToString();   // normalise (revert bad input)
+        };
+        limitRow.Children.Add(limitBox);
+        root.Children.Add(limitRow);
+        root.Children.Add(new TextBlock
+        {
+            Text = "How many system-message lines to keep on screen. Oldest lines are dropped past this.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
+        });
+
         var closeBtn = new Button
         {
             Content = "Close", Width = 80, Height = 26, IsDefault = true, IsCancel = true,

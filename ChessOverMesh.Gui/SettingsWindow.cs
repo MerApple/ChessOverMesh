@@ -17,7 +17,7 @@ internal sealed class SettingsWindow : Window
 
     public SettingsWindow(Window owner, bool deviceEnabled,
                           Action openDevice, Action openColor, Action openSound, Action openChess, Action openConnection,
-                          Action openSystemMessages, Action openSystemSettings)
+                          Action openSystemMessages, Action openSystemSettings, Action openChatSettings)
     {
         Title = "Settings";
         Owner = owner;
@@ -70,6 +70,9 @@ internal sealed class SettingsWindow : Window
         root.Children.Add(Section("Connection settings",
             "Keep-alive heartbeat and auto-reconnect for the device connection",
             openConnection, true));
+        root.Children.Add(Section("Chat messages",
+            "How many chat messages to keep per channel (on screen and in the saved history)",
+            openChatSettings, true));
         root.Children.Add(Section("System messages",
             "Choose which background events (position updates, new node info) appear in the system messages list",
             openSystemMessages, true));

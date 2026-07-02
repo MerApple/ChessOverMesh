@@ -58,6 +58,9 @@ public sealed class LogEntry : INotifyPropertyChanged
     // The channel this chat row belongs to (for per-channel caching/removal). uint.MaxValue = divider/none.
     public uint Channel = uint.MaxValue;
 
+    // Wall-clock time this chat row represents (for age-based auto-delete). default = unknown (never pruned).
+    public DateTime Time;
+
     // Stable id of this row's cached copy, so "Remove message" can delete it from the cache too. Null if uncached.
     public string? CacheId;
 

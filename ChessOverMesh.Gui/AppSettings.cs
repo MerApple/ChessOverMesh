@@ -16,6 +16,8 @@ internal static class AppSettings
         public bool ShowPositionUpdates { get; set; } = true;   // log "Position received from X" in system messages
         public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
+        public int ChatMessageLimit { get; set; } = 100;        // max chat messages kept per channel (cache + on-screen)
+        public int SystemMessageLimit { get; set; } = 200;      // max system messages kept on screen
         public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages + chat only
         public string? SystemFilterHidden { get; set; }         // CSV of SysCategory names hidden in the system-messages filter
         // Notification sounds: file path per category ("" = off, null = not chosen yet → a default is used),
@@ -49,6 +51,8 @@ internal static class AppSettings
         public double SystemSize { get; set; } = 12;
         public string? ChatFont { get; set; }
         public double ChatSize { get; set; } = 14;
+        public string? NodesFont { get; set; }
+        public double NodesSize { get; set; } = 12;
     }
 
     private static readonly string FilePath = Path.Combine(
@@ -142,6 +146,20 @@ internal static class AppSettings
         set => Mutate(d => d.ShowChessboard = value);
     }
 
+    /// <summary>Max chat messages kept per channel — applies to both the disk cache and the on-screen list.</summary>
+    public static int ChatMessageLimit
+    {
+        get => Load().ChatMessageLimit;
+        set => Mutate(d => d.ChatMessageLimit = value);
+    }
+
+    /// <summary>Max system messages kept on screen (oldest trimmed past this).</summary>
+    public static int SystemMessageLimit
+    {
+        get => Load().SystemMessageLimit;
+        set => Mutate(d => d.SystemMessageLimit = value);
+    }
+
     /// <summary>CSV of system-message category names the user has hidden in the System-messages filter.</summary>
     public static string? SystemFilterHidden
     {
@@ -181,4 +199,6 @@ internal static class AppSettings
     public static double SystemSize { get => Load().SystemSize; set => Mutate(d => d.SystemSize = value); }
     public static string? ChatFont { get => Load().ChatFont; set => Mutate(d => d.ChatFont = value); }
     public static double ChatSize { get => Load().ChatSize; set => Mutate(d => d.ChatSize = value); }
+    public static string? NodesFont { get => Load().NodesFont; set => Mutate(d => d.NodesFont = value); }
+    public static double NodesSize { get => Load().NodesSize; set => Mutate(d => d.NodesSize = value); }
 }

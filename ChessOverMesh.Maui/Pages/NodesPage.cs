@@ -40,12 +40,16 @@ public sealed class NodesPage : ContentPage
     IDispatcherTimer? _refreshTimer;
     bool _dirty;   // a NodesChanged arrived; the next timer tick recomputes the list
 
+    string _nodeFontFamily = "monospace";   // from the Colour/Fonts "Nodes" setting
+    double _nodeFontSize = 13;
+
     // The sort modes, matching the desktop nodes window.
     static readonly string[] SortModes = { "Name", "Favorite", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" };
 
     public NodesPage(MainPage main)
     {
         _main = main;
+        (_nodeFontFamily, _nodeFontSize) = main.NodesFont;   // seed from the persisted Nodes font
         Title = "Nodes";
         BackgroundColor = Bg;
 
@@ -109,9 +113,17 @@ public sealed class NodesPage : ContentPage
         Content = root;
     }
 
+    /// <summary>Restyles the node rows live when the "Nodes" font/size setting changes.</summary>
+    public void ApplyFont(string family, double size)
+    {
+        _nodeFontFamily = family; _nodeFontSize = size;
+        foreach (var vm in _byNum.Values) { vm.FontFamily = family; vm.FontSize = size; }
+    }
+
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        _main.NodesPageRef = this;   // let a Nodes font/size change restyle us live
         _main.NodesChanged += OnNodesChanged;
         // Coalesce live updates: NodesChanged just marks the list dirty; this timer applies them at most once a
         // second, so a burst of incoming packets updates rows smoothly instead of rebuilding on every packet.
@@ -125,6 +137,7 @@ public sealed class NodesPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        if (_main.NodesPageRef == this) _main.NodesPageRef = null;
         _main.NodesChanged -= OnNodesChanged;
         _refreshTimer?.Stop();
         _refreshTimer = null;
@@ -277,7 +290,10 @@ public sealed class NodesPage : ContentPage
         foreach (var n in sorted)
         {
             if (!_byNum.TryGetValue(n.Num, out var vm))
+            {
                 _byNum[n.Num] = vm = new NodeRowVM(_main, n.Num, n.IsSelf);
+                vm.FontFamily = _nodeFontFamily; vm.FontSize = _nodeFontSize;
+            }
             var (dm, block) = _main.NodePrefFor(n.Num);
             vm.Update(n, NameText(n), n.IsSelf ? Accent : Fg, Detail(n), dm, block);
             desired.Add(vm);
@@ -340,6 +356,8 @@ public sealed class NodesPage : ContentPage
         var nameLbl = new Label { FontAttributes = FontAttributes.Bold };
         nameLbl.SetBinding(Label.TextProperty, nameof(NodeRowVM.NameText));
         nameLbl.SetBinding(Label.TextColorProperty, nameof(NodeRowVM.NameColor));
+        nameLbl.SetBinding(Label.FontFamilyProperty, nameof(NodeRowVM.FontFamily));
+        nameLbl.SetBinding(Label.FontSizeProperty, nameof(NodeRowVM.FontSize));
 
         var detailLbl = new Label { TextColor = Dim, FontSize = 12 };
         detailLbl.SetBinding(Label.TextProperty, nameof(NodeRowVM.DetailText));
@@ -456,6 +474,12 @@ public sealed class NodesPage : ContentPage
 
         string _detailText = "";
         public string DetailText { get => _detailText; private set => Set(ref _detailText, value); }
+
+        string _fontFamily = "monospace";
+        public string FontFamily { get => _fontFamily; set => Set(ref _fontFamily, value); }
+
+        double _fontSize = 13;
+        public double FontSize { get => _fontSize; set => Set(ref _fontSize, value); }
 
         bool _hasDetail;
         public bool HasDetail { get => _hasDetail; private set => Set(ref _hasDetail, value); }

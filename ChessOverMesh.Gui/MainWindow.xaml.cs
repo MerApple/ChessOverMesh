@@ -147,6 +147,7 @@ public partial class MainWindow : Window
     private bool _isProxy;                        // connected through Meshtastic.Proxy (proxy:// link), not a device
     private DateTime _suppressAcksUntil;          // don't auto-ack until this time (covers the proxy backfill burst)
     private readonly HashSet<SysCategory> _hiddenSysCats = new();   // system-message categories hidden by the filter
+    private int _retentionTick;   // counts ack-timer ticks; a chat auto-delete sweep runs every 60
     private readonly HashSet<uint> _chatAckOn = new();   // channels where chat acks are on (default off; chess always acks)
     private readonly HashSet<uint> _chatAckSignalOn = new();   // channels whose chat ack also reports RSSI/SNR/hops
     // Per-channel auto-ack keywords: a received message whose (lowercased) text contains any of these triggers a
@@ -273,6 +274,9 @@ public partial class MainWindow : Window
 
         // The channel this chat row belongs to (so it can be cached/cleared per channel). uint.MaxValue = divider/none.
         public uint Channel = uint.MaxValue;
+
+        // Wall-clock time this chat row represents (for age-based auto-delete). default = unknown (never pruned).
+        public DateTime Time;
 
         // For a DM row, the other node (the conversation peer); 0 for channel/system rows. Used by the RX filter.
         public uint DmPeer;
@@ -412,7 +416,12 @@ public partial class MainWindow : Window
         _pollTimer.Tick += async (_, _) => await PollAsync();
 
         _ackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _ackTimer.Tick += async (_, _) => { await CheckPendingAcksAsync(); UpdateChatSendButton(); };
+        _ackTimer.Tick += async (_, _) =>
+        {
+            await CheckPendingAcksAsync();
+            UpdateChatSendButton();
+            if (++_retentionTick >= 60) { _retentionTick = 0; ApplyChatRetention(); }   // auto-delete sweep ~once a minute
+        };
         _ackTimer.Start();
 
         _probeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
@@ -474,7 +483,7 @@ public partial class MainWindow : Window
     private void SettingsBtn_Click(object sender, RoutedEventArgs e)
     {
         bool deviceEnabled = _connected && !_refreshing && !_joining && _mesh != null;
-        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemMessagesSettings, OpenSystemSettings).ShowDialog();
+        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemMessagesSettings, OpenSystemSettings, OpenChatSettings).ShowDialog();
     }
 
     private void OpenSystemMessagesSettings()
@@ -487,6 +496,9 @@ public partial class MainWindow : Window
 
     // System settings (cached-messages toggle): the window applies its changes immediately.
     private void OpenSystemSettings() => new SystemSettingsWindow(this).ShowDialog();
+
+    // Chat messages settings (per-channel message limit): applies immediately.
+    private void OpenChatSettings() => new ChatSettingsWindow(this).ShowDialog();
 
     private void OpenConnectionSettings()
     {
@@ -567,11 +579,24 @@ public partial class MainWindow : Window
             new("Moves", MoveList.FontFamily.Source, MoveList.FontSize, (f, s) => ApplyMovesFont(f, s)),
             new("System messages", SystemList.FontFamily.Source, SystemList.FontSize, (f, s) => ApplySystemFont(f, s)),
             new("Chat text", ChatList.FontFamily.Source, ChatList.FontSize, (f, s) => ApplyChatFont(f, s)),
+            new("Nodes", _nodesFont, _nodesSize, (f, s) => ApplyNodesFont(f, s)),
         };
         new ColorSettingsWindow(this, choices, fonts).ShowDialog();
     }
 
     // ---- List fonts -------------------------------------------------------------------
+
+    // Nodes-list font (applied when the Nodes window is built; re-rendered live if it's open).
+    private string _nodesFont = "Consolas";
+    private double _nodesSize = 12;
+
+    private void ApplyNodesFont(string family, double size, bool persist = true)
+    {
+        _nodesFont = family;
+        _nodesSize = size;
+        if (persist) { AppSettings.NodesFont = family; AppSettings.NodesSize = size; }
+        _nodesRepopulate?.Invoke();   // non-null only while the Nodes window is open — re-render with the new font
+    }
 
     private void LoadFonts()
     {
@@ -579,6 +604,7 @@ public partial class MainWindow : Window
         ApplyMovesFont(AppSettings.MovesFont ?? "Consolas", AppSettings.MovesSize, persist: false);
         ApplySystemFont(AppSettings.SystemFont ?? "Consolas", AppSettings.SystemSize, persist: false);
         ApplyChatFont(AppSettings.ChatFont ?? "Segoe UI", AppSettings.ChatSize, persist: false);
+        ApplyNodesFont(AppSettings.NodesFont ?? "Consolas", AppSettings.NodesSize, persist: false);
     }
 
     private void ApplyMovesFont(string family, double size, bool persist = true)
@@ -1175,6 +1201,7 @@ public partial class MainWindow : Window
         if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
 
         RebuildChatTxCombo();
+        DeviceCache.PruneChatByRetention(host);   // drop cache messages past their auto-delete age before loading
         LoadCachedChat(host);
     }
 
@@ -1195,6 +1222,7 @@ public partial class MainWindow : Window
             var e = AddChatLine(m.Text, m.Detail, CachedText);   // grey — saved history from a previous session
             e.Channel = m.Channel;
             e.CacheId = m.Id;
+            e.Time = m.Time;   // preserve original time for age-based auto-delete
         }
         var divider = AddChatLine("──────── saved history above · live messages below ────────", "",
             new SolidColorBrush(MediaColor.FromRgb(0x8A, 0x8A, 0x8A)));
@@ -3119,6 +3147,7 @@ public partial class MainWindow : Window
                 : AddChatLine($"{who}: {body}", detail, NormalText, msg);
             entry.PacketId = msg.PacketId;                       // so it can be replied to
             entry.Channel = msg.Channel;
+            TrimChatChannel(msg.Channel);                        // cap on-screen rows per channel
             _chatEntryById[msg.PacketId] = entry;                // so reactions can attach to this row
             if (_reactions.TryGetValue(msg.PacketId, out var early)) entry.Reactions = FormatReactions(early);
             if (!msg.DecryptFailed)
@@ -3652,6 +3681,7 @@ public partial class MainWindow : Window
             uint id = await _mesh.SendTextAsync(text, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
             entry.PacketId = id;          // so this message can itself be replied to / reacted to
             entry.Channel = _chatTxChannel;
+            TrimChatChannel(_chatTxChannel);   // cap on-screen rows per channel
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);   // hide if its target is filtered out
             _chatEntryById[id] = entry;   // so reactions can attach to this row
             _chatById[id] = text;         // remember its text for quoting in future replies
@@ -3711,7 +3741,7 @@ public partial class MainWindow : Window
     private LogEntry AddChatLine(string message, string detail, Brush color, MeshTextMessage? rx = null)
     {
         bool stick = IsScrolledToBottom(ChatList);
-        var entry = new LogEntry { Text = message, Detail = detail, Foreground = color, Rx = rx };
+        var entry = new LogEntry { Text = message, Detail = detail, Foreground = color, Rx = rx, Time = DateTime.Now };
         ChatList.Items.Add(entry);
         StickToBottom(ChatList, stick);
         return entry;
@@ -3730,8 +3760,72 @@ public partial class MainWindow : Window
     {
         entry.Category = cat;
         entry.Visible = !_hiddenSysCats.Contains(cat);
+        TrimSystemMessages();
         return entry;
     }
+
+    /// <summary>Trims the System list to <see cref="AppSettings.SystemMessageLimit"/> rows (oldest removed first).</summary>
+    public void TrimSystemMessages()
+    {
+        int limit = AppSettings.SystemMessageLimit;
+        while (limit > 0 && SystemList.Items.Count > limit) SystemList.Items.RemoveAt(0);
+    }
+
+    /// <summary>Trims the on-screen chat rows for one channel to <see cref="AppSettings.ChatMessageLimit"/> (oldest
+    /// first). uint.MaxValue (divider/system) is ignored.</summary>
+    private void TrimChatChannel(uint channel)
+    {
+        if (channel == uint.MaxValue) return;
+        int limit = AppSettings.ChatMessageLimit;
+        if (limit <= 0) return;
+        var rows = new List<LogEntry>();
+        foreach (LogEntry e in ChatList.Items) if (e.Channel == channel) rows.Add(e);
+        for (int i = 0; i < rows.Count - limit; i++) ChatList.Items.Remove(rows[i]);
+    }
+
+    /// <summary>Re-applies the chat message limit to every channel currently on screen (e.g. after the limit is
+    /// lowered in settings). The disk cache is re-capped on the next append.</summary>
+    public void ApplyChatMessageLimit()
+    {
+        foreach (var ch in ChatList.Items.OfType<LogEntry>().Select(e => e.Channel).Distinct().ToList())
+            TrimChatChannel(ch);
+    }
+
+    /// <summary>Removes on-screen chat rows older than the current device's per-channel auto-delete age.</summary>
+    private void PruneChatRam()
+    {
+        if (_currentHost.Length == 0) return;
+        var retention = DeviceCache.GetChannelRetention(_currentHost);
+        if (retention.Count == 0) return;
+        var now = DateTime.Now;
+        for (int i = ChatList.Items.Count - 1; i >= 0; i--)
+        {
+            if (ChatList.Items[i] is not LogEntry e || e.Time == default) continue;
+            if (retention.TryGetValue(e.Channel, out var hrs) && hrs > 0 && e.Time < now.AddHours(-hrs))
+                ChatList.Items.RemoveAt(i);
+        }
+    }
+
+    /// <summary>Auto-deletes chat older than each channel's retention — in the cache and on screen. Called on
+    /// connect, on a periodic sweep, and when the retention setting changes.</summary>
+    public void ApplyChatRetention()
+    {
+        if (_currentHost.Length == 0) return;
+        DeviceCache.PruneChatByRetention(_currentHost);
+        PruneChatRam();
+    }
+
+    /// <summary>Channels for the connected device (live), else the cached list for the last device. For settings UIs.</summary>
+    public IReadOnlyList<MeshChannel> GetAvailableChannels()
+    {
+        if (_mesh != null) return _mesh.GetAvailableChannels();
+        var host = CurrentHost;
+        var cached = host.Length > 0 ? DeviceCache.Get(host) : null;
+        return cached != null ? DeviceCache.ToMeshChannels(cached) : Array.Empty<MeshChannel>();
+    }
+
+    /// <summary>The connected device's host, or the last-connected host when offline ("" if never connected).</summary>
+    public string CurrentHost => _currentHost.Length > 0 ? _currentHost : (AppSettings.LastHost ?? "");
 
     // Loads the hidden system-message categories from settings into _hiddenSysCats.
     private void LoadSystemFilter()
@@ -4381,7 +4475,7 @@ public partial class MainWindow : Window
 
         var greyBrush = new SolidColorBrush(MediaColor.FromRgb(0xB0, 0xB0, 0xB0));
         var nameBrush = new SolidColorBrush(MediaColor.FromRgb(0xE0, 0xE0, 0xE0));
-        var consolas = new System.Windows.Media.FontFamily("Consolas");
+        var consolas = new System.Windows.Media.FontFamily(_nodesFont);   // Nodes-list font (from Colour/Fonts settings)
 
         // node num → (row text cell, node), rebuilt by Populate; lets telemetry refresh rows without a rebuild.
         var envCells = new Dictionary<uint, (TextBlock Cell, MeshNode Node)>();
@@ -4587,6 +4681,7 @@ public partial class MainWindow : Window
                 ToolTip = rowText,   // full text on hover (the row truncates with an ellipsis)
                 Foreground = nameBrush,
                 FontFamily = consolas,
+                FontSize = _nodesSize,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
             };

@@ -116,14 +116,21 @@ public partial class MainPage : ContentPage
     int _chessVolume = 80, _chatVolume = 80;
 
     // ---- Per-list fonts (family "" = platform default) ----
-    string _movesFamily = "monospace", _systemFamily = "monospace", _chatFamily = "";
-    double _movesSize = 13, _systemSize = 13, _chatSize = 15;
+    string _movesFamily = "monospace", _systemFamily = "monospace", _chatFamily = "", _nodesFamily = "monospace";
+    double _movesSize = 13, _systemSize = 13, _chatSize = 15, _nodesSize = 13;
 
     // The Chat tab registers itself here so a chat font/size change also restyles its TX composer.
     internal ChatTabPage? ChatTab;
 
+    // An open Nodes page registers itself here so a nodes font/size change restyles it live. The current font is
+    // exposed so a freshly-opened Nodes page can seed its rows.
+    internal NodesPage? NodesPageRef;
+    public (string Family, double Size) NodesFont => (_nodesFamily, _nodesSize);
+
     // System-message categories hidden by the filter.
     readonly HashSet<SysCategory> _hiddenSysCats = new();
+
+    int _retentionTick;   // counts ack-timer ticks; a chat auto-delete sweep runs every 60
 
     sealed record ChannelItem(uint Index, string Label);
 
@@ -220,6 +227,7 @@ public partial class MainPage : ContentPage
         _movesFamily = AppSettings.MovesFont ?? "monospace"; _movesSize = AppSettings.MovesSize;
         _systemFamily = AppSettings.SystemFont ?? "monospace"; _systemSize = AppSettings.SystemSize;
         _chatFamily = AppSettings.ChatFont ?? ""; _chatSize = AppSettings.ChatSize;
+        _nodesFamily = AppSettings.NodesFont ?? "monospace"; _nodesSize = AppSettings.NodesSize;
         LoadColors();
 
         BuildBoard();
@@ -234,7 +242,12 @@ public partial class MainPage : ContentPage
 
         _ackTimer = Dispatcher.CreateTimer();
         _ackTimer.Interval = TimeSpan.FromSeconds(1);
-        _ackTimer.Tick += async (_, _) => { await CheckPendingAcksAsync(); TickChatSendCountdown(); };
+        _ackTimer.Tick += async (_, _) =>
+        {
+            await CheckPendingAcksAsync();
+            TickChatSendCountdown();
+            if (++_retentionTick >= 60) { _retentionTick = 0; ApplyChatRetention(); }   // auto-delete sweep ~once a minute
+        };
         _ackTimer.Start();
 
         _probeTimer = Dispatcher.CreateTimer();
@@ -667,6 +680,7 @@ public partial class MainPage : ContentPage
         _chatTxChannel = prefs?.ChatTxChannel ?? chess;
         if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
         RebuildChatTxPicker();
+        DeviceCache.PruneChatByRetention(host);   // drop cache messages past their auto-delete age before loading
         LoadCachedChat(host);
     }
 
@@ -686,6 +700,7 @@ public partial class MainPage : ContentPage
             var e = AddChatLine(m.Text, m.Detail, Palette.Cached);   // grey — saved history from a previous session
             e.Channel = m.Channel;
             e.CacheId = m.Id;
+            e.Time = m.Time;   // preserve original time for age-based auto-delete
         }
         var divider = AddChatLine("──────── saved history above · live messages below ────────", "", Color.FromArgb("#8A8A8A"));
         divider.Channel = uint.MaxValue;
@@ -810,6 +825,7 @@ public partial class MainPage : ContentPage
             new("Moves", _movesFamily, _movesSize, ApplyMovesFont),
             new("System messages", _systemFamily, _systemSize, ApplySystemFont),
             new("Chat text", _chatFamily, _chatSize, ApplyChatFont),
+            new("Nodes", _nodesFamily, _nodesSize, ApplyNodesFont),
         };
         await Navigation.PushModalAsync(new ColorSettingsPage(fonts));
     }
@@ -1691,7 +1707,8 @@ public partial class MainPage : ContentPage
                 LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : Palette.Normal, msg);
                 entry.ChatNameBody = sentDmFromUs ? null : bodyPart;   // outgoing DMs aren't re-rendered (the prefix differs)
                 entry.Channel = msg.Channel;
-                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime);   // persist (latest 100 per channel)
+                TrimChatChannel(msg.Channel);   // cap on-screen rows per channel
+                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime);   // persist (latest N per channel)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
                 // instead of notifying (so a hidden conversation just shows a badge in the RX list).
                 bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
@@ -1881,6 +1898,7 @@ public partial class MainPage : ContentPage
             uint id = await _mesh.SendTextAsync(text, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
             entry.PacketId = id;          // so this sent message can itself be replied to / reacted to
             entry.Channel = _chatTxChannel;
+            TrimChatChannel(_chatTxChannel);   // cap on-screen rows per channel
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);   // hide if its target is filtered out
             entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase);   // persist (latest 100 per channel)
             _chatEntryById[id] = entry;   // so reactions can attach to this row
@@ -2567,6 +2585,7 @@ public partial class MainPage : ContentPage
     public void OpenSound() => OnSoundClicked(this, EventArgs.Empty);
     public async void OpenSystemMessages() => await Navigation.PushModalAsync(new SystemMessagesPage());
     public async void OpenSystemSettings() => await Navigation.PushModalAsync(new SystemSettingsPage(this));
+    public async void OpenChatSettings() => await Navigation.PushModalAsync(new ChatSettingsPage(this));
 
 
     void MarkAcked(MeshAck ack)
@@ -2958,8 +2977,69 @@ public partial class MainPage : ContentPage
         var entry = Append(_system, SystemView, text, color ?? SysCategoryColor(cat), _systemFamily, _systemSize);
         entry.Category = cat;
         entry.Visible = !_hiddenSysCats.Contains(cat);
+        TrimSystemMessages();
         return entry;
     }
+
+    /// <summary>Trims the System list to <see cref="AppSettings.SystemMessageLimit"/> rows (oldest removed first).</summary>
+    public void TrimSystemMessages()
+    {
+        int limit = AppSettings.SystemMessageLimit;
+        while (limit > 0 && _system.Count > limit) _system.RemoveAt(0);
+    }
+
+    /// <summary>Trims the on-screen chat rows for one channel to <see cref="AppSettings.ChatMessageLimit"/>.</summary>
+    void TrimChatChannel(uint channel)
+    {
+        if (channel == uint.MaxValue) return;
+        int limit = AppSettings.ChatMessageLimit;
+        if (limit <= 0) return;
+        var rows = _chat.Where(e => e.Channel == channel).ToList();
+        for (int i = 0; i < rows.Count - limit; i++) _chat.Remove(rows[i]);
+    }
+
+    /// <summary>Re-applies the chat message limit to every channel on screen (e.g. after it's lowered in settings).</summary>
+    public void ApplyChatMessageLimit()
+    {
+        foreach (var ch in _chat.Select(e => e.Channel).Distinct().ToList()) TrimChatChannel(ch);
+    }
+
+    /// <summary>Removes on-screen chat rows older than the current device's per-channel auto-delete age.</summary>
+    void PruneChatRam()
+    {
+        if (_currentHost.Length == 0) return;
+        var retention = DeviceCache.GetChannelRetention(_currentHost);
+        if (retention.Count == 0) return;
+        var now = DateTime.Now;
+        for (int i = _chat.Count - 1; i >= 0; i--)
+        {
+            var e = _chat[i];
+            if (e.Time == default) continue;
+            if (retention.TryGetValue(e.Channel, out var hrs) && hrs > 0 && e.Time < now.AddHours(-hrs))
+                _chat.RemoveAt(i);
+        }
+    }
+
+    /// <summary>Auto-deletes chat older than each channel's retention — cache + on screen. Called on connect, on a
+    /// periodic sweep, and when the retention setting changes.</summary>
+    public void ApplyChatRetention()
+    {
+        if (_currentHost.Length == 0) return;
+        DeviceCache.PruneChatByRetention(_currentHost);
+        PruneChatRam();
+    }
+
+    /// <summary>Channels for the connected device (live), else the cached list for the last device. For settings UIs.</summary>
+    public IReadOnlyList<MeshChannel> GetAvailableChannels()
+    {
+        if (_mesh != null) return _mesh.GetAvailableChannels();
+        var host = CurrentHost;
+        var cached = host.Length > 0 ? DeviceCache.Get(host) : null;
+        return cached != null ? DeviceCache.ToMeshChannels(cached) : Array.Empty<MeshChannel>();
+    }
+
+    /// <summary>The connected device's host, or the last-connected host when offline ("" if never connected).</summary>
+    public string CurrentHost => _currentHost.Length > 0 ? _currentHost : (AppSettings.LastHost ?? "");
     // Chat has its own bottom tab now (no in-panel CollectionView here), so pass no view to scroll.
     LogEntry AddChat(string text, Color? color = null) => Append(_chat, null, text, color, _chatFamily, _chatSize);
 
@@ -2967,6 +3047,7 @@ public partial class MainPage : ContentPage
     LogEntry AddChatLine(string message, string detail, Color color, MeshTextMessage? rx = null)
     {
         var entry = Append(_chat, null, message, color, _chatFamily, _chatSize, detail);
+        entry.Time = DateTime.Now;           // for age-based auto-delete (LoadCachedChat overrides with the cached time)
         entry.Rx = rx;                       // received rows carry the raw message (for node info / details / reply)
         entry.PacketId = rx?.PacketId ?? 0;  // received rows can be replied to / reacted to by id
         if (entry.PacketId != 0)
@@ -3026,6 +3107,13 @@ public partial class MainPage : ContentPage
         foreach (var e in _chat) { e.FontFamily = family; e.FontSize = size; }   // message line; detail stays small
         ChatTab?.ApplyComposerFont(family, size);   // keep the TX composer in sync with the chat text
         AppSettings.ChatFont = family; AppSettings.ChatSize = size;
+    }
+
+    void ApplyNodesFont(string family, double size)
+    {
+        _nodesFamily = family; _nodesSize = size;
+        NodesPageRef?.ApplyFont(family, size);   // restyle an open Nodes page live; otherwise it seeds on next open
+        AppSettings.NodesFont = family; AppSettings.NodesSize = size;
     }
 
     void Notify()

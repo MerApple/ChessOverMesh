@@ -95,6 +95,9 @@ internal static class DeviceCache
         // Per-channel chat history (channel index → latest messages, oldest first), persisted across runs.
         public Dictionary<uint, List<ChatMessage>> Chat { get; set; } = new();
 
+        // Per-channel auto-delete age (channel index → hours to keep; absent/0 = keep forever).
+        public Dictionary<uint, int> ChannelRetentionHours { get; set; } = new();
+
         // Channel selections: which channel chess uses, which channels chat listens to, and the chat TX channel.
         public uint? ChessChannel { get; set; }
         public List<uint> ChatListen { get; set; } = new();
@@ -191,6 +194,7 @@ internal static class DeviceCache
                 NodePrefs = existing?.NodePrefs ?? new Dictionary<uint, NodePrefs>(),     // preserve DM/Block flags
                 Telemetry = existing?.Telemetry ?? new Dictionary<uint, List<TelemetryReading>>(),   // preserve telemetry history
                 Chat = existing?.Chat ?? new Dictionary<uint, List<ChatMessage>>(),                  // preserve chat history
+                ChannelRetentionHours = existing?.ChannelRetentionHours ?? new Dictionary<uint, int>(),   // preserve retention
                 // Preserve channel selections across a channel-list save.
                 ChessChannel = existing?.ChessChannel,
                 ChatListen = existing?.ChatListen ?? new List<uint>(),
@@ -367,11 +371,12 @@ internal static class DeviceCache
     public static void ClearTelemetry(string host, uint nodeNum) => SaveTelemetry(host, nodeNum, Array.Empty<TelemetryReading>());
 
     /// <summary>The latest chat messages cached per channel for a device (channel index → messages), empty if none.</summary>
-    public const int MaxChatPerChannel = 100;
+    public const int MaxChatPerChannel = 100;   // default; the live cap comes from AppSettings.ChatMessageLimit
     public static IReadOnlyDictionary<uint, List<ChatMessage>> GetChat(string host) =>
         Load().GetValueOrDefault(host)?.Chat ?? new Dictionary<uint, List<ChatMessage>>();
 
-    /// <summary>Appends one chat message to a channel's history, keeping only the latest <see cref="MaxChatPerChannel"/>.</summary>
+    /// <summary>Appends one chat message to a channel's history, keeping only the latest
+    /// <see cref="AppSettings.ChatMessageLimit"/> per channel.</summary>
     public static void AppendChat(string host, uint channel, ChatMessage message)
     {
         try
@@ -380,7 +385,14 @@ internal static class DeviceCache
             var entry = all.GetValueOrDefault(host) ?? new Entry();
             if (!entry.Chat.TryGetValue(channel, out var list)) entry.Chat[channel] = list = new List<ChatMessage>();
             list.Add(message);
-            if (list.Count > MaxChatPerChannel) list.RemoveRange(0, list.Count - MaxChatPerChannel);
+            int cap = AppSettings.ChatMessageLimit;
+            if (cap > 0 && list.Count > cap) list.RemoveRange(0, list.Count - cap);
+            // Age cap for this channel (per-device), if set.
+            if (entry.ChannelRetentionHours.TryGetValue(channel, out var hrs) && hrs > 0)
+            {
+                var cutoff = DateTime.Now.AddHours(-hrs);
+                list.RemoveAll(m => m.Time != default && m.Time < cutoff);
+            }
             all[host] = entry;
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
@@ -418,6 +430,51 @@ internal static class DeviceCache
             var all = Load();
             var entry = all.GetValueOrDefault(host);
             if (entry == null || !entry.Chat.Remove(channel)) return;
+            all[host] = entry;
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Per-channel auto-delete age for a device (channel index → hours; empty if none set).</summary>
+    public static IReadOnlyDictionary<uint, int> GetChannelRetention(string host) =>
+        Load().GetValueOrDefault(host)?.ChannelRetentionHours ?? new Dictionary<uint, int>();
+
+    /// <summary>Sets a channel's auto-delete age (hours; 0/negative removes it = keep forever).</summary>
+    public static void SetChannelRetention(string host, uint channel, int hours)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            if (hours > 0) entry.ChannelRetentionHours[channel] = hours;
+            else entry.ChannelRetentionHours.Remove(channel);
+            all[host] = entry;
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Deletes cached chat messages older than each channel's configured retention (auto-delete).</summary>
+    public static void PruneChatByRetention(string host)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host);
+            if (entry == null || entry.ChannelRetentionHours.Count == 0) return;
+            bool changed = false;
+            foreach (var (channel, hrs) in entry.ChannelRetentionHours)
+            {
+                if (hrs <= 0 || !entry.Chat.TryGetValue(channel, out var list)) continue;
+                var cutoff = DateTime.Now.AddHours(-hrs);
+                int removed = list.RemoveAll(m => m.Time != default && m.Time < cutoff);
+                if (removed > 0) changed = true;
+                if (list.Count == 0) { entry.Chat.Remove(channel); changed = true; }
+            }
+            if (!changed) return;
             all[host] = entry;
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));

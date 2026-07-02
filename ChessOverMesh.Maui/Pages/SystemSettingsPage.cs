@@ -70,6 +70,29 @@ public sealed class SystemSettingsPage : ContentPage
             TextColor = Dim, FontSize = 11,
         });
 
+        var limitEntry = new Entry { Text = AppSettings.SystemMessageLimit.ToString(), Keyboard = Keyboard.Numeric,
+            TextColor = Fg, WidthRequest = 90, HorizontalOptions = LayoutOptions.Start };
+        void ApplyLimit()
+        {
+            if (int.TryParse(limitEntry.Text, out var n) && n > 0)
+            {
+                AppSettings.SystemMessageLimit = n;
+                _main.TrimSystemMessages();
+            }
+            limitEntry.Text = AppSettings.SystemMessageLimit.ToString();   // normalise (revert bad input)
+        }
+        limitEntry.Completed += (_, _) => ApplyLimit();
+        limitEntry.Unfocused += (_, _) => ApplyLimit();
+        var limitRow = new HorizontalStackLayout { Spacing = 10, Margin = new Thickness(0, 6, 0, 0) };
+        limitRow.Add(new Label { Text = "Max system messages", TextColor = Fg, VerticalOptions = LayoutOptions.Center });
+        limitRow.Add(limitEntry);
+        root.Add(limitRow);
+        root.Add(new Label
+        {
+            Text = "How many system-message lines to keep on screen. Oldest lines are dropped past this.",
+            TextColor = Dim, FontSize = 11,
+        });
+
         var closeBtn = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
         closeBtn.Clicked += async (_, _) => await Navigation.PopModalAsync();
         root.Add(closeBtn);
