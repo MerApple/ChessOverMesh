@@ -188,6 +188,15 @@ internal static class DeviceCache
         if (raw.Remove(host)) WriteRaw(raw);
     }
 
+    /// <summary>Wipes every device's entire cached blob and drops all passwords/encryption — a clean reset used
+    /// when the user turns off cached messages (removes the file, so nothing is left encrypted or in plaintext).</summary>
+    public static void ClearAllDevices()
+    {
+        _passwords.Clear();
+        _unlocked.Clear();
+        try { if (File.Exists(FilePath)) File.Delete(FilePath); } catch { /* best effort */ }
+    }
+
     /// <summary>Drops a device's session password + authorisation (call on user disconnect so reconnect re-prompts).</summary>
     public static void ForgetSession(string host)
     {

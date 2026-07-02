@@ -20,28 +20,8 @@ public sealed class SystemSettingsPage : ContentPage
         BackgroundColor = Bg;
 
         var cacheSwitch = new Switch { IsToggled = AppSettings.CacheMessages, VerticalOptions = LayoutOptions.Center };
-        cacheSwitch.Toggled += async (_, e) =>
-        {
-            if (_suppress) return;
-            if (e.Value)
-            {
-                AppSettings.CacheMessages = true;
-                return;
-            }
-            bool ok = await DisplayAlert("Delete cached messages?",
-                "Turning off cached messages deletes all chat history currently cached on this device for every connection. " +
-                "This cannot be undone. Continue?",
-                "Delete", "Cancel");
-            if (!ok)
-            {
-                _suppress = true;
-                cacheSwitch.IsToggled = true;   // revert — keep caching on
-                _suppress = false;
-                return;
-            }
-            AppSettings.CacheMessages = false;
-            DeviceCache.ClearAllChat();
-        };
+        // cacheSwitch.Toggled is wired up further down, after the cache-password section's controls exist — turning
+        // caching off wipes every device and its password, and we refresh that section to reflect it.
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 10 };
         root.Add(new Label { Text = "System settings", TextColor = Fg, FontSize = 20, FontAttributes = FontAttributes.Bold });
@@ -51,7 +31,7 @@ public sealed class SystemSettingsPage : ContentPage
         root.Add(new Label
         {
             Text = "Keep a local copy of chat messages per device so the conversation reloads after a reconnect. " +
-                   "Turning this off deletes the existing cache and stops storing new messages.",
+                   "Turning this off deletes all cached data for every device (including any cache passwords) and stops storing new messages.",
             TextColor = Dim, FontSize = 11,
         });
 
@@ -146,6 +126,30 @@ public sealed class SystemSettingsPage : ContentPage
             RefreshCacheState();
         };
         RefreshCacheState();
+        cacheSwitch.Toggled += async (_, e) =>
+        {
+            if (_suppress) return;
+            if (e.Value)
+            {
+                AppSettings.CacheMessages = true;
+                return;
+            }
+            bool ok = await DisplayAlert("Delete cached messages?",
+                "Turning off cached messages deletes ALL cached data for every device on this phone — chat history, " +
+                "node and telemetry data, saved channel settings and app keys — and removes any cache passwords. " +
+                "This cannot be undone. Continue?",
+                "Delete", "Cancel");
+            if (!ok)
+            {
+                _suppress = true;
+                cacheSwitch.IsToggled = true;   // revert — keep caching on
+                _suppress = false;
+                return;
+            }
+            AppSettings.CacheMessages = false;
+            DeviceCache.ClearAllDevices();
+            RefreshCacheState();   // the wiped device is no longer encrypted — reflect that in the password section
+        };
         root.Add(cacheStatus);
         root.Add(setPwBtn);
         root.Add(removePwBtn);

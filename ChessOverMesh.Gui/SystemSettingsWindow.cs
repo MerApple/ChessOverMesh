@@ -40,28 +40,13 @@ internal sealed class SystemSettingsWindow : Window
             if (_suppress) return;
             AppSettings.CacheMessages = true;
         };
-        cache.Unchecked += (_, _) =>
-        {
-            if (_suppress) return;
-            bool answer = ThemedDialog.Confirm(this,
-                "Turning off cached messages deletes all chat history currently cached on this computer for every device. " +
-                "This cannot be undone. Continue?",
-                "Delete cached messages?");
-            if (!answer)
-            {
-                _suppress = true;
-                cache.IsChecked = true;   // revert — keep caching on
-                _suppress = false;
-                return;
-            }
-            AppSettings.CacheMessages = false;
-            DeviceCache.ClearAllChat();
-        };
+        // cache.Unchecked is wired up further down, after the cache-password section's controls exist — turning
+        // caching off wipes every device and its password, and we refresh that section to reflect it.
         root.Children.Add(cache);
         root.Children.Add(new TextBlock
         {
             Text = "Keep a local copy of chat messages per device so the conversation reloads after a reconnect. " +
-                   "Turning this off deletes the existing cache and stops storing new messages.",
+                   "Turning this off deletes all cached data for every device (including any cache passwords) and stops storing new messages.",
             Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
         });
 
@@ -147,6 +132,25 @@ internal sealed class SystemSettingsWindow : Window
             RefreshCacheState();
         };
         RefreshCacheState();
+        cache.Unchecked += (_, _) =>
+        {
+            if (_suppress) return;
+            bool answer = ThemedDialog.Confirm(this,
+                "Turning off cached messages deletes ALL cached data for every device on this computer — chat history, " +
+                "node and telemetry data, saved channel settings and app keys — and removes any cache passwords. " +
+                "This cannot be undone. Continue?",
+                "Delete cached messages?");
+            if (!answer)
+            {
+                _suppress = true;
+                cache.IsChecked = true;   // revert — keep caching on
+                _suppress = false;
+                return;
+            }
+            AppSettings.CacheMessages = false;
+            DeviceCache.ClearAllDevices();
+            RefreshCacheState();   // the wiped device is no longer encrypted — reflect that in the password section
+        };
         root.Children.Add(statusText);
         root.Children.Add(setBtn);
         root.Children.Add(removeBtn);
