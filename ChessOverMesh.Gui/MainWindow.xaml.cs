@@ -3382,7 +3382,9 @@ public partial class MainWindow : Window
     private void ChatBox_TextChanged(object sender, TextChangedEventArgs e) => UpdateCharCounter();
 
     /// <summary>Live "&lt;wire chars&gt; / &lt;max&gt;" counter under Send. Counts the bytes actually sent:
-    /// the (trimmed) text, or its AES base64 length when a channel key is set. Turns red over the limit.</summary>
+    /// the (trimmed) text, or its AES base64 length when a channel key is set. Turns red over the limit.
+    /// When the TX channel has a self-destruct lifetime, also appends the wall-clock time this message would be
+    /// deleted (now + the channel's send-TTL) so the sender sees it before hitting Send.</summary>
     private void UpdateCharCounter()
     {
         if (CharCounter == null) return;
@@ -3391,8 +3393,23 @@ public partial class MainWindow : Window
         // The radio limit is on the payload BYTES, so count UTF-8 bytes (emoji are multi-byte); for an app-keyed
         // channel the payload is the AES base64 ciphertext (ASCII, so length == bytes).
         int wireLen = text.Length == 0 ? 0 : (key.Length > 0 ? AesText.Encrypt(text, key).Length : System.Text.Encoding.UTF8.GetByteCount(text));
-        CharCounter.Text = $"{wireLen} / {MaxChatChars}";
+        CharCounter.Text = $"{wireLen} / {MaxChatChars}{SendDeleteSuffix(text.Length > 0)}";
         CharCounter.Foreground = wireLen > MaxChatChars ? WarningText : CounterNormal;
+    }
+
+    /// <summary>The " · 🕓 deletes …" tail for the char counter: the wall-clock time a message sent right now on the
+    /// current TX channel would self-destruct, or "" if the channel has no send-TTL (or there's nothing to send).
+    /// Shows the time of day, adding the date when the deletion falls on a later day.</summary>
+    private string SendDeleteSuffix(bool hasText)
+    {
+        if (!hasText) return "";
+        int ttlMinutes = _currentHost.Length > 0
+            ? DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel)
+            : 0;
+        if (ttlMinutes <= 0) return "";
+        DateTime deleteAt = DateTime.Now.AddMinutes(ttlMinutes);
+        string when = deleteAt.Date == DateTime.Today ? deleteAt.ToString("HH:mm") : deleteAt.ToString("MMM d HH:mm");
+        return $"   🕓 deletes {when}";
     }
 
     private void ChatSendBtn_Click(object sender, RoutedEventArgs e) => SendChat();
@@ -3937,6 +3954,12 @@ public partial class MainWindow : Window
             string wanted = "🕓 " + ExpiryCountdown(exp - now);
             if (e.Expiry != wanted) e.Expiry = wanted;
         }
+
+        // The counter's "deletes …" preview is now + the channel's send-TTL, so it drifts a minute at a time while the
+        // box sits idle — refresh it each second so it keeps pointing at the real deletion time. Only when a TTL is set.
+        if (ChatBox.Text.Trim().Length > 0 && _currentHost.Length > 0
+            && DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel) > 0)
+            UpdateCharCounter();
     }
 
     /// <summary>Channels for the connected device (live), else the cached list for the last device. For settings UIs.</summary>

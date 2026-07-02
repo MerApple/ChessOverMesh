@@ -13,6 +13,13 @@ public partial class App : Application
         // One class handler covers every window, including the settings dialogs and any added later.
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
             new RoutedEventHandler((s, _) => { if (s is Window w) w.FontSize = AppSettings.UiTextSize; }));
+
+        // Context menus live in their own popup and default to the larger Windows system-menu font instead of
+        // inheriting the window's size, so the UiTextSize applied above never reaches them. Re-apply it here: Loaded
+        // fires each time a menu opens, so this covers every ContextMenu in the app (chat / system / moves / nodes,
+        // XAML or code-built) and picks up a changed setting the next time the menu is opened.
+        EventManager.RegisterClassHandler(typeof(ContextMenu), FrameworkElement.LoadedEvent,
+            new RoutedEventHandler((s, _) => { if (s is ContextMenu cm) cm.FontSize = AppSettings.UiTextSize; }));
     }
 
     /// <summary>Re-applies the current UI text size to every open window — call after the setting changes so it

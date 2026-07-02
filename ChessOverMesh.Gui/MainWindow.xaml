@@ -221,8 +221,8 @@
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
                          SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
                     <ListBox.ContextMenu>
-                        <!-- FontSize matches the app's default button/label text (12) so the menu isn't the larger system-menu size -->
-                        <ContextMenu FontSize="12">
+                        <!-- FontSize follows the app UI text size via the ContextMenu class handler in App.xaml.cs -->
+                        <ContextMenu>
                             <MenuItem Header="Reply" Click="Reply_Click"/>
                             <MenuItem Header="React">
                                 <MenuItem Header="👍" Click="React_Click"/>
@@ -333,9 +333,9 @@
                         <Button x:Name="ChatSendBtn" Content="Send" MinWidth="56" MinHeight="26"
                                 Margin="4,0,0,0" IsEnabled="False" Click="ChatSendBtn_Click"/>
                     </StackPanel>
-                    <TextBlock x:Name="CharCounter" Grid.Row="2" Grid.Column="1" Text="0 / 200"
+                    <TextBlock x:Name="CharCounter" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="0 / 200"
                                FontSize="10" Foreground="#FFB0B0B0" HorizontalAlignment="Right" Margin="0,2,2,0"
-                               ToolTip="Bytes as sent (UTF-8, or the AES base64 length when a channel key is set) / maximum"/>
+                               ToolTip="Bytes as sent (UTF-8, or the AES base64 length when a channel key is set) / maximum. When the channel self-destructs messages, also shows when this one would be deleted."/>
                 </Grid>
                 </Grid>
                 <!-- end Chat section -->
