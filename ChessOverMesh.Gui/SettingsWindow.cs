@@ -42,7 +42,7 @@ internal sealed class SettingsWindow : Window
             var b = new Button
             {
                 Content = content,
-                Height = 30,
+                MinHeight = 30,
                 Margin = new Thickness(0, 0, 0, 8),
                 HorizontalContentAlignment = HorizontalAlignment.Left,
                 Padding = new Thickness(10, 0, 0, 0),
@@ -83,8 +83,8 @@ internal sealed class SettingsWindow : Window
         var closeBtn = new Button
         {
             Content = "Close",
-            Width = 80,
-            Height = 26,
+            MinWidth = 80,
+            MinHeight = 26,
             IsDefault = true,
             IsCancel = true,
             HorizontalAlignment = HorizontalAlignment.Right,

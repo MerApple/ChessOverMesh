@@ -1,4 +1,4 @@
-using ChessOverMesh.Chess;
+﻿using ChessOverMesh.Chess;
 
 namespace ChessOverMesh.Game;
 
@@ -18,7 +18,35 @@ public readonly struct ProtocolMessage
 
     /// <summary>Marker prepended to a channel-chat message when it is retransmitted after no acknowledgement,
     /// so the receiver can tell it's a resend (plain chat has no envelope to carry such a flag).</summary>
-    public const string ChatResendPrefix = "↻ ";
+    public const string ChatResendPrefix = "â†» ";
+
+    /// <summary>Delimiter for the optional self-destruct (auto-delete) header a sender can prepend to a chat
+    /// message: <c>\x01&lt;seconds&gt;\x01&lt;body&gt;</c>. Plain chat has no envelope, so the sender's chosen
+    /// lifetime rides in the text itself (hidden by the app's AES layer when a channel key is set). It's a
+    /// cooperative hint â€” a stock Meshtastic client that doesn't understand the header just shows the raw text.
+    /// SOH (U+0001) never appears in ordinary chat and is a single UTF-8 byte, so the header is ~5â€“7 bytes.</summary>
+    private const char TtlMark = '\u0001';
+
+    /// <summary>Wraps <paramref name="body"/> with a self-destruct header carrying <paramref name="seconds"/>
+    /// (the sender-chosen lifetime). Returns the body unchanged when <paramref name="seconds"/> is not positive.</summary>
+    public static string EncodeChatTtl(int seconds, string body) =>
+        seconds > 0 ? $"{TtlMark}{seconds}{TtlMark}{body}" : body;
+
+    /// <summary>Parses a self-destruct header off <paramref name="text"/>. On success sets
+    /// <paramref name="seconds"/> to the sender-chosen lifetime and <paramref name="body"/> to the remaining
+    /// message; on failure returns false with <paramref name="body"/> = the original text and seconds = 0.</summary>
+    public static bool TryDecodeChatTtl(string text, out int seconds, out string body)
+    {
+        seconds = 0;
+        body = text;
+        if (text.Length < 2 || text[0] != TtlMark) return false;
+        int end = text.IndexOf(TtlMark, 1);
+        if (end < 2) return false;   // need at least one digit between the marks
+        if (!int.TryParse(text.AsSpan(1, end - 1), out var s) || s <= 0) return false;
+        seconds = s;
+        body = text.Substring(end + 1);
+        return true;
+    }
 
     public MessageKind Kind { get; init; }
     public string GameId { get; init; }
@@ -63,7 +91,7 @@ public readonly struct ProtocolMessage
             : string.Join(Sep, Prefix, "CHATACK", chatPacketId, signal);
 
     /// <summary>Announces a newly created, open game, the creator's colour, and (if the game resumes
-    /// a saved file) the save's filename — joiners must load the same file to join.</summary>
+    /// a saved file) the save's filename â€” joiners must load the same file to join.</summary>
     public static string EncodeNew(string gameId, Color creatorColor, string? saveName = null) =>
         string.IsNullOrEmpty(saveName)
             ? string.Join(Sep, Prefix, gameId, "NEW", creatorColor.ToString().ToLowerInvariant())

@@ -60,7 +60,13 @@ public sealed class ColorSettingsPage : ContentPage
             foreach (var f in fonts) root.Add(BuildFontRow(f));
         }
 
-        var done = new Button { Text = "Done", HeightRequest = 40, Margin = new Thickness(0, 12, 0, 0) };
+        root.Add(new BoxView { HeightRequest = 1, Color = Color.FromArgb("#3F3F46"), Margin = new Thickness(0, 10, 0, 4) });
+        root.Add(new Label { Text = "App text size", TextColor = Color.FromArgb("#E0E0E0"), FontAttributes = FontAttributes.Bold });
+        root.Add(new Label { Text = "Size of buttons and labels across the app (settings screens). The lists above keep their own sizes.",
+            TextColor = Color.FromArgb("#B0B0B0"), FontSize = 12 });
+        root.Add(BuildUiTextRow());
+
+        var done = new Button { Text = "Done", MinimumHeightRequest = 40, Margin = new Thickness(0, 12, 0, 0) };
         done.Clicked += async (_, _) => await Navigation.PopModalAsync();
         root.Add(done);
 
@@ -71,7 +77,7 @@ public sealed class ColorSettingsPage : ContentPage
     {
         var swatch = new BoxView { WidthRequest = 28, HeightRequest = 20, Color = ch.Get(), CornerRadius = 3, VerticalOptions = LayoutOptions.Center };
         var sample = new Label { Text = ch.Name, TextColor = ch.Get(), VerticalOptions = LayoutOptions.Center };
-        var hex = new Entry { Text = Hex(ch.Get()), WidthRequest = 110, TextColor = Color.FromArgb("#E0E0E0"), Placeholder = "#RRGGBB" };
+        var hex = new Entry { Text = Hex(ch.Get()), MinimumWidthRequest = 110, TextColor = Color.FromArgb("#E0E0E0"), Placeholder = "#RRGGBB" };
 
         void Apply(Color c)
         {
@@ -85,14 +91,14 @@ public sealed class ColorSettingsPage : ContentPage
         foreach (var p in Presets)
         {
             var c = Color.FromArgb(p);
-            var b = new Button { BackgroundColor = c, WidthRequest = 34, HeightRequest = 28, Margin = 3, CornerRadius = 4 };
+            var b = new Button { BackgroundColor = c, MinimumWidthRequest = 34, MinimumHeightRequest = 28, Margin = 3, CornerRadius = 4 };
             b.Clicked += (_, _) => Apply(c);
             presets.Add(b);
         }
 
-        var applyBtn = new Button { Text = "Apply", HeightRequest = 36, Padding = new Thickness(10, 0), FontSize = 13 };
+        var applyBtn = new Button { Text = "Apply", MinimumHeightRequest = 36, Padding = new Thickness(10, 0) };
         applyBtn.Clicked += (_, _) => { var c = Parse(hex.Text); if (c != null) Apply(c); };
-        var resetBtn = new Button { Text = "Reset", HeightRequest = 36, Padding = new Thickness(10, 0), FontSize = 13 };
+        var resetBtn = new Button { Text = "Reset", MinimumHeightRequest = 36, Padding = new Thickness(10, 0) };
         resetBtn.Clicked += (_, _) => Apply(ch.Default);
 
         var header = new HorizontalStackLayout { Spacing = 8 };
@@ -113,12 +119,12 @@ public sealed class ColorSettingsPage : ContentPage
 
     View BuildFontRow(FontChoice f)
     {
-        var familyPicker = new Picker { TextColor = Color.FromArgb("#E0E0E0"), BackgroundColor = Color.FromArgb("#1E1E1E"), WidthRequest = 150 };
+        var familyPicker = new Picker { TextColor = Color.FromArgb("#E0E0E0"), BackgroundColor = Color.FromArgb("#1E1E1E"), MinimumWidthRequest = 150 };
         foreach (var fam in Families) familyPicker.Items.Add(fam.Label);
         int famIdx = Array.FindIndex(Families, x => string.Equals(x.Value, f.Family, StringComparison.OrdinalIgnoreCase));
         familyPicker.SelectedIndex = famIdx >= 0 ? famIdx : 0;
 
-        var sizePicker = new Picker { TextColor = Color.FromArgb("#E0E0E0"), BackgroundColor = Color.FromArgb("#1E1E1E"), WidthRequest = 70 };
+        var sizePicker = new Picker { TextColor = Color.FromArgb("#E0E0E0"), BackgroundColor = Color.FromArgb("#1E1E1E"), MinimumWidthRequest = 70 };
         foreach (var s in FontSizes) sizePicker.Items.Add(s.ToString());
         int nearest = FontSizes.OrderBy(s => Math.Abs(s - (int)Math.Round(f.Size))).First();
         sizePicker.SelectedIndex = Array.IndexOf(FontSizes, nearest);
@@ -147,6 +153,30 @@ public sealed class ColorSettingsPage : ContentPage
         row.Add(name); Grid.SetColumn(name, 0);
         row.Add(familyPicker); Grid.SetColumn(familyPicker, 1);
         row.Add(sizePicker); Grid.SetColumn(sizePicker, 2);
+        return row;
+    }
+
+    View BuildUiTextRow()
+    {
+        var sizePicker = new Picker { TextColor = Color.FromArgb("#E0E0E0"), BackgroundColor = Color.FromArgb("#1E1E1E"), MinimumWidthRequest = 70 };
+        foreach (var s in FontSizes) sizePicker.Items.Add(s.ToString());
+        int nearest = FontSizes.OrderBy(s => Math.Abs(s - (int)Math.Round(AppSettings.UiTextSize))).First();
+        sizePicker.SelectedIndex = Array.IndexOf(FontSizes, nearest);
+        sizePicker.SelectedIndexChanged += (_, _) =>
+        {
+            if (sizePicker.SelectedIndex < 0) return;
+            AppSettings.UiTextSize = FontSizes[sizePicker.SelectedIndex];
+            App.ApplyUiTextSize();   // resize buttons/labels app-wide, live
+        };
+
+        var row = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+            ColumnSpacing = 8, Margin = new Thickness(0, 4, 0, 4),
+        };
+        var name = new Label { Text = "Buttons & labels", TextColor = Color.FromArgb("#E0E0E0"), VerticalOptions = LayoutOptions.Center };
+        row.Add(name); Grid.SetColumn(name, 0);
+        row.Add(sizePicker); Grid.SetColumn(sizePicker, 1);
         return row;
     }
 

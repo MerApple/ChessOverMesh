@@ -29,7 +29,7 @@ public sealed class SystemMessagesPage : ContentPage
         root.Add(Row(newNodeSwitch, "Show new node information"));
         root.Add(new Label { Text = "Log a line when a node is heard for the first time, or when its node info (name/hardware) is received.", TextColor = Dim, FontSize = 11 });
 
-        var closeBtn = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
+        var closeBtn = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
         closeBtn.Clicked += async (_, _) => await Navigation.PopModalAsync();
         root.Add(closeBtn);
 

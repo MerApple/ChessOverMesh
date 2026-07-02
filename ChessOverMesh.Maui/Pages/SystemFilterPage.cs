@@ -24,14 +24,14 @@ public sealed class SystemFilterPage : ContentPage
         Title = "Filter system messages";
         BackgroundColor = Bg;
 
-        var allBtn = new Button { Text = "All", HeightRequest = 38, Padding = new Thickness(14, 0) };
+        var allBtn = new Button { Text = "All", MinimumHeightRequest = 38, Padding = new Thickness(14, 0) };
         allBtn.Clicked += (_, _) => { foreach (var c in Categories) _main.SetSystemCategoryHidden(c, false); Build(); };
-        var noneBtn = new Button { Text = "None", HeightRequest = 38, Padding = new Thickness(14, 0) };
+        var noneBtn = new Button { Text = "None", MinimumHeightRequest = 38, Padding = new Thickness(14, 0) };
         noneBtn.Clicked += (_, _) => { foreach (var c in Categories) _main.SetSystemCategoryHidden(c, true); Build(); };
         var btns = new HorizontalStackLayout { Spacing = 8 };
         btns.Add(allBtn); btns.Add(noneBtn);
 
-        var close = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 12, 0, 0) };
+        var close = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 12, 0, 0) };
         close.Clicked += async (_, _) => await Navigation.PopModalAsync();
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 10 };

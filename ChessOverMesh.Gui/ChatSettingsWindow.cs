@@ -5,8 +5,9 @@ using ChessOverMesh.Mesh;
 
 namespace ChessOverMesh.Gui;
 
-/// <summary>Chat message settings: how many chat messages to keep per channel, plus a per-channel auto-delete
-/// age. Both apply to the on-screen list and the disk cache. Applied immediately; the window only has Close.</summary>
+/// <summary>Chat message settings: how many chat messages to keep per channel, a per-channel receiver auto-delete
+/// age, and a per-channel sender self-destruct that stamps outgoing messages to auto-delete on every recipient.
+/// All apply immediately; the window only has Close.</summary>
 internal sealed class ChatSettingsWindow : Window
 {
     private static readonly Brush Bg = new SolidColorBrush(Color.FromRgb(0x2D, 0x2D, 0x30));
@@ -34,7 +35,7 @@ internal sealed class ChatSettingsWindow : Window
         });
         var limitRow = new StackPanel { Orientation = Orientation.Horizontal };
         limitRow.Children.Add(new TextBlock { Text = "Messages per channel:", Foreground = Fg, VerticalAlignment = VerticalAlignment.Center });
-        var limitBox = new TextBox { Width = 70, Margin = new Thickness(8, 0, 0, 0), Text = AppSettings.ChatMessageLimit.ToString() };
+        var limitBox = new TextBox { MinWidth = 70, Margin = new Thickness(8, 0, 0, 0), Text = AppSettings.ChatMessageLimit.ToString() };
         limitBox.LostFocus += (_, _) =>
         {
             if (int.TryParse(limitBox.Text, out var n) && n > 0)
@@ -83,22 +84,80 @@ internal sealed class ChatSettingsWindow : Window
             {
                 var channel = ch;   // capture for the closures
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-                row.Children.Add(new TextBlock { Text = channel.DisplayName, Foreground = Fg, Width = 150, VerticalAlignment = VerticalAlignment.Center });
-                var valBox = new TextBox { Width = 50, VerticalAlignment = VerticalAlignment.Center };
-                var unit = new ComboBox { Width = 74, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-                unit.Items.Add("Days");
+                row.Children.Add(new TextBlock { Text = channel.DisplayName, Foreground = Fg, MinWidth = 150, VerticalAlignment = VerticalAlignment.Center });
+                var valBox = new TextBox { MinWidth = 50, VerticalAlignment = VerticalAlignment.Center };
+                var unit = new ComboBox { MinWidth = 88, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                unit.Items.Add("Minutes");
                 unit.Items.Add("Hours");
-                int hrs = retention.TryGetValue(channel.Index, out var h) ? h : 0;
-                if (hrs > 0 && hrs % 24 == 0) { valBox.Text = (hrs / 24).ToString(); unit.SelectedIndex = 0; }
-                else if (hrs > 0) { valBox.Text = hrs.ToString(); unit.SelectedIndex = 1; }
-                else { valBox.Text = ""; unit.SelectedIndex = 0; }
+                unit.Items.Add("Days");
+                int mins = retention.TryGetValue(channel.Index, out var mv) ? mv : 0;
+                if (mins > 0 && mins % 1440 == 0) { valBox.Text = (mins / 1440).ToString(); unit.SelectedIndex = 2; }
+                else if (mins > 0 && mins % 60 == 0) { valBox.Text = (mins / 60).ToString(); unit.SelectedIndex = 1; }
+                else if (mins > 0) { valBox.Text = mins.ToString(); unit.SelectedIndex = 0; }
+                else { valBox.Text = ""; unit.SelectedIndex = 1; }   // default unit: Hours
 
                 void Apply()
                 {
-                    int hours = 0;
-                    if (int.TryParse(valBox.Text, out var v) && v > 0) hours = v * (unit.SelectedIndex == 1 ? 1 : 24);
-                    DeviceCache.SetChannelRetention(host, channel.Index, hours);
+                    int minutes = 0;
+                    if (int.TryParse(valBox.Text, out var v) && v > 0)
+                        minutes = v * (unit.SelectedIndex == 2 ? 1440 : unit.SelectedIndex == 1 ? 60 : 1);
+                    DeviceCache.SetChannelRetention(host, channel.Index, minutes);
                     main?.ApplyChatRetention();
+                }
+                valBox.LostFocus += (_, _) => Apply();
+                unit.SelectionChanged += (_, _) => Apply();
+                row.Children.Add(valBox);
+                row.Children.Add(unit);
+                root.Children.Add(row);
+            }
+        }
+
+        // ---- Per-channel sender self-destruct (rides in the message; every receiver honours it) ----
+        root.Children.Add(new TextBlock
+        {
+            Text = "Self-destruct sent messages", Foreground = Fg, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 14, 0, 2),
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = "When you send on a channel, stamp your message to auto-delete after this — on every recipient " +
+                   "and here — with a live countdown shown under it. Cooperative: a recipient not running this app " +
+                   "keeps the message. Blank or 0 = off.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8),
+        });
+
+        if (channels.Count == 0 || host.Length == 0)
+        {
+            root.Children.Add(new TextBlock
+            {
+                Text = "Connect to a device to set per-channel self-destruct.",
+                Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12),
+            });
+        }
+        else
+        {
+            var sendTtl = DeviceCache.GetChannelSendTtl(host);
+            foreach (var ch in channels)
+            {
+                var channel = ch;   // capture for the closures
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+                row.Children.Add(new TextBlock { Text = channel.DisplayName, Foreground = Fg, MinWidth = 150, VerticalAlignment = VerticalAlignment.Center });
+                var valBox = new TextBox { MinWidth = 50, VerticalAlignment = VerticalAlignment.Center };
+                var unit = new ComboBox { MinWidth = 88, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                unit.Items.Add("Minutes");
+                unit.Items.Add("Hours");
+                unit.Items.Add("Days");
+                int mins = sendTtl.TryGetValue(channel.Index, out var mm) ? mm : 0;
+                if (mins > 0 && mins % 1440 == 0) { valBox.Text = (mins / 1440).ToString(); unit.SelectedIndex = 2; }
+                else if (mins > 0 && mins % 60 == 0) { valBox.Text = (mins / 60).ToString(); unit.SelectedIndex = 1; }
+                else if (mins > 0) { valBox.Text = mins.ToString(); unit.SelectedIndex = 0; }
+                else { valBox.Text = ""; unit.SelectedIndex = 0; }   // default unit: Minutes
+
+                void Apply()
+                {
+                    int minutes = 0;
+                    if (int.TryParse(valBox.Text, out var v) && v > 0)
+                        minutes = v * (unit.SelectedIndex == 2 ? 1440 : unit.SelectedIndex == 1 ? 60 : 1);
+                    DeviceCache.SetChannelSendTtl(host, channel.Index, minutes);
                 }
                 valBox.LostFocus += (_, _) => Apply();
                 unit.SelectionChanged += (_, _) => Apply();
@@ -110,7 +169,7 @@ internal sealed class ChatSettingsWindow : Window
 
         var closeBtn = new Button
         {
-            Content = "Close", Width = 80, Height = 26, IsDefault = true, IsCancel = true,
+            Content = "Close", MinWidth = 80, MinHeight = 26, IsDefault = true, IsCancel = true,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0),
         };
         closeBtn.Click += (_, _) => Close();

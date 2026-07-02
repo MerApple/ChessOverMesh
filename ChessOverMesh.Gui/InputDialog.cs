@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -32,7 +32,7 @@ internal static class InputDialog
             Margin = new Thickness(0, 0, 0, 8),
         });
 
-        var box = new TextBox { Text = initial, Height = 26 };
+        var box = new TextBox { Text = initial, MinHeight = 26 };
         root.Children.Add(box);
 
         var buttons = new StackPanel
@@ -41,8 +41,8 @@ internal static class InputDialog
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 10, 0, 0),
         };
-        var ok = new Button { Content = "OK", Width = 75, Height = 26, IsDefault = true, Margin = new Thickness(0, 0, 6, 0) };
-        var cancel = new Button { Content = "Cancel", Width = 75, Height = 26, IsCancel = true };
+        var ok = new Button { Content = "OK", MinWidth = 75, MinHeight = 26, IsDefault = true, Margin = new Thickness(0, 0, 6, 0) };
+        var cancel = new Button { Content = "Cancel", MinWidth = 75, MinHeight = 26, IsCancel = true };
         ok.Click += (_, _) => { result = box.Text; dialog.DialogResult = true; };
         cancel.Click += (_, _) => dialog.DialogResult = false;
         buttons.Children.Add(ok);

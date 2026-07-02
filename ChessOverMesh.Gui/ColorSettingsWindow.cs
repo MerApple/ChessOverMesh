@@ -25,7 +25,8 @@ internal sealed class ColorSettingsWindow : Window
     private readonly List<string> _families =
         Fonts.SystemFontFamilies.Select(f => f.Source).OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
 
-    public ColorSettingsWindow(Window owner, IReadOnlyList<ColorChoice> choices, IReadOnlyList<FontChoice> fonts)
+    public ColorSettingsWindow(Window owner, IReadOnlyList<ColorChoice> choices, IReadOnlyList<FontChoice> fonts,
+                               double uiTextSize, Action<double> applyUiText)
     {
         Title = "Colors & fonts";
         Owner = owner;
@@ -53,7 +54,17 @@ internal sealed class ColorSettingsWindow : Window
         });
         foreach (var f in fonts) root.Children.Add(FontRow(f));
 
-        var done = new Button { Content = "Done", Width = 80, Height = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        root.Children.Add(new Border { Height = 1, Background = Edge, Margin = new Thickness(0, 12, 0, 0) });
+        root.Children.Add(Header("App text size"));
+        root.Children.Add(new TextBlock
+        {
+            Text = "Size of buttons and labels across the app (settings screens, menus). The lists above keep their " +
+                   "own sizes. Changes apply immediately.",
+            Foreground = Fg, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6),
+        });
+        root.Children.Add(UiTextRow(uiTextSize, applyUiText));
+
+        var done = new Button { Content = "Done", MinWidth = 80, MinHeight = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
         done.Click += (_, _) => { DialogResult = true; };
         root.Children.Add(done);
 
@@ -73,8 +84,8 @@ internal sealed class ColorSettingsWindow : Window
         DockPanel.SetDock(swatch, Dock.Left);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var choose = new Button { Content = "Choose…", Width = 72, Height = 24 };
-        var reset = new Button { Content = "Reset", Width = 60, Height = 24, Margin = new Thickness(6, 0, 0, 0) };
+        var choose = new Button { Content = "Choose…", MinWidth = 72, MinHeight = 24 };
+        var reset = new Button { Content = "Reset", MinWidth = 60, MinHeight = 24, Margin = new Thickness(6, 0, 0, 0) };
         choose.Click += (_, _) => Pick(ch);
         reset.Click += (_, _) => { ch.Brush.Color = ch.Default; ch.Persist(ch.Default); };
         buttons.Children.Add(choose);
@@ -92,15 +103,15 @@ internal sealed class ColorSettingsWindow : Window
     {
         var row = new DockPanel { Margin = new Thickness(0, 4, 0, 4) };
 
-        var name = new TextBlock { Text = f.Name, Foreground = Fg, VerticalAlignment = VerticalAlignment.Center, Width = 120 };
+        var name = new TextBlock { Text = f.Name, Foreground = Fg, VerticalAlignment = VerticalAlignment.Center, MinWidth = 120 };
         DockPanel.SetDock(name, Dock.Left);
 
         // Make sure the current family is selectable even if it isn't in the enumerated system list.
         if (!_families.Contains(f.Family, StringComparer.OrdinalIgnoreCase)) _families.Insert(0, f.Family);
         string currentFamily = _families.First(x => string.Equals(x, f.Family, StringComparison.OrdinalIgnoreCase));
 
-        var familyCombo = new ComboBox { Width = 170, Height = 24, ItemsSource = _families, SelectedItem = currentFamily };
-        var sizeCombo = new ComboBox { Width = 56, Height = 24, Margin = new Thickness(8, 0, 0, 0), ItemsSource = Sizes, SelectedItem = NearestSize(f.Size) };
+        var familyCombo = new ComboBox { MinWidth = 170, MinHeight = 24, ItemsSource = _families, SelectedItem = currentFamily };
+        var sizeCombo = new ComboBox { MinWidth = 56, MinHeight = 24, Margin = new Thickness(8, 0, 0, 0), ItemsSource = Sizes, SelectedItem = NearestSize(f.Size) };
 
         void ApplyNow()
         {
@@ -118,6 +129,21 @@ internal sealed class ColorSettingsWindow : Window
 
         row.Children.Add(name);
         row.Children.Add(controls);
+        return row;
+    }
+
+    private UIElement UiTextRow(double current, Action<double> apply)
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 4, 0, 4) };
+        var name = new TextBlock { Text = "Buttons & labels", Foreground = Fg, VerticalAlignment = VerticalAlignment.Center, MinWidth = 120 };
+        DockPanel.SetDock(name, Dock.Left);
+
+        var sizeCombo = new ComboBox { MinWidth = 56, MinHeight = 24, ItemsSource = Sizes, SelectedItem = NearestSize(current), HorizontalAlignment = HorizontalAlignment.Right };
+        sizeCombo.SelectionChanged += (_, _) => { if (sizeCombo.SelectedItem is int s) apply(s); };
+        DockPanel.SetDock(sizeCombo, Dock.Right);
+
+        row.Children.Add(name);
+        row.Children.Add(sizeCombo);
         return row;
     }
 

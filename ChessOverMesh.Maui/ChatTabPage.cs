@@ -52,11 +52,15 @@ public sealed class ChatTabPage : ContentPage
                 msg.SetBinding(Label.FontSizeProperty, nameof(LogEntry.FontSize));
                 var detail = new Label { TextColor = Color.FromArgb("#8A8A8A"), FontSize = 10 };
                 detail.SetBinding(Label.TextProperty, nameof(LogEntry.Detail));
+                // Sender self-destruct countdown ("🕓 deletes in …"), dim; hidden when the message has no expiry.
+                var expiry = new Label { TextColor = Color.FromArgb("#8A8A8A"), FontSize = 10 };
+                expiry.SetBinding(Label.TextProperty, nameof(LogEntry.Expiry));
+                expiry.SetBinding(Label.IsVisibleProperty, new Binding(nameof(LogEntry.Expiry), converter: NotEmpty));
                 // Emoji reactions (tapbacks) on this message, hidden when there are none.
                 var reactions = new Label { FontSize = 16 };
                 reactions.SetBinding(Label.TextProperty, nameof(LogEntry.Reactions));
                 reactions.SetBinding(Label.IsVisibleProperty, new Binding(nameof(LogEntry.Reactions), converter: NotEmpty));
-                var cell = new VerticalStackLayout { Padding = new Thickness(6, 4), Spacing = 1, Children = { msg, detail, reactions } };
+                var cell = new VerticalStackLayout { Padding = new Thickness(6, 4), Spacing = 1, Children = { msg, detail, expiry, reactions } };
                 cell.SetBinding(IsVisibleProperty, nameof(LogEntry.Visible));   // the RX filter hides a channel/DM's rows
 
                 // Long-press a message → the same options as the desktop right-click menu. MAUI has no built-in
@@ -129,11 +133,11 @@ public sealed class ChatTabPage : ContentPage
 
         // Live "<used> / <max> · <left> left" counter under the composer (matches the desktop GUI). Turns red over the limit.
         _charCounter = new Label { TextColor = Color.FromArgb("#B0B0B0"), FontSize = 11, HorizontalOptions = LayoutOptions.End, Margin = new Thickness(0, 0, 4, 0) };
-        _sendBtn = new Button { Text = "Send", HeightRequest = 44, Padding = new Thickness(14, 0), VerticalOptions = LayoutOptions.End };
+        _sendBtn = new Button { Text = "Send", MinimumHeightRequest = 44, Padding = new Thickness(14, 0), VerticalOptions = LayoutOptions.End };
         _sendBtn.Clicked += async (_, _) => await SendAsync();
 
         // RX view filter: choose which channels/DMs are shown; the button shows total unread on hidden ones.
-        _rxBtn = new Button { Text = "RX ▾", Padding = new Thickness(10, 0), HeightRequest = 36, FontSize = 13 };
+        _rxBtn = new Button { Text = "RX ▾", Padding = new Thickness(10, 0), MinimumHeightRequest = 36 };
         _rxBtn.Clicked += async (_, _) => { await Navigation.PushModalAsync(new RxFilterPage(_main)); };
 
         var txRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
@@ -147,7 +151,7 @@ public sealed class ChatTabPage : ContentPage
 
         // Reply banner: shows what the next send replies to, with an ✕ to cancel. Hidden unless replying.
         _replyLabel = new Label { TextColor = Color.FromArgb("#B0B0B0"), FontSize = 12, VerticalOptions = LayoutOptions.Center, LineBreakMode = LineBreakMode.TailTruncation };
-        var cancelReply = new Button { Text = "✕", FontSize = 14, Padding = new Thickness(8, 0), HeightRequest = 32, BackgroundColor = Colors.Transparent, TextColor = Color.FromArgb("#E0E0E0") };
+        var cancelReply = new Button { Text = "✕", Padding = new Thickness(8, 0), MinimumHeightRequest = 32, BackgroundColor = Colors.Transparent, TextColor = Color.FromArgb("#E0E0E0") };
         cancelReply.Clicked += (_, _) => _main.CancelReply();
         _replyBanner = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, BackgroundColor = Color.FromArgb("#252526"), Padding = new Thickness(6, 2), IsVisible = false };
         _replyBanner.Add(_replyLabel, 0, 0);

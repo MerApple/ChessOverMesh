@@ -110,7 +110,7 @@ internal sealed class DeviceSettingsWindow : Window
 
         root.Children.Add(_status);
 
-        var closeBtn = new Button { Content = "Close", Width = 80, Height = 26, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 26, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
         closeBtn.Click += (_, _) => Close();
         root.Children.Add(closeBtn);
         return root;
@@ -464,7 +464,7 @@ internal sealed class DeviceSettingsWindow : Window
 
     private UIElement SaveButton(string text, Func<Task<string?>> write)
     {
-        var btn = new Button { Content = text, Height = 26, Width = 130, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        var btn = new Button { Content = text, MinHeight = 26, MinWidth = 130, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
         btn.Click += async (_, _) =>
         {
             if (_busy) return;
@@ -482,13 +482,12 @@ internal sealed class DeviceSettingsWindow : Window
 
     private UIElement ActionButton(string text, string confirm, Func<Task> action, bool doubleConfirm = false)
     {
-        var btn = new Button { Content = text, Height = 26, Width = 140, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
+        var btn = new Button { Content = text, MinHeight = 26, MinWidth = 140, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
         btn.Click += async (_, _) =>
         {
             if (_busy) return;
-            if (MessageBox.Show(this, confirm, text, MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            if (doubleConfirm && MessageBox.Show(this, "Are you absolutely sure? This cannot be undone.", text,
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            if (!ThemedDialog.Confirm(this, confirm, text, defaultYes: true)) return;
+            if (doubleConfirm && !ThemedDialog.Confirm(this, "Are you absolutely sure? This cannot be undone.", text, defaultYes: true)) return;
             _busy = true; SetEnabled(false); _status.Text = $"Sending {text}…";
             try { await action(); _status.Text = $"{text} sent."; }
             catch (Exception ex) { _status.Text = $"{text} failed: {ex.Message}"; }
@@ -507,7 +506,7 @@ internal sealed class DeviceSettingsWindow : Window
     private static FrameworkElement Row(string label, FrameworkElement control)
     {
         var dp = new DockPanel { Margin = new Thickness(0, 3, 0, 3) };
-        var lbl = new TextBlock { Text = label, Foreground = Fg, Width = 150, VerticalAlignment = VerticalAlignment.Center };
+        var lbl = new TextBlock { Text = label, Foreground = Fg, MinWidth = 150, VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(lbl, Dock.Left);
         dp.Children.Add(lbl);
         control.HorizontalAlignment = HorizontalAlignment.Left;
@@ -515,8 +514,8 @@ internal sealed class DeviceSettingsWindow : Window
         return dp;
     }
 
-    private static TextBox Text(int width) => new() { Width = width, Height = 24, HorizontalAlignment = HorizontalAlignment.Left };
-    private static ComboBox Combo(int width) => new() { Width = width, Height = 24, HorizontalAlignment = HorizontalAlignment.Left };
+    private static TextBox Text(int width) => new() { MinWidth = width, MinHeight = 24, HorizontalAlignment = HorizontalAlignment.Left };
+    private static ComboBox Combo(int width) => new() { MinWidth = width, MinHeight = 24, HorizontalAlignment = HorizontalAlignment.Left };
     private static CheckBox Check(string content) => new() { Content = content, Foreground = Fg, VerticalAlignment = VerticalAlignment.Center };
 
     private static uint ParseU(TextBox t, uint fallback) => uint.TryParse(t.Text.Trim(), out var v) ? v : fallback;

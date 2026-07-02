@@ -49,6 +49,20 @@ internal static class AppSettings
         public double ChatSize { get; set; } = 15;
         public string? NodesFont { get; set; }
         public double NodesSize { get; set; } = 13;
+
+        // App-wide text size for buttons and labels (window chrome). Content lists keep their own sizes.
+        // Default 14 matches the built-in style, so it's a no-op until changed.
+        public double UiTextSize { get; set; } = 14;
+
+        // Remembered proxy sign-in credentials, keyed by proxy host. The password is protected via SecretProtector.
+        public Dictionary<string, ProxyCred> ProxyCreds { get; set; } = new();
+    }
+
+    /// <summary>A remembered proxy login: username plus the protected password.</summary>
+    public sealed class ProxyCred
+    {
+        public string User { get; set; } = "";
+        public string Pass { get; set; } = "";   // protected ciphertext
     }
 
     private static readonly string FilePath =
@@ -116,4 +130,22 @@ internal static class AppSettings
     public static double ChatSize { get => Load().ChatSize; set => Mutate(d => d.ChatSize = value); }
     public static string? NodesFont { get => Load().NodesFont; set => Mutate(d => d.NodesFont = value); }
     public static double NodesSize { get => Load().NodesSize; set => Mutate(d => d.NodesSize = value); }
+
+    // App-wide text size for buttons and labels (window chrome). Content lists keep their own sizes.
+    public static double UiTextSize { get => Load().UiTextSize; set => Mutate(d => d.UiTextSize = value); }
+
+    /// <summary>The remembered proxy login for <paramref name="host"/> (password decrypted), or null if none saved.</summary>
+    public static (string User, string Pass)? GetProxyCred(string host)
+    {
+        var c = Load().ProxyCreds.GetValueOrDefault(host);
+        if (c == null) return null;
+        return (c.User, SecretProtector.Unprotect(c.Pass));
+    }
+
+    /// <summary>Remembers a proxy login for <paramref name="host"/> (password protected).</summary>
+    public static void SetProxyCred(string host, string user, string pass) =>
+        Mutate(d => d.ProxyCreds[host] = new ProxyCred { User = user, Pass = SecretProtector.Protect(pass) });
+
+    /// <summary>Forgets the remembered proxy login for <paramref name="host"/>.</summary>
+    public static void ClearProxyCred(string host) => Mutate(d => d.ProxyCreds.Remove(host));
 }

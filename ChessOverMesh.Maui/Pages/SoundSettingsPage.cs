@@ -34,7 +34,7 @@ public sealed class SoundSettingsPage : ContentPage
         root.Add(Section("Chess move sound", _chessPicker, _chessVol));
         root.Add(Section("Chat message sound", _chatPicker, _chatVol));
 
-        var done = new Button { Text = "Done", HeightRequest = 40, Margin = new Thickness(0, 14, 0, 0) };
+        var done = new Button { Text = "Done", MinimumHeightRequest = 40, Margin = new Thickness(0, 14, 0, 0) };
         done.Clicked += OnDone;
         root.Add(done);
 
@@ -46,7 +46,7 @@ public sealed class SoundSettingsPage : ContentPage
         var box = new VerticalStackLayout { Spacing = 4, Margin = new Thickness(0, 6, 0, 6) };
         box.Add(new Label { Text = title, TextColor = Color.FromArgb("#E0E0E0"), FontAttributes = FontAttributes.Bold });
 
-        var test = new Button { Text = "Test", HeightRequest = 36, Padding = new Thickness(10, 0), FontSize = 13 };
+        var test = new Button { Text = "Test", MinimumHeightRequest = 36, Padding = new Thickness(10, 0) };
         test.Clicked += (_, _) =>
         {
             if (picker.SelectedItem is SoundLibrary.Sound s) SoundService.Play(s.Asset, (int)volume.Value);

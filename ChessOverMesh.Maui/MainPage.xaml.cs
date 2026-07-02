@@ -246,6 +246,7 @@ public partial class MainPage : ContentPage
         {
             await CheckPendingAcksAsync();
             TickChatSendCountdown();
+            UpdateExpiryCountdowns();   // live "deletes in …" countdown + self-destruct removal, every second
             if (++_retentionTick >= 60) { _retentionTick = 0; ApplyChatRetention(); }   // auto-delete sweep ~once a minute
         };
         _ackTimer.Start();
@@ -505,14 +506,32 @@ public partial class MainPage : ContentPage
         if (colon > 0 && int.TryParse(rest[(colon + 1)..], out var pv)) { ph = rest[..colon]; pp = pv; }
         if (ph.Length == 0) return "Enter the proxy address, e.g. proxy://192.168.1.50:4403";
 
-        TcpStreamMeshTransport proxy;
-        try { proxy = await TcpStreamMeshTransport.ConnectTlsAsync(ph, pp, TimeSpan.FromSeconds(8)); }
-        catch (Exception ex) { return $"Couldn't reach the proxy at {ph}:{pp} — {ex.Message}"; }
+        // Use the remembered login (if any); if the proxy demands auth we don't have, prompt and retry. A proxy
+        // with no auth connects on the first try and never prompts.
+        TcpStreamMeshTransport? proxy = null;
+        var saved = AppSettings.GetProxyCred(ph);
+        string? user = saved?.User, pass = saved?.Pass;
+        while (proxy == null)
+        {
+            try { proxy = await TcpStreamMeshTransport.ConnectTlsAsync(ph, pp, TimeSpan.FromSeconds(8), user, pass); }
+            catch (ProxyAuthException ax)
+            {
+                var page = new ProxyCredentialsPage(ph, ax.Rejected ? ax.Message : null, user);
+                await Navigation.PushModalAsync(page);
+                var (ok, u, p, remember) = await page.Result;
+                if (Navigation.ModalStack.Contains(page)) await Navigation.PopModalAsync();
+                if (!ok) return "Proxy sign-in cancelled.";
+                user = u; pass = p;
+                if (remember) AppSettings.SetProxyCred(ph, user, pass);
+                else AppSettings.ClearProxyCred(ph);
+            }
+            catch (Exception ex) { return $"Couldn't reach the proxy at {ph}:{pp} — {ex.Message}"; }
+        }
 
         _reconnectBle = null;
         _probeHost = ph; _probePort = pp;
         _isProxy = true;   // a proxy link supports message catch-up (backfill); a direct device does not
-        return await ConnectCoreAsync(() => new MeshtasticHttpClient(proxy), proxyUrl, $"proxy {ph}:{pp}",
+        return await ConnectCoreAsync(() => new MeshtasticHttpClient(proxy!), proxyUrl, $"proxy {ph}:{pp}",
             isIp: true, "Check the proxy is running and reachable.");
     }
 
@@ -560,6 +579,8 @@ public partial class MainPage : ContentPage
             _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) AppSettings.LastHost = cacheKey;
+            // If this device's cache is encrypted, unlock (or delete) it before reading or writing any cache.
+            if (!await EnsureCacheUnlockedAsync(cacheKey)) { Disconnect("Cache locked — connection cancelled."); return "Cache locked — connection cancelled."; }
             DeviceCache.Save(cacheKey, _mesh.GetAvailableChannels(), _mesh.MyNodeNum);
             LoadChannelPrefs(cacheKey, _mesh.GetAvailableChannels());
             result = "Connected.";
@@ -598,8 +619,36 @@ public partial class MainPage : ContentPage
         return result;
     }
 
-    void Disconnect(string statusMessage)
+    /// <summary>If the device's cache is encrypted, loops a password prompt until it unlocks or the user deletes
+    /// the cache. Returns false only if the user cancels (caller aborts the connection).</summary>
+    async Task<bool> EnsureCacheUnlockedAsync(string host)
     {
+        string? err = null;
+        while (DeviceCache.IsEncrypted(host) && !DeviceCache.IsUnlocked(host))
+        {
+            var page = new PasswordPromptPage(err);
+            await Navigation.PushModalAsync(page);
+            var (pw, delete) = await page.Result;
+            if (Navigation.ModalStack.Contains(page)) await Navigation.PopModalAsync();
+            if (delete)
+            {
+                bool ok = await DisplayAlert("Delete cache",
+                    "Delete all cached data for this device and reset its password? This cannot be undone.", "Delete", "Cancel");
+                if (ok) { DeviceCache.ClearDevice(host); return true; }
+                continue;
+            }
+            if (pw == null) return false;   // cancelled / backed out
+            if (DeviceCache.Unlock(host, pw)) return true;
+            err = "Wrong password — try again.";
+        }
+        return true;
+    }
+
+    void Disconnect(string statusMessage, bool forgetCache = true)
+    {
+        // Keep the cache password across a dropped-connection/auto-reconnect (forgetCache:false) so it doesn't
+        // re-prompt on every blip; forget it on a user-initiated disconnect so reconnect asks again.
+        if (forgetCache && _currentHost.Length > 0) DeviceCache.ForgetSession(_currentHost);
         BackgroundConnection.CleanupOnAppClose = null;   // no live link to clean up on app close anymore
         BackgroundConnection.Stop();   // drop the keep-alive foreground service + its ongoing notification
         _pollTimer!.Stop();
@@ -681,6 +730,7 @@ public partial class MainPage : ContentPage
         if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
         RebuildChatTxPicker();
         DeviceCache.PruneChatByRetention(host);   // drop cache messages past their auto-delete age before loading
+        DeviceCache.PruneChatByExpiry(host);      // …and any past their sender-set self-destruct time
         LoadCachedChat(host);
     }
 
@@ -690,10 +740,10 @@ public partial class MainPage : ContentPage
     {
         if (host.Length == 0 || _chat.Count > 0) return;
         var chat = DeviceCache.GetChat(host);
-        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id)>();
+        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt)>();
         foreach (var ch in ReceiveChannels())   // all enabled channels (RX shows everything; the filter hides)
             if (chat.TryGetValue(ch, out var list))
-                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id));
+                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt));
         if (msgs.Count == 0) return;
         foreach (var m in msgs.OrderBy(m => m.Time))
         {
@@ -701,17 +751,22 @@ public partial class MainPage : ContentPage
             e.Channel = m.Channel;
             e.CacheId = m.Id;
             e.Time = m.Time;   // preserve original time for age-based auto-delete
+            if (m.ExpiresAt != default)   // resume the self-destruct countdown for a still-pending message
+            {
+                e.ExpiresAt = m.ExpiresAt;
+                e.Expiry = "🕓 " + ExpiryCountdown(m.ExpiresAt - DateTime.Now);
+            }
         }
         var divider = AddChatLine("──────── saved history above · live messages below ────────", "", Color.FromArgb("#8A8A8A"));
         divider.Channel = uint.MaxValue;
     }
 
     // Caches a chat line (latest 100 per channel) for the current device; returns the stable id stamped on the row.
-    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0)
+    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt });
         return id;
     }
 
@@ -1432,7 +1487,7 @@ public partial class MainPage : ContentPage
         string host = _currentHost;
         var rebuildBle = _reconnectBle;   // Disconnect() leaves this intact so auto-reconnect can rebuild the link
         AddSystem(Stamp() + "— Connection to the device was lost (it may have been turned off, slept, or left the network). —", Palette.Warning, SysCategory.Connection);
-        Disconnect("Connection lost.");
+        Disconnect("Connection lost.", forgetCache: false);   // keep the cache password so auto-reconnect doesn't re-prompt
         // Auto-reconnect works for WiFi (reconnect to the host) and BLE (rebuild the GATT link).
         bool canReconnect = (_transportIsIp && host.Length > 0) || rebuildBle != null;
         if (AppSettings.AutoReconnect && canReconnect)
@@ -1691,6 +1746,10 @@ public partial class MainPage : ContentPage
                 string chan = isDm ? "" : $"{ChannelLabel(msg.Channel)} ";
                 // A resent chat carries a marker prefix; strip it and note "resent" in the metadata instead.
                 string body = msg.Text;
+                // Sender self-destruct header (if any): peel off the chosen lifetime and honour it — the message
+                // deletes itself (screen + cache) once it's this old, counted from when the radio received it.
+                int ttlSeconds = 0;
+                if (ProtocolMessage.TryDecodeChatTtl(body, out var ttlS, out var strippedBody)) { ttlSeconds = ttlS; body = strippedBody; }
                 bool resent = body.StartsWith(ProtocolMessage.ChatResendPrefix, StringComparison.Ordinal);
                 if (resent) body = body.Substring(ProtocolMessage.ChatResendPrefix.Length);
                 string detail = $"{Stamp()}{chan}{sig}".Trim();   // dim metadata line under the message
@@ -1707,8 +1766,17 @@ public partial class MainPage : ContentPage
                 LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : Palette.Normal, msg);
                 entry.ChatNameBody = sentDmFromUs ? null : bodyPart;   // outgoing DMs aren't re-rendered (the prefix differs)
                 entry.Channel = msg.Channel;
+                // Honour the sender's self-destruct: expiry is counted from the radio's receive time (falls back to
+                // now), so an old backfilled message already past its lifetime is dropped on the next sweep.
+                DateTime rxLocal = msg.RxTime != 0 ? DateTimeOffset.FromUnixTimeSeconds(msg.RxTime).LocalDateTime : DateTime.Now;
+                DateTime expiresAt = (ttlSeconds > 0 && !msg.DecryptFailed) ? rxLocal.AddSeconds(ttlSeconds) : default;
+                if (expiresAt != default)
+                {
+                    entry.ExpiresAt = expiresAt;
+                    entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now);
+                }
                 TrimChatChannel(msg.Channel);   // cap on-screen rows per channel
-                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime);   // persist (latest N per channel)
+                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt);   // persist (latest N per channel)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
                 // instead of notifying (so a hidden conversation just shows a badge in the RX list).
                 bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
@@ -1868,9 +1936,14 @@ public partial class MainPage : ContentPage
         if (wait > TimeSpan.Zero)
             return $"Just acknowledged an incoming message — you can send in {Math.Ceiling(wait.TotalSeconds):0}s.";
 
+        // Sender self-destruct: if this channel has a send-TTL set, ride the chosen lifetime (seconds) in the wire
+        // text so every receiver — and our own copy — deletes it after that. The displayed/cached text stays clean.
+        int ttlSeconds = (_currentHost.Length > 0 ? DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel) : 0) * 60;
+        string wireText = ProtocolMessage.EncodeChatTtl(ttlSeconds, text);
+
         string key = _mesh.GetChannelKey(_chatTxChannel);
         bool encrypted = key.Length > 0;
-        int wireLen = (encrypted ? AesText.Encrypt(text, key) : text).Length;
+        int wireLen = (encrypted ? AesText.Encrypt(wireText, key) : wireText).Length;
         if (wireLen > MaxChatChars)
             return $"Message is too long: {wireLen}/{MaxChatChars} chars{(encrypted ? " (once encrypted)" : "")}.";
 
@@ -1893,14 +1966,21 @@ public partial class MainPage : ContentPage
         // channel broadcast is confirmed by overhearing a relay. Either way we hold "in flight" until confirmed.
         bool relayConfirm = isDm || !_chatAckOn.Contains(_chatTxChannel);
         var entry = AddChatLine(msgLine, detailBase + MarkSending, Palette.Pending);
+        // Start our own copy's self-destruct countdown immediately (before the ack) so it's visible right away.
+        DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
+        if (ttlSeconds > 0)
+        {
+            entry.ExpiresAt = expiresAt;
+            entry.Expiry = "🕓 " + ExpiryCountdown(TimeSpan.FromSeconds(ttlSeconds));
+        }
         try
         {
-            uint id = await _mesh.SendTextAsync(text, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
+            uint id = await _mesh.SendTextAsync(wireText, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
             entry.PacketId = id;          // so this sent message can itself be replied to / reacted to
             entry.Channel = _chatTxChannel;
             TrimChatChannel(_chatTxChannel);   // cap on-screen rows per channel
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);   // hide if its target is filtered out
-            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase);   // persist (latest 100 per channel)
+            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt);   // persist (latest 100 per channel)
             _chatEntryById[id] = entry;   // so reactions can attach to this row
             _pending[id] = new PendingSend { Id = id, Payload = text, LastSentUtc = DateTime.UtcNow, Attempts = 1, IsChat = true, IsRelayConfirm = relayConfirm, IsDm = isDm, Channel = _chatTxChannel, Label = isDm ? $"direct message to {dmName}" : "chat message", Entry = entry, BaseText = detailBase,
                 // Latest moment we'll still be waiting if nothing is heard (MaxSendAttempts windows of AckTimeout
@@ -3015,7 +3095,7 @@ public partial class MainPage : ContentPage
         {
             var e = _chat[i];
             if (e.Time == default) continue;
-            if (retention.TryGetValue(e.Channel, out var hrs) && hrs > 0 && e.Time < now.AddHours(-hrs))
+            if (retention.TryGetValue(e.Channel, out var mins) && mins > 0 && e.Time < now.AddMinutes(-mins))
                 _chat.RemoveAt(i);
         }
     }
@@ -3026,7 +3106,40 @@ public partial class MainPage : ContentPage
     {
         if (_currentHost.Length == 0) return;
         DeviceCache.PruneChatByRetention(_currentHost);
+        DeviceCache.PruneChatByExpiry(_currentHost);
         PruneChatRam();
+    }
+
+    /// <summary>Formats a self-destruct countdown for the dim line: "deletes in 1h 05m" / "deletes in 9:58" /
+    /// "deletes in 8s".</summary>
+    static string ExpiryCountdown(TimeSpan left)
+    {
+        if (left < TimeSpan.Zero) left = TimeSpan.Zero;
+        if (left.TotalHours >= 1) return $"deletes in {(int)left.TotalHours}h {left.Minutes:00}m";
+        if (left.TotalMinutes >= 1) return $"deletes in {left.Minutes}:{left.Seconds:00}";
+        return $"deletes in {left.Seconds}s";
+    }
+
+    /// <summary>Refreshes the live "deletes in …" countdown on every expiring chat row, and removes rows (screen +
+    /// cache) whose sender-set self-destruct time has passed. Runs each second from the ack timer.</summary>
+    void UpdateExpiryCountdowns()
+    {
+        var now = DateTime.Now;
+        for (int i = _chat.Count - 1; i >= 0; i--)
+        {
+            var e = _chat[i];
+            if (e.ExpiresAt is not DateTime exp) continue;
+            if (now >= exp)
+            {
+                // Screen-only removal — no disk I/O in this per-second loop. The cache copy is dropped by the
+                // batched PruneChatByExpiry (the ~60 s retention sweep) and again on the next connect (which prunes
+                // before loading), so an expired message can never reappear even if its cache row lingers briefly.
+                _chat.RemoveAt(i);
+                continue;
+            }
+            string wanted = "🕓 " + ExpiryCountdown(exp - now);
+            if (e.Expiry != wanted) e.Expiry = wanted;
+        }
     }
 
     /// <summary>Channels for the connected device (live), else the cached list for the last device. For settings UIs.</summary>

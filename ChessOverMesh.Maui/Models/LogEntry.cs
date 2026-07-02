@@ -61,6 +61,20 @@ public sealed class LogEntry : INotifyPropertyChanged
     // Wall-clock time this chat row represents (for age-based auto-delete). default = unknown (never pruned).
     public DateTime Time;
 
+    // Sender-set self-destruct time for this row (local wall-clock); null = no expiry. When set, the row shows a
+    // live "deletes in …" countdown and is removed (screen + cache) once reached.
+    public DateTime? ExpiresAt;
+
+    // The live "🕓 deletes in …" countdown line, shown dim under the message on its own line (kept separate from
+    // Detail so the sending/delivered marks that mutate Detail don't fight the per-second countdown). Empty = none.
+    private string _expiry = "";
+    public string Expiry
+    {
+        get => _expiry;
+        set { _expiry = value; PropertyChanged?.Invoke(this, ExpiryArgs); }
+    }
+    private static readonly PropertyChangedEventArgs ExpiryArgs = new(nameof(Expiry));
+
     // Stable id of this row's cached copy, so "Remove message" can delete it from the cache too. Null if uncached.
     public string? CacheId;
 

@@ -195,7 +195,7 @@ public sealed class DeviceConfigPage : ContentPage
         _body.Add(ActionButton("NodeDB reset", "Clear the device's node database? It will forget all known nodes.", () => _mesh.NodeDbResetAsync()));
         _body.Add(ActionButton("Factory reset", "FACTORY RESET the device? This erases ALL settings and channels and cannot be undone.", () => _mesh.FactoryResetAsync(), doubleConfirm: true));
 
-        var closeBtn = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 12, 0, 0) };
+        var closeBtn = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 12, 0, 0) };
         closeBtn.Clicked += async (_, _) => await CloseAsync();
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 8 };
@@ -427,7 +427,7 @@ public sealed class DeviceConfigPage : ContentPage
 
     View SaveButton(string text, Func<Task<string?>> write)
     {
-        var btn = new Button { Text = text, HeightRequest = 40, HorizontalOptions = LayoutOptions.End, Margin = new Thickness(0, 6, 0, 0) };
+        var btn = new Button { Text = text, MinimumHeightRequest = 40, HorizontalOptions = LayoutOptions.End, Margin = new Thickness(0, 6, 0, 0) };
         btn.Clicked += async (_, _) =>
         {
             if (_busy || !_loaded) return;
@@ -445,7 +445,7 @@ public sealed class DeviceConfigPage : ContentPage
 
     View ActionButton(string text, string confirm, Func<Task> action, bool doubleConfirm = false)
     {
-        var btn = new Button { Text = text, HeightRequest = 40, HorizontalOptions = LayoutOptions.Start, Margin = new Thickness(0, 4, 0, 0) };
+        var btn = new Button { Text = text, MinimumHeightRequest = 40, HorizontalOptions = LayoutOptions.Start, Margin = new Thickness(0, 4, 0, 0) };
         btn.Clicked += async (_, _) =>
         {
             if (_busy || !_loaded) return;

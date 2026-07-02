@@ -14,10 +14,10 @@ internal sealed class SoundSettingsWindow : Window
     private static readonly Brush Fg = new SolidColorBrush(Color.FromRgb(0xE0, 0xE0, 0xE0));
     private static readonly Brush Dim = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0));
 
-    private readonly ComboBox _chessCombo = new() { Width = 200, Height = 24 };
-    private readonly ComboBox _chatCombo = new() { Width = 200, Height = 24 };
-    private readonly Slider _chessVol = new() { Width = 160, Minimum = 0, Maximum = 100, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Slider _chatVol = new() { Width = 160, Minimum = 0, Maximum = 100, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ComboBox _chessCombo = new() { MinWidth = 200, MinHeight = 24 };
+    private readonly ComboBox _chatCombo = new() { MinWidth = 200, MinHeight = 24 };
+    private readonly Slider _chessVol = new() { MinWidth = 160, Minimum = 0, Maximum = 100, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Slider _chatVol = new() { MinWidth = 160, Minimum = 0, Maximum = 100, VerticalAlignment = VerticalAlignment.Center };
     private readonly MediaPlayer _preview = new();
 
     public string ChessSoundPath { get; private set; }
@@ -59,7 +59,7 @@ internal sealed class SoundSettingsWindow : Window
         root.Children.Add(Section("Chess move sound", _chessCombo, _chessVol, () => Preview(_chessCombo, _chessVol)));
         root.Children.Add(Section("Chat message sound", _chatCombo, _chatVol, () => Preview(_chatCombo, _chatVol)));
 
-        var done = new Button { Content = "Done", Width = 80, Height = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+        var done = new Button { Content = "Done", MinWidth = 80, MinHeight = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         done.Click += Done_Click;
         root.Children.Add(done);
         return root;
@@ -73,7 +73,7 @@ internal sealed class SoundSettingsWindow : Window
         var row = new WrapPanel();
         row.Children.Add(new TextBlock { Text = "Sound:", Foreground = Fg, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
         row.Children.Add(combo);
-        var testBtn = new Button { Content = "Test", Width = 56, Height = 24, Margin = new Thickness(8, 0, 0, 0) };
+        var testBtn = new Button { Content = "Test", MinWidth = 56, MinHeight = 24, Margin = new Thickness(8, 0, 0, 0) };
         testBtn.Click += (_, _) => test();
         row.Children.Add(testBtn);
         panel.Children.Add(row);

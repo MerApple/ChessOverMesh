@@ -35,7 +35,7 @@ public sealed class DeviceTabPage : ContentPage
         BackgroundColor = Color.FromArgb("#1E1E1E");
 
         _status = new Label { Text = "Not connected.", TextColor = Dim, FontSize = 12 };
-        _disconnectBtn = new Button { Text = "Disconnect", HeightRequest = 44, Padding = new Thickness(14, 0), IsVisible = false };
+        _disconnectBtn = new Button { Text = "Disconnect", MinimumHeightRequest = 44, Padding = new Thickness(14, 0), IsVisible = false };
         _disconnectBtn.Clicked += OnDisconnect;
 
         // ---- Connected-device info ----
@@ -62,7 +62,7 @@ public sealed class DeviceTabPage : ContentPage
 
         // Opens the device configuration editor (owner/role, LoRa, position, telemetry, reboot/resets) — the
         // MAUI equivalent of the desktop "Device settings…" window. Enabled once connected and synced.
-        _deviceSettingsBtn = new Button { Text = "Device settings…", HeightRequest = 44, Padding = new Thickness(14, 0), IsVisible = false };
+        _deviceSettingsBtn = new Button { Text = "Device settings…", MinimumHeightRequest = 44, Padding = new Thickness(14, 0), IsVisible = false };
         _deviceSettingsBtn.Clicked += (_, _) => _main.OpenDeviceSettings();
 
         // ---- WiFi (HTTP) ----
@@ -71,7 +71,7 @@ public sealed class DeviceTabPage : ContentPage
             Text = string.IsNullOrWhiteSpace(AppSettings.LastHost) ? "http://192.168.2.183" : AppSettings.LastHost,
             TextColor = Fg, Keyboard = Keyboard.Url, Placeholder = "http://192.168.x.x",
         };
-        _findBtn = new Button { Text = "Find", HeightRequest = 40, Padding = new Thickness(12, 0) };
+        _findBtn = new Button { Text = "Find", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         _findBtn.Clicked += OnFind;
         var hostRow = new Grid
         {
@@ -81,18 +81,18 @@ public sealed class DeviceTabPage : ContentPage
         hostRow.Add(new Label { Text = "Host", TextColor = Dim, VerticalOptions = LayoutOptions.Center }, 0, 0);
         hostRow.Add(_host, 1, 0);
         hostRow.Add(_findBtn, 2, 0);
-        _wifiBtn = new Button { Text = "Connect over WiFi", HeightRequest = 44, Padding = new Thickness(14, 0) };
+        _wifiBtn = new Button { Text = "Connect over WiFi", MinimumHeightRequest = 44, Padding = new Thickness(14, 0) };
         _wifiBtn.Clicked += OnWifiConnect;
 
         // ---- Bluetooth LE (experimental) ----
-        _scanBtn = new Button { Text = "Scan", HeightRequest = 40, Padding = new Thickness(12, 0) };
+        _scanBtn = new Button { Text = "Scan", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         _scanBtn.Clicked += OnScan;
         _blePicker = new Picker
         {
             Title = "Discovered radios", TextColor = Fg, BackgroundColor = Color.FromArgb("#1E1E1E"),
             ItemDisplayBinding = new Binding(nameof(BleDeviceInfo.Name)),
         };
-        _bleBtn = new Button { Text = "Connect over Bluetooth", HeightRequest = 44, Padding = new Thickness(14, 0) };
+        _bleBtn = new Button { Text = "Connect over Bluetooth", MinimumHeightRequest = 44, Padding = new Thickness(14, 0) };
         _bleBtn.Clicked += OnBleConnect;
 
         var stack = new VerticalStackLayout { Padding = 16, Spacing = 12 };

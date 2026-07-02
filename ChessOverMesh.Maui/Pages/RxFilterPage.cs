@@ -21,14 +21,14 @@ public sealed class RxFilterPage : ContentPage
         Title = "Show channels & DMs";
         BackgroundColor = Bg;
 
-        var allBtn = new Button { Text = "All", HeightRequest = 38, Padding = new Thickness(14, 0) };
+        var allBtn = new Button { Text = "All", MinimumHeightRequest = 38, Padding = new Thickness(14, 0) };
         allBtn.Clicked += (_, _) => { _main.ShowAllRx(); Build(); };
-        var noneBtn = new Button { Text = "None", HeightRequest = 38, Padding = new Thickness(14, 0) };
+        var noneBtn = new Button { Text = "None", MinimumHeightRequest = 38, Padding = new Thickness(14, 0) };
         noneBtn.Clicked += (_, _) => { _main.HideAllRx(); Build(); };
         var btns = new HorizontalStackLayout { Spacing = 8 };
         btns.Add(allBtn); btns.Add(noneBtn);
 
-        var close = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 12, 0, 0) };
+        var close = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 12, 0, 0) };
         close.Clicked += async (_, _) => await Navigation.PopModalAsync();
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 10 };
@@ -57,7 +57,7 @@ public sealed class RxFilterPage : ContentPage
             var label = new Label { Text = target.Label, TextColor = Fg, VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Start };
             int unread = _main.RxUnread(target.IsDm, target.Id);
             var badge = new Label { Text = unread > 0 ? $"●{unread}" : "", TextColor = Badge, VerticalOptions = LayoutOptions.Center };
-            var del = new Button { Text = "🗑", FontSize = 15, Padding = new Thickness(8, 0), HeightRequest = 34, BackgroundColor = Colors.Transparent, TextColor = Fg };
+            var del = new Button { Text = "🗑", Padding = new Thickness(8, 0), MinimumHeightRequest = 34, BackgroundColor = Colors.Transparent, TextColor = Fg };
             del.Clicked += async (_, _) => await DeletePromptAsync(target);
 
             // [switch] [label …grows…] [badge] [delete]

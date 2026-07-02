@@ -29,9 +29,9 @@ public sealed class TraceroutePage : ContentPage
         _status = new Label { TextColor = Dim, FontSize = 12 };
         _hops = new Label { TextColor = Fg, FontFamily = "monospace", FontSize = 13 };
 
-        var copy = new Button { Text = "Copy", HeightRequest = 40, Padding = new Thickness(12, 0) };
+        var copy = new Button { Text = "Copy", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         copy.Clicked += async (_, _) => await Clipboard.SetTextAsync($"{_header.Text}\n{_status.Text}\n{_hops.Text}");
-        var close = new Button { Text = "Close", HeightRequest = 40, Padding = new Thickness(12, 0) };
+        var close = new Button { Text = "Close", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         close.Clicked += async (_, _) => await Navigation.PopModalAsync();
         var btns = new Grid { ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) } };
         btns.Add(new BoxView { Color = Colors.Transparent }, 0, 0);

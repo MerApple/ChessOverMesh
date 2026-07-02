@@ -50,6 +50,7 @@ internal static class DeviceCache
         public DateTime Time { get; set; }
         public string? Id { get; set; }   // stable id so a single message can be removed from the cache (null for legacy entries)
         public uint RxTime { get; set; }  // the message's device rx_time (epoch s, 0 if unknown), for proxy catch-up
+        public DateTime ExpiresAt { get; set; }   // sender-set self-destruct time (local); default = never expires
     }
 
     /// <summary>A cached node position (decimal degrees), persisted so the map shows last-known locations.</summary>
@@ -96,7 +97,17 @@ internal static class DeviceCache
         public Dictionary<uint, List<ChatMessage>> Chat { get; set; } = new();
 
         // Per-channel auto-delete age (channel index → hours to keep; absent/0 = keep forever).
+        // Legacy: retention is now stored in ChannelRetentionMinutes; a value here is read as hours*60 unless the
+        // minutes map overrides it (kept only so pre-existing hour settings survive an upgrade).
         public Dictionary<uint, int> ChannelRetentionHours { get; set; } = new();
+
+        // Per-channel receiver auto-delete age in minutes (channel index → minutes; absent/0 = keep forever).
+        // Supersedes ChannelRetentionHours for any channel present here.
+        public Dictionary<uint, int> ChannelRetentionMinutes { get; set; } = new();
+
+        // Per-channel sender self-destruct: when sending on this channel, stamp outgoing messages to auto-delete
+        // after this many minutes on every receiver (and locally). Channel index → minutes; absent/0 = off.
+        public Dictionary<uint, int> ChannelSendTtlMinutes { get; set; } = new();
 
         // Channel selections: which channel chess uses, which channels chat listens to, and the chat TX channel.
         public uint? ChessChannel { get; set; }
@@ -125,16 +136,137 @@ internal static class DeviceCache
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ChessOverMesh", "devices.json");
 
-    private static Dictionary<string, Entry> Load()
+    // ---- Optional per-device AES encryption ----------------------------------------------------------------
+    // The file is Dictionary<string, Stored>: each device is either plaintext (Data) or encrypted (Verifier +
+    // Cipher, AES via AesText keyed on the device password). The password is NEVER persisted — it's held in
+    // memory for the session once the user unlocks (or sets) it. A locked device (encrypted, no session
+    // password) is omitted from Load() until unlocked; the connect flow prompts before any cache read.
+    private sealed class Stored
+    {
+        public Entry? Data { get; set; }        // plaintext (no password)
+        public string? Verifier { get; set; }   // AesText.Encrypt(VerifierToken, password) — checks the password
+        public string? Cipher { get; set; }      // AesText.Encrypt(JSON(Entry), password) — the encrypted entry
+    }
+
+    private const string VerifierToken = "ChessOverMesh cache v1";
+    private static readonly Dictionary<string, string> _passwords = new();   // host -> password (this session only)
+    // Hosts we've legitimately handled this session (unlocked, or had their password set/removed). Persist only
+    // writes plaintext over an on-disk encrypted blob for a host in this set — so a stray write for a locked
+    // device can never clobber its encrypted cache.
+    private static readonly HashSet<string> _unlocked = new();
+
+    // Reads the raw on-disk map, migrating an old Dictionary<string,Entry> file (raw Entry per host) transparently.
+    private static Dictionary<string, Stored> LoadRaw()
     {
         try
         {
-            if (File.Exists(FilePath))
-                return JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(FilePath))
-                       ?? new Dictionary<string, Entry>();
+            if (!File.Exists(FilePath)) return new();
+            var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText(FilePath));
+            if (raw == null) return new();
+            var result = new Dictionary<string, Stored>();
+            foreach (var (host, el) in raw)
+            {
+                if (el.ValueKind != JsonValueKind.Object) continue;
+                bool wrapper = el.TryGetProperty("Data", out _) || el.TryGetProperty("Cipher", out _) || el.TryGetProperty("Verifier", out _);
+                result[host] = wrapper ? (el.Deserialize<Stored>() ?? new Stored())
+                                       : new Stored { Data = el.Deserialize<Entry>() };   // legacy raw Entry
+            }
+            return result;
         }
-        catch { /* ignore a corrupt/unreadable cache */ }
-        return new Dictionary<string, Entry>();
+        catch { return new(); }
+    }
+
+    private static void WriteRaw(Dictionary<string, Stored> raw)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        File.WriteAllText(FilePath, JsonSerializer.Serialize(raw, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    /// <summary>True when this device's cache is encrypted on disk.</summary>
+    public static bool IsEncrypted(string host) =>
+        LoadRaw().TryGetValue(host, out var s) && (s.Verifier != null || s.Cipher != null);
+
+    /// <summary>True when this device's password is known for this session (or it isn't encrypted).</summary>
+    public static bool IsUnlocked(string host) => _passwords.ContainsKey(host);
+
+    /// <summary>Verifies a password against the device's stored verifier; stores it for the session on success.</summary>
+    public static bool Unlock(string host, string password)
+    {
+        var raw = LoadRaw();
+        if (!raw.TryGetValue(host, out var s) || s.Verifier == null) return true;   // not encrypted — nothing to unlock
+        if (AesText.TryDecrypt(s.Verifier, password, out var token) && token == VerifierToken)
+        {
+            _passwords[host] = password;
+            _unlocked.Add(host);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Enables/changes (non-empty) or disables (empty) cache encryption for a device, re-persisting now.</summary>
+    public static void SetPassword(string host, string password)
+    {
+        var all = Load();
+        _unlocked.Add(host);   // authorised — Persist may rewrite this host (encrypted or plaintext)
+        if (string.IsNullOrEmpty(password)) _passwords.Remove(host);
+        else _passwords[host] = password;
+        if (!all.ContainsKey(host)) all[host] = new Entry();   // ensure it's written in the chosen form
+        Persist(all);
+    }
+
+    /// <summary>Wipes a device's cached data and resets it to unencrypted (the "delete cache / forgot password" reset).</summary>
+    public static void ClearDevice(string host)
+    {
+        _passwords.Remove(host);
+        _unlocked.Remove(host);
+        var raw = LoadRaw();
+        if (raw.Remove(host)) WriteRaw(raw);
+    }
+
+    /// <summary>Drops a device's session password + authorisation (call on user disconnect so reconnect re-prompts).</summary>
+    public static void ForgetSession(string host)
+    {
+        _passwords.Remove(host);
+        _unlocked.Remove(host);
+    }
+
+    private static Dictionary<string, Entry> Load()
+    {
+        var result = new Dictionary<string, Entry>();
+        foreach (var (host, s) in LoadRaw())
+        {
+            if (s.Data != null) { result[host] = s.Data; continue; }          // plaintext
+            if (s.Verifier == null && s.Cipher == null) continue;             // empty/unknown
+            if (!_passwords.TryGetValue(host, out var pw)) continue;          // encrypted + locked → omit
+            if (s.Cipher == null) { result[host] = new Entry(); continue; }   // encrypted, enabled, no data yet
+            if (AesText.TryDecrypt(s.Cipher, pw, out var json))
+                try { if (JsonSerializer.Deserialize<Entry>(json) is { } e) result[host] = e; } catch { }
+        }
+        return result;
+    }
+
+    // Writes `all` back, preserving locked hosts' encrypted blobs and encrypting hosts with a session password.
+    private static void Persist(Dictionary<string, Entry> all)
+    {
+        try
+        {
+            var raw = LoadRaw();   // keep locked hosts' Stored blobs (they're absent from `all`)
+            foreach (var (host, entry) in all)
+            {
+                if (_passwords.TryGetValue(host, out var pw) && !string.IsNullOrEmpty(pw))
+                    raw[host] = new Stored
+                    {
+                        Verifier = AesText.Encrypt(VerifierToken, pw),
+                        Cipher = AesText.Encrypt(JsonSerializer.Serialize(entry), pw),
+                    };
+                else if (raw.TryGetValue(host, out var ex) && (ex.Verifier != null || ex.Cipher != null) && !_unlocked.Contains(host))
+                    continue;   // encrypted on disk and not authorised this session — never clobber it with plaintext
+                else
+                    raw[host] = new Stored { Data = entry };
+            }
+            WriteRaw(raw);
+        }
+        catch { /* best effort */ }
     }
 
     public static Entry? Get(string host)
@@ -194,7 +326,9 @@ internal static class DeviceCache
                 NodePrefs = existing?.NodePrefs ?? new Dictionary<uint, NodePrefs>(),     // preserve DM/Block flags
                 Telemetry = existing?.Telemetry ?? new Dictionary<uint, List<TelemetryReading>>(),   // preserve telemetry history
                 Chat = existing?.Chat ?? new Dictionary<uint, List<ChatMessage>>(),                  // preserve chat history
-                ChannelRetentionHours = existing?.ChannelRetentionHours ?? new Dictionary<uint, int>(),   // preserve retention
+                ChannelRetentionHours = existing?.ChannelRetentionHours ?? new Dictionary<uint, int>(),   // preserve retention (legacy)
+                ChannelRetentionMinutes = existing?.ChannelRetentionMinutes ?? new Dictionary<uint, int>(),   // preserve retention
+                ChannelSendTtlMinutes = existing?.ChannelSendTtlMinutes ?? new Dictionary<uint, int>(),  // preserve send TTLs
                 // Preserve channel selections across a channel-list save.
                 ChessChannel = existing?.ChessChannel,
                 ChatListen = existing?.ChatListen ?? new List<uint>(),
@@ -204,8 +338,7 @@ internal static class DeviceCache
                 ChatAckSignalOn = existing?.ChatAckSignalOn ?? new List<uint>(),
                 AckTriggers = existing?.AckTriggers ?? new Dictionary<uint, List<string>>(),
             };
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* caching is best-effort */ }
     }
@@ -234,8 +367,7 @@ internal static class DeviceCache
             entry.ChatListen = chatListen.Distinct().OrderBy(i => i).ToList();
             entry.ChatTxChannel = chatTxChannel;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -253,8 +385,7 @@ internal static class DeviceCache
             var entry = all.GetValueOrDefault(host) ?? new Entry();
             entry.UtilityChannel = channel;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -275,8 +406,7 @@ internal static class DeviceCache
             if (!dm && !block) entry.NodePrefs.Remove(nodeNum);
             else entry.NodePrefs[nodeNum] = new NodePrefs { Dm = dm, Block = block };
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -302,8 +432,7 @@ internal static class DeviceCache
             entry.NodePrefs.Remove(nodeNum);
             entry.Telemetry.Remove(nodeNum);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -321,8 +450,7 @@ internal static class DeviceCache
             var entry = all.GetValueOrDefault(host) ?? new Entry();
             entry.ChannelOptions[index] = options;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -340,8 +468,7 @@ internal static class DeviceCache
             var entry = all.GetValueOrDefault(host) ?? new Entry();
             entry.Positions = positions.ToDictionary(kv => kv.Key, kv => new CachedPosition { Lat = kv.Value.Lat, Lon = kv.Value.Lon, LastHeard = kv.Value.LastHeard, PosTime = kv.Value.PosTime });
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -361,8 +488,7 @@ internal static class DeviceCache
             if (list.Count == 0) entry.Telemetry.Remove(nodeNum);
             else entry.Telemetry[nodeNum] = list;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -388,14 +514,17 @@ internal static class DeviceCache
             int cap = AppSettings.ChatMessageLimit;
             if (cap > 0 && list.Count > cap) list.RemoveRange(0, list.Count - cap);
             // Age cap for this channel (per-device), if set.
-            if (entry.ChannelRetentionHours.TryGetValue(channel, out var hrs) && hrs > 0)
+            int retMins = EffectiveRetentionMinutes(entry, channel);
+            if (retMins > 0)
             {
-                var cutoff = DateTime.Now.AddHours(-hrs);
+                var cutoff = DateTime.Now.AddMinutes(-retMins);
                 list.RemoveAll(m => m.Time != default && m.Time < cutoff);
             }
+            // Sender self-destruct: drop any message whose expiry has already passed.
+            var expiryNow = DateTime.Now;
+            list.RemoveAll(m => m.ExpiresAt != default && m.ExpiresAt <= expiryNow);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -416,8 +545,7 @@ internal static class DeviceCache
             if (idx < 0) return;
             list.RemoveAt(idx);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -431,28 +559,48 @@ internal static class DeviceCache
             var entry = all.GetValueOrDefault(host);
             if (entry == null || !entry.Chat.Remove(channel)) return;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
 
-    /// <summary>Per-channel auto-delete age for a device (channel index → hours; empty if none set).</summary>
-    public static IReadOnlyDictionary<uint, int> GetChannelRetention(string host) =>
-        Load().GetValueOrDefault(host)?.ChannelRetentionHours ?? new Dictionary<uint, int>();
+    /// <summary>A channel's effective receiver auto-delete age in minutes: the minutes setting if present, else the
+    /// legacy hours setting (×60), else 0 (keep forever).</summary>
+    private static int EffectiveRetentionMinutes(Entry e, uint channel)
+    {
+        if (e.ChannelRetentionMinutes.TryGetValue(channel, out var mins) && mins > 0) return mins;
+        if (e.ChannelRetentionHours.TryGetValue(channel, out var hrs) && hrs > 0) return hrs * 60;
+        return 0;
+    }
 
-    /// <summary>Sets a channel's auto-delete age (hours; 0/negative removes it = keep forever).</summary>
-    public static void SetChannelRetention(string host, uint channel, int hours)
+    /// <summary>Per-channel receiver auto-delete age for a device (channel index → minutes; empty if none set).
+    /// Merges the minutes setting with any legacy hours setting (minutes wins).</summary>
+    public static IReadOnlyDictionary<uint, int> GetChannelRetention(string host)
+    {
+        var entry = Load().GetValueOrDefault(host);
+        var result = new Dictionary<uint, int>();
+        if (entry == null) return result;
+        foreach (var ch in entry.ChannelRetentionHours.Keys.Concat(entry.ChannelRetentionMinutes.Keys).Distinct())
+        {
+            int mins = EffectiveRetentionMinutes(entry, ch);
+            if (mins > 0) result[ch] = mins;
+        }
+        return result;
+    }
+
+    /// <summary>Sets a channel's receiver auto-delete age (minutes; 0/negative removes it = keep forever). Also
+    /// clears any legacy hours entry for the channel so the minutes value is authoritative.</summary>
+    public static void SetChannelRetention(string host, uint channel, int minutes)
     {
         try
         {
             var all = Load();
             var entry = all.GetValueOrDefault(host) ?? new Entry();
-            if (hours > 0) entry.ChannelRetentionHours[channel] = hours;
-            else entry.ChannelRetentionHours.Remove(channel);
+            entry.ChannelRetentionHours.Remove(channel);   // superseded by the minutes value
+            if (minutes > 0) entry.ChannelRetentionMinutes[channel] = minutes;
+            else entry.ChannelRetentionMinutes.Remove(channel);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -464,20 +612,66 @@ internal static class DeviceCache
         {
             var all = Load();
             var entry = all.GetValueOrDefault(host);
-            if (entry == null || entry.ChannelRetentionHours.Count == 0) return;
+            if (entry == null) return;
+            var channels = entry.ChannelRetentionHours.Keys.Concat(entry.ChannelRetentionMinutes.Keys).Distinct().ToList();
+            if (channels.Count == 0) return;
             bool changed = false;
-            foreach (var (channel, hrs) in entry.ChannelRetentionHours)
+            foreach (var channel in channels)
             {
-                if (hrs <= 0 || !entry.Chat.TryGetValue(channel, out var list)) continue;
-                var cutoff = DateTime.Now.AddHours(-hrs);
+                int mins = EffectiveRetentionMinutes(entry, channel);
+                if (mins <= 0 || !entry.Chat.TryGetValue(channel, out var list)) continue;
+                var cutoff = DateTime.Now.AddMinutes(-mins);
                 int removed = list.RemoveAll(m => m.Time != default && m.Time < cutoff);
                 if (removed > 0) changed = true;
                 if (list.Count == 0) { entry.Chat.Remove(channel); changed = true; }
             }
             if (!changed) return;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Deletes cached chat messages whose sender-set self-destruct time has passed (any channel).</summary>
+    public static void PruneChatByExpiry(string host)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host);
+            if (entry == null || entry.Chat.Count == 0) return;
+            var now = DateTime.Now;
+            bool changed = false;
+            foreach (var channel in entry.Chat.Keys.ToList())
+            {
+                var list = entry.Chat[channel];
+                int removed = list.RemoveAll(m => m.ExpiresAt != default && m.ExpiresAt <= now);
+                if (removed > 0) changed = true;
+                if (list.Count == 0) { entry.Chat.Remove(channel); changed = true; }
+            }
+            if (!changed) return;
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>Per-channel sender self-destruct minutes for a device (channel index → minutes; empty if none set).</summary>
+    public static IReadOnlyDictionary<uint, int> GetChannelSendTtl(string host) =>
+        Load().GetValueOrDefault(host)?.ChannelSendTtlMinutes ?? new Dictionary<uint, int>();
+
+    /// <summary>Sets a channel's sender self-destruct minutes (outgoing messages auto-delete after this on every
+    /// receiver and locally). 0/negative removes it (= don't stamp a lifetime).</summary>
+    public static void SetChannelSendTtl(string host, uint channel, int minutes)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            if (minutes > 0) entry.ChannelSendTtlMinutes[channel] = minutes;
+            else entry.ChannelSendTtlMinutes.Remove(channel);
+            all[host] = entry;
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -492,8 +686,7 @@ internal static class DeviceCache
             foreach (var entry in all.Values)
                 if (entry.Chat.Count > 0) { entry.Chat.Clear(); changed = true; }
             if (!changed) return;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -526,8 +719,7 @@ internal static class DeviceCache
             if (enabled) { if (!entry.ChatAckOn.Contains(channelIndex)) entry.ChatAckOn.Add(channelIndex); }
             else entry.ChatAckOn.Remove(channelIndex);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -550,8 +742,7 @@ internal static class DeviceCache
             if (enabled) { if (!entry.ChatAckSignalOn.Contains(channelIndex)) entry.ChatAckSignalOn.Add(channelIndex); }
             else entry.ChatAckSignalOn.Remove(channelIndex);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -575,8 +766,7 @@ internal static class DeviceCache
             if (list.Count == 0) entry.AckTriggers.Remove(channelIndex);
             else entry.AckTriggers[channelIndex] = list;
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }
@@ -601,8 +791,7 @@ internal static class DeviceCache
             else
                 entry.ChannelKeys[channelIndex] = SecretProtector.Protect(key);
             all[host] = entry;
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            Persist(all);
         }
         catch { /* best effort */ }
     }

@@ -31,37 +31,37 @@ public sealed class TelemetryPage : ContentPage
         _sub = new Label { TextColor = Dim, FontSize = 12 };
         _status = new Label { TextColor = Dim, FontSize = 12 };
 
-        var requestBtn = new Button { Text = "Request telemetry", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        var requestBtn = new Button { Text = "Request telemetry", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         requestBtn.Clicked += OnRequest;
-        var metricsBtn = new Button { Text = "Request battery/metrics", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        var metricsBtn = new Button { Text = "Request battery/metrics", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         metricsBtn.Clicked += async (_, _) =>
         {
             _status.Text = $"Requesting device metrics from {_target.Display}…";
             try { await _main.RequestDeviceMetricsForAsync(_target.Num); _status.Text = $"Requested device metrics from {_target.Display} — reply refreshes the info above."; }
             catch (Exception ex) { _status.Text = $"Request failed: {ex.Message}"; }
         };
-        var deleteBtn = new Button { Text = "Delete", HeightRequest = 40, Padding = new Thickness(10, 0) };
+        var deleteBtn = new Button { Text = "Delete", MinimumHeightRequest = 40, Padding = new Thickness(10, 0) };
         deleteBtn.Clicked += OnDelete;
-        var copyBtn = new Button { Text = "Copy", HeightRequest = 40, Padding = new Thickness(10, 0) };
+        var copyBtn = new Button { Text = "Copy", MinimumHeightRequest = 40, Padding = new Thickness(10, 0) };
         copyBtn.Clicked += OnCopy;
-        var closeBtn = new Button { Text = "Close", HeightRequest = 40, Padding = new Thickness(10, 0) };
+        var closeBtn = new Button { Text = "Close", MinimumHeightRequest = 40, Padding = new Thickness(10, 0) };
         closeBtn.Clicked += async (_, _) => await Navigation.PopModalAsync();
         var btns = new HorizontalStackLayout { Spacing = 8 };
         btns.Add(deleteBtn); btns.Add(copyBtn); btns.Add(closeBtn);
 
         // Node actions (moved here from the Nodes list long-press menu). Wrap so they fit on narrow screens.
-        var infoBtn = new Button { Text = "Request info", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        var infoBtn = new Button { Text = "Request info", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         infoBtn.Clicked += async (_, _) => { _status.Text = $"Requesting info from {_target.Display}…"; _status.Text = await _main.RequestNodeInfoForAsync(_target.Num); };
-        var posBtn = new Button { Text = "Request position", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        var posBtn = new Button { Text = "Request position", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         posBtn.Clicked += async (_, _) =>
         {
             _status.Text = $"Requesting position from {_target.Display}…";
             try { await _main.RequestNodePositionAsync(_target.Num); _status.Text = $"Requested position from {_target.Display}."; }
             catch (Exception ex) { _status.Text = $"Position request failed: {ex.Message}"; }
         };
-        var traceBtn = new Button { Text = "Traceroute", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        var traceBtn = new Button { Text = "Traceroute", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         traceBtn.Clicked += async (_, _) => await Navigation.PushModalAsync(new TraceroutePage(_main, _target));
-        var noiseBtn = new Button { Text = "Request noise floor", HeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        var noiseBtn = new Button { Text = "Request noise floor", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         noiseBtn.Clicked += async (_, _) =>
         {
             _status.Text = $"Requesting noise floor from {_target.Display}…";

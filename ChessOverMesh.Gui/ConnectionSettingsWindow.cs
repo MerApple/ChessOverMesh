@@ -37,8 +37,8 @@ internal sealed class ConnectionSettingsWindow : Window
         });
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var ok = new Button { Content = "OK", Width = 80, Height = 26, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
-        var cancel = new Button { Content = "Cancel", Width = 80, Height = 26, IsCancel = true };
+        var ok = new Button { Content = "OK", MinWidth = 80, MinHeight = 26, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var cancel = new Button { Content = "Cancel", MinWidth = 80, MinHeight = 26, IsCancel = true };
         ok.Click += (_, _) => { DialogResult = true; };
         buttons.Children.Add(ok);
         buttons.Children.Add(cancel);

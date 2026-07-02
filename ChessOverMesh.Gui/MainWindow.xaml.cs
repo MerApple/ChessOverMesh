@@ -278,6 +278,20 @@ public partial class MainWindow : Window
         // Wall-clock time this chat row represents (for age-based auto-delete). default = unknown (never pruned).
         public DateTime Time;
 
+        // Sender-set self-destruct time for this row (local wall-clock); null = no expiry. When set, the row shows
+        // a live "deletes in …" countdown and is removed (screen + cache) once reached.
+        public DateTime? ExpiresAt;
+
+        // The live "🕓 deletes in …" countdown line, shown dim under the message on its own line (kept separate from
+        // Detail so the sending/delivered marks that mutate Detail don't fight the per-second countdown). Empty = none.
+        private string _expiry = "";
+        public string Expiry
+        {
+            get => _expiry;
+            set { _expiry = value; PropertyChanged?.Invoke(this, ExpiryChangedArgs); }
+        }
+        private static readonly PropertyChangedEventArgs ExpiryChangedArgs = new(nameof(Expiry));
+
         // For a DM row, the other node (the conversation peer); 0 for channel/system rows. Used by the RX filter.
         public uint DmPeer;
 
@@ -420,6 +434,7 @@ public partial class MainWindow : Window
         {
             await CheckPendingAcksAsync();
             UpdateChatSendButton();
+            UpdateExpiryCountdowns();   // live "deletes in …" countdown + self-destruct removal, every second
             if (++_retentionTick >= 60) { _retentionTick = 0; ApplyChatRetention(); }   // auto-delete sweep ~once a minute
         };
         _ackTimer.Start();
@@ -581,7 +596,11 @@ public partial class MainWindow : Window
             new("Chat text", ChatList.FontFamily.Source, ChatList.FontSize, (f, s) => ApplyChatFont(f, s)),
             new("Nodes", _nodesFont, _nodesSize, (f, s) => ApplyNodesFont(f, s)),
         };
-        new ColorSettingsWindow(this, choices, fonts).ShowDialog();
+        new ColorSettingsWindow(this, choices, fonts, AppSettings.UiTextSize, size =>
+        {
+            AppSettings.UiTextSize = size;
+            App.ApplyUiTextSize();   // update every open window (this dialog + main) live
+        }).ShowDialog();
     }
 
     // ---- List fonts -------------------------------------------------------------------
@@ -679,11 +698,11 @@ public partial class MainWindow : Window
             if (ips.Count == 0)
             {
                 Status("No device found automatically — enter the IP address manually.");
-                MessageBox.Show(this,
+                ThemedDialog.Info(this,
                     "No Meshtastic device was found at meshtastic.local.\n\n" +
                     "Check that the device has WiFi enabled and is on the same network, then try Find again — " +
                     "or just type its IP address in the Host box.",
-                    "No device found", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "No device found");
                 return;
             }
             HostBox.Text = ips[0];
@@ -717,8 +736,7 @@ public partial class MainWindow : Window
         string host = HostBox.Text.Trim();
         if (host.Length == 0 || host == "http://")
         {
-            MessageBox.Show(this, "Enter the device's address, e.g. http://192.168.1.50",
-                "Host required", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Info(this, "Enter the device's address, e.g. http://192.168.1.50", "Host required");
             return;
         }
 
@@ -738,8 +756,7 @@ public partial class MainWindow : Window
         try { ipHost = new Uri(host).Host; }
         catch
         {
-            MessageBox.Show(this, "That doesn't look like a valid address. Try e.g. http://192.168.1.50",
-                "Host required", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Info(this, "That doesn't look like a valid address. Try e.g. http://192.168.1.50", "Host required");
             return;
         }
 
@@ -776,18 +793,18 @@ public partial class MainWindow : Window
         {
             Status($"Connection timed out after {ConnectTimeout.TotalSeconds:0}s. You can try again.");
             if (!_autoReconnecting)   // stay quiet during auto-reconnect retries — no pop-up every minute
-                MessageBox.Show(this,
+                ThemedDialog.Info(this,
                     $"The device at {host} did not respond within {ConnectTimeout.TotalSeconds:0} seconds.\n\n" +
                     "Check it's powered on, on WiFi, and its API is enabled, then Connect again.",
-                    "Connection timed out", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    "Connection timed out");
         }
         catch (Exception ex)
         {
             Status("Connection failed.");
             if (!_autoReconnecting)
-                MessageBox.Show(this, $"Could not reach the device:\n{ex.Message}\n\n" +
+                ThemedDialog.Info(this, $"Could not reach the device:\n{ex.Message}\n\n" +
                 "Check it's on WiFi and its API is enabled, then Connect again.",
-                "Connection failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                "Connection failed");
         }
         finally
         {
@@ -813,8 +830,7 @@ public partial class MainWindow : Window
         if (colon > 0 && int.TryParse(rest[(colon + 1)..], out var pv)) { ph = rest[..colon]; pp = pv; }
         if (ph.Length == 0)
         {
-            MessageBox.Show(this, "Enter the proxy address, e.g. proxy://192.168.1.50:4403",
-                "Proxy address required", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedDialog.Info(this, "Enter the proxy address, e.g. proxy://192.168.1.50:4403", "Proxy address required");
             return;
         }
 
@@ -827,7 +843,22 @@ public partial class MainWindow : Window
         TcpStreamMeshTransport? proxy = null;
         try
         {
-            proxy = await TcpStreamMeshTransport.ConnectTlsAsync(ph, pp, TimeSpan.FromSeconds(8));
+            // Use the remembered login (if any); if the proxy demands auth we don't have, prompt and retry. A proxy
+            // with no auth connects on the first try and never prompts.
+            var saved = AppSettings.GetProxyCred(ph);
+            string? user = saved?.User, pass = saved?.Pass;
+            while (proxy == null)
+            {
+                try { proxy = await TcpStreamMeshTransport.ConnectTlsAsync(ph, pp, TimeSpan.FromSeconds(8), user, pass); }
+                catch (ProxyAuthException ax)
+                {
+                    var creds = ProxyCredentialsPrompt.Show(this, ph, ax.Rejected ? ax.Message : null, user);
+                    if (creds == null) { Status("Proxy sign-in cancelled."); return; }
+                    user = creds.Value.User; pass = creds.Value.Pass;
+                    if (creds.Value.Remember) AppSettings.SetProxyCred(ph, user, pass);
+                    else AppSettings.ClearProxyCred(ph);
+                }
+            }
             await FinishConnectAsync(new MeshtasticHttpClient(proxy), proxyUrl, ph, pp);
             proxy = null;   // ownership handed off to the client
         }
@@ -839,8 +870,8 @@ public partial class MainWindow : Window
         {
             Status($"Could not reach the proxy at {ph}:{pp}.");
             if (!_autoReconnecting)
-                MessageBox.Show(this, $"Could not reach the proxy:\n{ex.Message}\n\nCheck Meshtastic.Proxy is running " +
-                    "and reachable, then Connect again.", "Proxy connection failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                ThemedDialog.Info(this, $"Could not reach the proxy:\n{ex.Message}\n\nCheck Meshtastic.Proxy is running " +
+                    "and reachable, then Connect again.", "Proxy connection failed");
         }
         finally
         {
@@ -853,6 +884,29 @@ public partial class MainWindow : Window
     // Runs the want-config handshake on a freshly-built client (over TCP or HTTP), then arms state + the
     // background backlog sync. Always syncs with the device. Disposes the client (and its transport) and
     // rethrows on failure so the caller can fall back or report it.
+    /// <summary>If the device's cache is encrypted, loops a password prompt until it unlocks or the user deletes
+    /// the cache. Returns false only if the user cancels (caller should abort the connection). Reused on connect.</summary>
+    private bool EnsureCacheUnlocked(string host)
+    {
+        string? err = null;
+        while (DeviceCache.IsEncrypted(host) && !DeviceCache.IsUnlocked(host))
+        {
+            var dlg = new PasswordPromptWindow(this, err);
+            if (dlg.ShowDialog() != true) return false;   // Cancel / closed
+            if (dlg.DeleteRequested)
+            {
+                if (ThemedDialog.Confirm(this,
+                        $"Delete all cached data for {host} and reset its cache password? This cannot be undone.",
+                        "Delete cache"))
+                { DeviceCache.ClearDevice(host); return true; }
+                continue;
+            }
+            if (DeviceCache.Unlock(host, dlg.Password)) return true;
+            err = "Wrong password — try again.";
+        }
+        return true;
+    }
+
     private async Task FinishConnectAsync(MeshtasticHttpClient client, string host, string probeHost, int probePort)
     {
         try
@@ -877,6 +931,9 @@ public partial class MainWindow : Window
         _synced = false;
         AppSettings.LastHost = host;
 
+        // If this device's cache is encrypted, unlock (or delete) it before we read or write any cache for it.
+        if (!EnsureCacheUnlocked(host)) { Disconnect("Cache locked — connection cancelled."); return; }
+
         DeviceCache.Save(host, _mesh.GetAvailableChannels(), _mesh.MyNodeNum);
         LoadChannelPrefs(host, _mesh.GetAvailableChannels());
         ApplyConnectionState();
@@ -888,16 +945,19 @@ public partial class MainWindow : Window
     private bool EnsureChessChannelSelected()
     {
         if (_mesh != null && _mesh.ChannelIndex != 0) return true;
-        MessageBox.Show(this,
+        ThemedDialog.Info(this,
             "No chess channel is set for this device.\n\n" +
             "Chess needs a dedicated secondary channel — it can't use the primary channel (0). " +
             "Open Channels… to pick an existing channel for chess, or create one, then start a game.",
-            "Choose a chess channel", MessageBoxButton.OK, MessageBoxImage.Information);
+            "Choose a chess channel");
         return false;
     }
 
-    private void Disconnect(string statusMessage)
+    private void Disconnect(string statusMessage, bool forgetCache = true)
     {
+        // Keep the cache password across a dropped-connection/auto-reconnect (forgetCache:false) so it doesn't
+        // re-prompt on every blip; forget it on a user-initiated disconnect so reconnect asks again.
+        if (forgetCache && _currentHost.Length > 0) DeviceCache.ForgetSession(_currentHost);
         _pollTimer.Stop();
         _mesh?.Dispose();
         _mesh = null;
@@ -1202,6 +1262,7 @@ public partial class MainWindow : Window
 
         RebuildChatTxCombo();
         DeviceCache.PruneChatByRetention(host);   // drop cache messages past their auto-delete age before loading
+        DeviceCache.PruneChatByExpiry(host);      // …and any past their sender-set self-destruct time
         LoadCachedChat(host);
     }
 
@@ -1212,10 +1273,10 @@ public partial class MainWindow : Window
     {
         if (host.Length == 0 || ChatList.Items.Count > 0) return;
         var chat = DeviceCache.GetChat(host);
-        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id)>();
+        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt)>();
         foreach (var ch in ReceiveChannels())   // all enabled channels (RX shows everything; the filter hides)
             if (chat.TryGetValue(ch, out var list))
-                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id));
+                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt));
         if (msgs.Count == 0) return;
         foreach (var m in msgs.OrderBy(m => m.Time))
         {
@@ -1223,6 +1284,11 @@ public partial class MainWindow : Window
             e.Channel = m.Channel;
             e.CacheId = m.Id;
             e.Time = m.Time;   // preserve original time for age-based auto-delete
+            if (m.ExpiresAt != default)   // resume the self-destruct countdown for a still-pending message
+            {
+                e.ExpiresAt = m.ExpiresAt;
+                e.Expiry = "🕓 " + ExpiryCountdown(m.ExpiresAt - DateTime.Now);
+            }
         }
         var divider = AddChatLine("──────── saved history above · live messages below ────────", "",
             new SolidColorBrush(MediaColor.FromRgb(0x8A, 0x8A, 0x8A)));
@@ -1232,11 +1298,11 @@ public partial class MainWindow : Window
     /// <summary>Caches a chat line (latest 100 per channel) for the current device. Returns the stable id given
     /// to the cached copy (or null when not cached), so the caller can stamp it on the displayed row for later
     /// per-message removal.</summary>
-    private string? CacheChat(uint channel, string text, string detail, uint rxTime = 0)
+    private string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt });
         return id;
     }
 
@@ -1454,8 +1520,8 @@ public partial class MainWindow : Window
             TextWrapping = TextWrapping.Wrap, MaxWidth = 240, Margin = new Thickness(0, 0, 0, 6),
         });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-        var allBtn = new Button { Content = "All", Width = 54, Height = 22, Margin = new Thickness(0, 0, 4, 0) };
-        var noneBtn = new Button { Content = "None", Width = 54, Height = 22 };
+        var allBtn = new Button { Content = "All", MinWidth = 54, MinHeight = 22, Margin = new Thickness(0, 0, 4, 0) };
+        var noneBtn = new Button { Content = "None", MinWidth = 54, MinHeight = 22 };
         var targets = GetRxTargets();   // all device channels + DM peers
         allBtn.Click += (_, _) =>
         {
@@ -1481,7 +1547,7 @@ public partial class MainWindow : Window
             var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
 
             // Right-docked: a delete (🗑) button, then the unread badge.
-            var del = new Button { Content = "🗑", Width = 24, Height = 22, Margin = new Thickness(8, 0, 0, 0),
+            var del = new Button { Content = "🗑", MinWidth = 24, MinHeight = 22, Margin = new Thickness(8, 0, 0, 0),
                 ToolTip = "Delete all messages on this channel/DM (shown and cached)" };
             del.Click += (_, _) => DeleteChatTargetPrompt(target);
             DockPanel.SetDock(del, Dock.Right);
@@ -1506,8 +1572,8 @@ public partial class MainWindow : Window
 
     private void DeleteChatTargetPrompt(TxTarget t)
     {
-        if (MessageBox.Show(this, $"Delete all messages on {t.Label}?\n\nThis removes them from the chat window and the saved history on this PC.",
-                "Delete messages", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (!ThemedDialog.Confirm(this, $"Delete all messages on {t.Label}?\n\nThis removes them from the chat window and the saved history on this PC.",
+                "Delete messages", defaultYes: true))
             return;
         DeleteChatTarget(t.IsDm, t.Id);
         BuildRxList();   // refresh the popup (badges/state)
@@ -1615,17 +1681,17 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 0, 0, 12),
         });
         panel.Children.Add(new TextBlock { Text = "Game id:", Foreground = light, Margin = new Thickness(0, 0, 0, 2) });
-        var idBox = new TextBox { Text = NewGameId(), Height = 24, Margin = new Thickness(0, 0, 0, 10) };
+        var idBox = new TextBox { Text = NewGameId(), MinHeight = 24, Margin = new Thickness(0, 0, 0, 10) };
         panel.Children.Add(idBox);
 
         panel.Children.Add(new TextBlock { Text = "Role:", Foreground = light, Margin = new Thickness(0, 0, 0, 2) });
-        var roleBox = new ComboBox { Height = 24, Margin = new Thickness(0, 0, 0, 14), ItemsSource = new[] { RoleAuto, RoleWhite, RoleBlack }, SelectedIndex = 0 };
+        var roleBox = new ComboBox { MinHeight = 24, Margin = new Thickness(0, 0, 0, 14), ItemsSource = new[] { RoleAuto, RoleWhite, RoleBlack }, SelectedIndex = 0 };
         panel.Children.Add(roleBox);
 
-        var newBtn = new Button { Content = "Create new game", Height = 34, Margin = new Thickness(0, 0, 0, 8), IsDefault = true };
-        var loadBtn = new Button { Content = "Load existing game", Height = 34, Margin = new Thickness(0, 0, 0, 8) };
-        var joinBtn = new Button { Content = "Join an open game", Height = 34, Margin = new Thickness(0, 0, 0, 12) };
-        var cancelBtn = new Button { Content = "Cancel", Height = 26, Width = 90, HorizontalAlignment = HorizontalAlignment.Right, IsCancel = true };
+        var newBtn = new Button { Content = "Create new game", MinHeight = 34, Margin = new Thickness(0, 0, 0, 8), IsDefault = true };
+        var loadBtn = new Button { Content = "Load existing game", MinHeight = 34, Margin = new Thickness(0, 0, 0, 8) };
+        var joinBtn = new Button { Content = "Join an open game", MinHeight = 34, Margin = new Thickness(0, 0, 0, 12) };
+        var cancelBtn = new Button { Content = "Cancel", MinHeight = 26, MinWidth = 90, HorizontalAlignment = HorizontalAlignment.Right, IsCancel = true };
         newBtn.Click += (_, _) => { result = StartChoice.New; dialog.Close(); };
         loadBtn.Click += (_, _) => { result = StartChoice.Load; dialog.Close(); };
         joinBtn.Click += (_, _) => { result = StartChoice.Join; dialog.Close(); };
@@ -1839,8 +1905,7 @@ public partial class MainWindow : Window
     private void CancelBtn_Click(object sender, RoutedEventArgs e)
     {
         if (!_playing || _gameOver || !(_awaitingOpponent || _resigning)) return;
-        if (MessageBox.Show(this, "Cancel this game?", "Cancel game",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!ThemedDialog.Confirm(this, "Cancel this game?", "Cancel game", defaultYes: true))
             return;
         CancelGame($"Game '{_gameId}' cancelled.");
     }
@@ -2046,8 +2111,7 @@ public partial class MainWindow : Window
         var game = GameStorage.Load(dlg.FileName);
         if (game == null)
         {
-            MessageBox.Show(this, "Couldn't read that save file.", "Load failed",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedDialog.Info(this, "Couldn't read that save file.", "Load failed");
             return false;
         }
 
@@ -2128,8 +2192,8 @@ public partial class MainWindow : Window
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         DockPanel.SetDock(buttons, Dock.Bottom);
-        var joinBtn = new Button { Content = "Join selected", Width = 110, Height = 28, Margin = new Thickness(0, 0, 8, 0) };
-        var closeBtn = new Button { Content = "Close", Width = 80, Height = 28 };
+        var joinBtn = new Button { Content = "Join selected", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
+        var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28 };
         buttons.Children.Add(joinBtn);
         buttons.Children.Add(closeBtn);
 
@@ -2177,8 +2241,7 @@ public partial class MainWindow : Window
     private async void ResignBtn_Click(object sender, RoutedEventArgs e)
     {
         if (!_playing || _gameOver || _resigning || _mesh == null) return;
-        if (MessageBox.Show(this, "Resign this game?", "Resign",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!ThemedDialog.Confirm(this, "Resign this game?", "Resign", defaultYes: true))
             return;
 
         // Send RESIGN and wait for the opponent's RESIGNACK before ending the game.
@@ -2262,9 +2325,9 @@ public partial class MainWindow : Window
     /// <summary>Confirms then runs a remote-admin action against another node, reporting via <paramref name="setStatus"/>.</summary>
     private async Task RunRemoteAdminAction(MeshNode n, string label, string warn, Func<Task<string?>> action, Window owner, Action<string> setStatus)
     {
-        if (MessageBox.Show(owner,
+        if (!ThemedDialog.Confirm(owner,
                 $"{warn}\n\nTarget: {n.Display}\n\nRemote admin needs a shared channel named \"admin\" configured on BOTH this node and the target. Continue?",
-                $"Remote {label}?", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+                $"Remote {label}?"))
             return;
         setStatus($"Sending remote {label} to {n.Display}… (negotiating session key)");
         try
@@ -2680,8 +2743,7 @@ public partial class MainWindow : Window
             if (_moveHistory.Count > 0) _moveHistory.RemoveAt(_moveHistory.Count - 1);
             MoveList.Items.Remove(entry);
             Render();
-            MessageBox.Show(this, $"Move could not be sent:\n{ex.Message}\n\nReverted — please try again.",
-                "Send failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedDialog.Info(this, $"Move could not be sent:\n{ex.Message}\n\nReverted — please try again.", "Send failed");
         }
 
         if (!CheckForEnd()) UpdateTurnStatus();
@@ -2746,7 +2808,7 @@ public partial class MainWindow : Window
         if (!_connected) return;   // already torn down
         string host = _currentHost;
         AddSystemWarning(Stamp() + "— Connection to the device was lost (it may have been turned off or left the network). —", SysCategory.Connection);
-        Disconnect("Connection lost.");
+        Disconnect("Connection lost.", forgetCache: false);   // keep the cache password so auto-reconnect doesn't re-prompt
         if (AppSettings.AutoReconnect && host.Length > 0)
             StartAutoReconnect(host);
         else
@@ -3133,6 +3195,10 @@ public partial class MainWindow : Window
             string dmTag = sentDmFromUs ? "DM → " : (wasDm ? "DM ← " : "");   // direction of the DM in the metadata
             // A resent chat carries a marker prefix; strip it and note "resent" in the metadata instead.
             string body = msg.Text;
+            // Sender self-destruct header (if any): peel off the chosen lifetime and honour it — the message
+            // deletes itself (screen + cache) once it's this old, counted from when the radio received it.
+            int ttlSeconds = 0;
+            if (ProtocolMessage.TryDecodeChatTtl(body, out var ttlS, out var strippedBody)) { ttlSeconds = ttlS; body = strippedBody; }
             bool resent = body.StartsWith(ProtocolMessage.ChatResendPrefix, StringComparison.Ordinal);
             if (resent) body = body.Substring(ProtocolMessage.ChatResendPrefix.Length);
             string detail = $"{Stamp()}{dmTag}{chan}{sig}".Trim();   // dim metadata line under the message
@@ -3147,13 +3213,22 @@ public partial class MainWindow : Window
                 : AddChatLine($"{who}: {body}", detail, NormalText, msg);
             entry.PacketId = msg.PacketId;                       // so it can be replied to
             entry.Channel = msg.Channel;
+            // Honour the sender's self-destruct: expiry is counted from the radio's receive time (falls back to now),
+            // so an old backfilled message that's already past its lifetime is dropped on the next sweep.
+            DateTime rxLocal = msg.RxTime != 0 ? DateTimeOffset.FromUnixTimeSeconds(msg.RxTime).LocalDateTime : DateTime.Now;
+            DateTime expiresAt = (ttlSeconds > 0 && !msg.DecryptFailed) ? rxLocal.AddSeconds(ttlSeconds) : default;
+            if (expiresAt != default)
+            {
+                entry.ExpiresAt = expiresAt;
+                entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now);
+            }
             TrimChatChannel(msg.Channel);                        // cap on-screen rows per channel
             _chatEntryById[msg.PacketId] = entry;                // so reactions can attach to this row
             if (_reactions.TryGetValue(msg.PacketId, out var early)) entry.Reactions = FormatReactions(early);
             if (!msg.DecryptFailed)
             {
                 _chatById[msg.PacketId] = body;                  // remember its text for reply quoting
-                entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime);   // persist (latest 100 per channel)
+                entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt);   // persist (latest 100 per channel)
             }
             // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there instead
             // of notifying (so a hidden conversation just shows a badge in the RX list).
@@ -3342,7 +3417,7 @@ public partial class MainWindow : Window
         {
             var b = new Button
             {
-                Content = em, Width = 28, Height = 28, FontSize = 15, Margin = new Thickness(1),
+                Content = em, MinWidth = 28, MinHeight = 28, FontSize = 15, Margin = new Thickness(1),
                 Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0),
                 Foreground = new SolidColorBrush(MediaColor.FromRgb(0xE0, 0xE0, 0xE0)), Cursor = System.Windows.Input.Cursors.Hand,
             };
@@ -3543,9 +3618,9 @@ public partial class MainWindow : Window
         {
             string who = _mesh.DescribeNode(num);
             report($"No position data found for {who}.");
-            MessageBox.Show(owner,
+            ThemedDialog.Info(owner,
                 $"No position data found for {who}.\n\nThis node hasn't shared its location yet. Use \"Request position\" to ask for it, then try again.",
-                "No location", MessageBoxButton.OK, MessageBoxImage.Information);
+                "No location");
             return;
         }
         string url = MeshtasticHttpClient.GoogleMapsUrl(pos.Latitude, pos.Longitude);
@@ -3636,6 +3711,11 @@ public partial class MainWindow : Window
         string text = ChatBox.Text.Trim();
         if (text.Length == 0) return;
 
+        // Sender self-destruct: if this channel has a send-TTL set, ride the chosen lifetime (seconds) in the wire
+        // text so every receiver — and our own copy — deletes it after that. The displayed/cached text stays clean.
+        int ttlSeconds = (_currentHost.Length > 0 ? DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel) : 0) * 60;
+        string wireText = ProtocolMessage.EncodeChatTtl(ttlSeconds, text);
+
         // Brief hold after receiving a message so its CHATACK finishes sending before we transmit.
         var wait = _chatSendAllowedUtc - DateTime.UtcNow;
         if (wait > TimeSpan.Zero)
@@ -3648,7 +3728,7 @@ public partial class MainWindow : Window
         // TX channel has an app key — the AES-256 base64 ciphertext (which is longer). Warn and don't send.
         string key = _mesh.GetChannelKey(_chatTxChannel);
         bool encrypted = key.Length > 0;
-        int wireLen = encrypted ? AesText.Encrypt(text, key).Length : System.Text.Encoding.UTF8.GetByteCount(text);
+        int wireLen = encrypted ? AesText.Encrypt(wireText, key).Length : System.Text.Encoding.UTF8.GetByteCount(wireText);
         if (wireLen > MaxChatChars)
         {
             AddSystemWarning($"{Stamp()}Chat NOT sent — {wireLen} chars" +
@@ -3676,16 +3756,23 @@ public partial class MainWindow : Window
         bool relayConfirm = isDm || !_chatAckOn.Contains(_chatTxChannel);
 
         var entry = AddChatLine(msgLine, detailBase + MarkSending, PendingText);   // amber while awaiting confirmation
+        // Start our own copy's self-destruct countdown immediately (before the ack) so it's visible right away.
+        DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
+        if (ttlSeconds > 0)
+        {
+            entry.ExpiresAt = expiresAt;
+            entry.Expiry = "🕓 " + ExpiryCountdown(TimeSpan.FromSeconds(ttlSeconds));
+        }
         try
         {
-            uint id = await _mesh.SendTextAsync(text, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
+            uint id = await _mesh.SendTextAsync(wireText, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
             entry.PacketId = id;          // so this message can itself be replied to / reacted to
             entry.Channel = _chatTxChannel;
             TrimChatChannel(_chatTxChannel);   // cap on-screen rows per channel
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);   // hide if its target is filtered out
             _chatEntryById[id] = entry;   // so reactions can attach to this row
             _chatById[id] = text;         // remember its text for quoting in future replies
-            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase);   // persist (latest 100 per channel)
+            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt);   // persist (latest 100 per channel)
             _pending[id] = new PendingSend
             {
                 Id = id,
@@ -3801,18 +3888,51 @@ public partial class MainWindow : Window
         for (int i = ChatList.Items.Count - 1; i >= 0; i--)
         {
             if (ChatList.Items[i] is not LogEntry e || e.Time == default) continue;
-            if (retention.TryGetValue(e.Channel, out var hrs) && hrs > 0 && e.Time < now.AddHours(-hrs))
+            if (retention.TryGetValue(e.Channel, out var mins) && mins > 0 && e.Time < now.AddMinutes(-mins))
                 ChatList.Items.RemoveAt(i);
         }
     }
 
     /// <summary>Auto-deletes chat older than each channel's retention — in the cache and on screen. Called on
-    /// connect, on a periodic sweep, and when the retention setting changes.</summary>
+    /// connect, on a periodic sweep, and when the retention setting changes. Also sweeps the cache for messages
+    /// past their sender-set self-destruct time (the on-screen countdown handles those live).</summary>
     public void ApplyChatRetention()
     {
         if (_currentHost.Length == 0) return;
         DeviceCache.PruneChatByRetention(_currentHost);
+        DeviceCache.PruneChatByExpiry(_currentHost);
         PruneChatRam();
+    }
+
+    /// <summary>Formats a self-destruct countdown for the dim metadata line: "deletes in 1h 05m" / "deletes in
+    /// 9:58" / "deletes in 8s".</summary>
+    private static string ExpiryCountdown(TimeSpan left)
+    {
+        if (left < TimeSpan.Zero) left = TimeSpan.Zero;
+        if (left.TotalHours >= 1) return $"deletes in {(int)left.TotalHours}h {left.Minutes:00}m";
+        if (left.TotalMinutes >= 1) return $"deletes in {left.Minutes}:{left.Seconds:00}";
+        return $"deletes in {left.Seconds}s";
+    }
+
+    /// <summary>Refreshes the live "deletes in …" countdown on every expiring chat row, and removes rows (screen +
+    /// cache) whose sender-set self-destruct time has passed. Runs each second from the ack timer.</summary>
+    private void UpdateExpiryCountdowns()
+    {
+        var now = DateTime.Now;
+        for (int i = ChatList.Items.Count - 1; i >= 0; i--)
+        {
+            if (ChatList.Items[i] is not LogEntry e || e.ExpiresAt is not DateTime exp) continue;
+            if (now >= exp)
+            {
+                // Screen-only removal — no disk I/O in this per-second loop. The cache copy is dropped by the
+                // batched PruneChatByExpiry (the ~60 s retention sweep) and again on the next connect (which prunes
+                // before loading), so an expired message can never reappear even if its cache row lingers briefly.
+                ChatList.Items.RemoveAt(i);
+                continue;
+            }
+            string wanted = "🕓 " + ExpiryCountdown(exp - now);
+            if (e.Expiry != wanted) e.Expiry = wanted;
+        }
     }
 
     /// <summary>Channels for the connected device (live), else the cached list for the last device. For settings UIs.</summary>
@@ -3858,8 +3978,8 @@ public partial class MainWindow : Window
     {
         SystemFilterPanel.Children.Clear();
         var allNone = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
-        var allBtn = new Button { Content = "All", Width = 46, Height = 22, Margin = new Thickness(0, 0, 4, 0) };
-        var noneBtn = new Button { Content = "None", Width = 46, Height = 22 };
+        var allBtn = new Button { Content = "All", MinWidth = 46, MinHeight = 22, Margin = new Thickness(0, 0, 4, 0) };
+        var noneBtn = new Button { Content = "None", MinWidth = 46, MinHeight = 22 };
         allNone.Children.Add(allBtn);
         allNone.Children.Add(noneBtn);
         SystemFilterPanel.Children.Add(allNone);
@@ -4465,10 +4585,10 @@ public partial class MainWindow : Window
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         DockPanel.SetDock(buttons, Dock.Bottom);
-        var updateBtn = new Button { Content = "Update nodes", Width = 110, Height = 28, Margin = new Thickness(0, 0, 8, 0) };
-        var mapBtn = new Button { Content = "Map", Width = 70, Height = 28, Margin = new Thickness(0, 0, 8, 0) };
+        var updateBtn = new Button { Content = "Update nodes", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
+        var mapBtn = new Button { Content = "Map", MinWidth = 70, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         mapBtn.Click += (_, _) => ShowMap();
-        var closeBtn = new Button { Content = "Close", Width = 80, Height = 28 };
+        var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28 };
         buttons.Children.Add(updateBtn);
         buttons.Children.Add(mapBtn);
         buttons.Children.Add(closeBtn);
@@ -4485,7 +4605,7 @@ public partial class MainWindow : Window
         var controls = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
         DockPanel.SetDock(controls, Dock.Top);
 
-        var sortCombo = new ComboBox { Width = 110, Height = 22, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        var sortCombo = new ComboBox { MinWidth = 110, MinHeight = 22, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         foreach (var s in new[] { "Name", "Favorite", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" }) sortCombo.Items.Add(s);
         sortCombo.SelectedIndex = 0;
         var sortLabel = new TextBlock { Text = "Sort:", Foreground = greyBrush, VerticalAlignment = VerticalAlignment.Center };
@@ -4497,7 +4617,7 @@ public partial class MainWindow : Window
         var searchLabel = new TextBlock { Text = "Search:", Foreground = greyBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
         var searchBox = new TextBox
         {
-            Height = 22, VerticalAlignment = VerticalAlignment.Center,
+            MinHeight = 22, VerticalAlignment = VerticalAlignment.Center,
             Background = new SolidColorBrush(MediaColor.FromRgb(0x1E, 0x1E, 0x1E)),
             Foreground = nameBrush,
             CaretBrush = nameBrush,
@@ -4531,13 +4651,13 @@ public partial class MainWindow : Window
                 var dmCb = new CheckBox
                 {
                     Content = "DM", IsChecked = dmOn, IsEnabled = !blockOn, Foreground = greyBrush,
-                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), Width = 46,
+                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), MinWidth = 46,
                     ToolTip = "List this node as a TX target so you can send it direct messages.",
                 };
                 var blkCb = new CheckBox
                 {
                     Content = "Block", IsChecked = blockOn, Foreground = greyBrush,
-                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0), Width = 62,
+                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0), MinWidth = 62,
                     ToolTip = "Ignore incoming direct messages from this node.",
                 };
 
@@ -4601,12 +4721,12 @@ public partial class MainWindow : Window
                 var removeItem = new MenuItem { Header = "Remove from device (forget node)" };
                 removeItem.Click += async (_, _) =>
                 {
-                    if (MessageBox.Show(dialog,
+                    if (!ThemedDialog.Confirm(dialog,
                             $"Remove {n.Display} from the device's node database?\n\n" +
                             "Use this when the node reinstalled its firmware and direct messages stopped working " +
                             "(its stored public key is stale). After removal the device re-learns the node — and its " +
                             "new key — the next time it hears from it.",
-                            "Remove node", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                            "Remove node", defaultYes: true))
                         return;
                     status.Text = $"Removing {n.Display} from the device…";
                     try
@@ -4932,32 +5052,31 @@ public partial class MainWindow : Window
         // Reload live while this window is open (HandleNodeDiagnostics fires this when telemetry arrives).
         _telemetryRefresh = Load;
 
-        var requestBtn = new Button { Content = "Request telemetry", Width = 120, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var requestBtn = new Button { Content = "Request telemetry", MinWidth = 120, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         requestBtn.Click += async (_, _) =>
         {
             status.Text = "Requesting telemetry… (a node without an environment sensor won't reply)";
             try { await _mesh!.RequestTelemetryAsync(target.Num); }
             catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
         };
-        var metricsBtn = new Button { Content = "Request battery/metrics", Width = 150, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var metricsBtn = new Button { Content = "Request battery/metrics", MinWidth = 150, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         metricsBtn.Click += async (_, _) =>
         {
             status.Text = $"Requesting device metrics from {target.Display}…";
             try { await _mesh!.RequestDeviceMetricsAsync(target.Num); status.Text = $"Requested device metrics from {target.Display} — reply refreshes the info above."; }
             catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
         };
-        var deleteBtn = new Button { Content = "Delete", Width = 80, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var deleteBtn = new Button { Content = "Delete", MinWidth = 80, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         deleteBtn.Click += (_, _) =>
         {
-            if (MessageBox.Show(win, $"Delete all cached telemetry for {target.Display}?", "Delete telemetry",
-                    MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            if (!ThemedDialog.Confirm(win, $"Delete all cached telemetry for {target.Display}?", "Delete telemetry", defaultYes: true)) return;
             _mesh!.ClearEnvironment(target.Num);
             if (_currentHost.Length > 0) DeviceCache.ClearTelemetry(_currentHost, target.Num);
             Load();
             _nodesRefresh?.Invoke();   // drop the latest-reading summary from the node row too
             status.Text = "Telemetry deleted.";
         };
-        var copyBtn = new Button { Content = "Copy", Width = 80, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var copyBtn = new Button { Content = "Copy", MinWidth = 80, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         copyBtn.Click += (_, _) =>
         {
             var sb = new System.Text.StringBuilder();
@@ -4967,7 +5086,7 @@ public partial class MainWindow : Window
             foreach (var item in list.Items) sb.AppendLine(item?.ToString());
             try { Clipboard.SetText(sb.ToString()); } catch { /* clipboard may be momentarily locked by another app */ }
         };
-        var closeBtn = new Button { Content = "Close", Width = 80, Height = 28, Margin = new Thickness(0, 8, 0, 0) };
+        var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
         closeBtn.Click += (_, _) => win.Close();
         var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         btnPanel.Children.Add(deleteBtn);
@@ -4977,23 +5096,23 @@ public partial class MainWindow : Window
 
         // Node actions (moved here from the node right-click menu). Replies arrive via the poll loop and refresh
         // the details above; traceroute opens its own window.
-        var infoBtn = new Button { Content = "Request info", Width = 96, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var infoBtn = new Button { Content = "Request info", MinWidth = 96, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         infoBtn.Click += async (_, _) =>
         {
             status.Text = $"Requesting info from {target.Display}…";
             try { await _mesh!.RequestNodeInfoAsync(target.Num); status.Text = $"Requested node info from {target.Display}."; }
             catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
         };
-        var posBtn = new Button { Content = "Request position", Width = 110, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var posBtn = new Button { Content = "Request position", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         posBtn.Click += async (_, _) =>
         {
             status.Text = $"Requesting position from {target.Display}…";
             try { await _mesh!.RequestPositionAsync(target.Num); status.Text = $"Requested position from {target.Display}."; }
             catch (Exception ex) { status.Text = $"Position request failed: {ex.Message}"; }
         };
-        var traceBtn = new Button { Content = "Traceroute", Width = 96, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var traceBtn = new Button { Content = "Traceroute", MinWidth = 96, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         traceBtn.Click += (_, _) => ShowTraceroute(target, win);
-        var noiseBtn = new Button { Content = "Request noise floor", Width = 130, Height = 28, Margin = new Thickness(0, 8, 0, 0) };
+        var noiseBtn = new Button { Content = "Request noise floor", MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
         noiseBtn.Click += async (_, _) =>
         {
             status.Text = $"Requesting noise floor from {target.Display}…";
@@ -5074,7 +5193,7 @@ public partial class MainWindow : Window
 
         // Copy gathers the whole window's text (header, status, hops, diagnostics) to the clipboard — the info
         // is most useful when it can be pasted into a report.
-        var copyBtn = new Button { Content = "Copy", Width = 80, Height = 28, Margin = new Thickness(0, 8, 8, 0) };
+        var copyBtn = new Button { Content = "Copy", MinWidth = 80, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         copyBtn.Click += (_, _) =>
         {
             var sb = new System.Text.StringBuilder();
@@ -5083,7 +5202,7 @@ public partial class MainWindow : Window
             foreach (var item in hopList.Items) sb.AppendLine(item?.ToString());
             try { Clipboard.SetText(sb.ToString()); } catch { /* clipboard may be momentarily locked by another app */ }
         };
-        var closeBtn = new Button { Content = "Close", Width = 80, Height = 28, Margin = new Thickness(0, 8, 0, 0) };
+        var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
         closeBtn.Click += (_, _) => win.Close();
         var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         btnPanel.Children.Add(copyBtn);
@@ -5288,7 +5407,7 @@ public partial class MainWindow : Window
     private void ShowNotice(string title, string message)
     {
         var dlg = BuildModeless(title, message);
-        var ok = new Button { Content = "OK", Width = 80, Height = 28, HorizontalAlignment = HorizontalAlignment.Right, IsDefault = true, IsCancel = true };
+        var ok = new Button { Content = "OK", MinWidth = 80, MinHeight = 28, HorizontalAlignment = HorizontalAlignment.Right, IsDefault = true, IsCancel = true };
         ok.Click += (_, _) => dlg.Close();
         ((StackPanel)dlg.Content).Children.Add(ok);
         dlg.Show();
@@ -5300,8 +5419,8 @@ public partial class MainWindow : Window
     {
         var dlg = BuildModeless(title, message);
         var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var yes = new Button { Content = yesText, MinWidth = 90, Height = 28, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
-        var no = new Button { Content = noText, MinWidth = 90, Height = 28, IsCancel = true };
+        var yes = new Button { Content = yesText, MinWidth = 90, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var no = new Button { Content = noText, MinWidth = 90, MinHeight = 28, IsCancel = true };
         bool done = false;
         yes.Click += (_, _) => { if (done) return; done = true; dlg.Close(); onYes(); };
         no.Click  += (_, _) => { if (done) return; done = true; dlg.Close(); onNo(); };

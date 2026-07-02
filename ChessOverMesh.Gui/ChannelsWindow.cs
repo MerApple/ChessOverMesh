@@ -27,13 +27,13 @@ internal sealed class ChannelsWindow : Window
     private IReadOnlyList<MeshChannel> _channels;
 
     private readonly ListBox _list = new() { Background = Panel, Foreground = Fg, BorderThickness = new Thickness(0), Height = 140 };
-    private readonly TextBox _nameBox = new() { Height = 24, Width = 110 };
-    private readonly TextBox _pskBox = new() { Height = 24, Width = 140 };
-    private readonly TextBox _appKeyBox = new() { Height = 24, Width = 160, IsEnabled = false };
-    private readonly TextBox _triggerBox = new() { Height = 24, Width = 230, IsEnabled = false };
-    private readonly TextBox _pskShow = new() { Height = 24, Width = 250, IsReadOnly = true, Foreground = Dim, Background = Panel, BorderThickness = new Thickness(0) };
-    private readonly ComboBox _chessCombo = new() { Height = 24, Width = 220 };
-    private readonly ComboBox _utilityCombo = new() { Height = 24, Width = 220 };
+    private readonly TextBox _nameBox = new() { MinHeight = 24, MinWidth = 110 };
+    private readonly TextBox _pskBox = new() { MinHeight = 24, MinWidth = 140 };
+    private readonly TextBox _appKeyBox = new() { MinHeight = 24, MinWidth = 160, IsEnabled = false };
+    private readonly TextBox _triggerBox = new() { MinHeight = 24, MinWidth = 230, IsEnabled = false };
+    private readonly TextBox _pskShow = new() { MinHeight = 24, MinWidth = 250, IsReadOnly = true, Foreground = Dim, Background = Panel, BorderThickness = new Thickness(0) };
+    private readonly ComboBox _chessCombo = new() { MinHeight = 24, MinWidth = 220 };
+    private readonly ComboBox _utilityCombo = new() { MinHeight = 24, MinWidth = 220 };
     private readonly TextBlock _status = new() { Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
     // Shown next to the Update button while no fetch has happened this session — explains why Update is disabled.
     private readonly TextBlock _updateHint = new() { Foreground = Warn, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0), Text = "← Fetch from device to enable Update" };
@@ -80,16 +80,16 @@ internal sealed class ChannelsWindow : Window
         ResizeMode = ResizeMode.NoResize;
         Background = Bg;
 
-        _fetchBtn = new Button { Content = "Fetch from device", Height = 24, Padding = new Thickness(8, 0, 8, 0), HorizontalAlignment = HorizontalAlignment.Right };
-        _createBtn = new Button { Content = "Create channel", Width = 120, Height = 24,
+        _fetchBtn = new Button { Content = "Fetch from device", MinHeight = 24, Padding = new Thickness(8, 0, 8, 0), HorizontalAlignment = HorizontalAlignment.Right };
+        _createBtn = new Button { Content = "Create channel", MinWidth = 120, MinHeight = 24,
             ToolTip = "Create a NEW channel in the first free slot from the name, PSK and options below." };
-        _updateBtn = new Button { Content = "Update channel", Width = 120, Height = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false,
+        _updateBtn = new Button { Content = "Update channel", MinWidth = 120, MinHeight = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false,
             ToolTip = "Write the name, PSK and options to the selected channel. Requires a Fetch from device first, so the channel's PSK is read correctly before it's rewritten." };
-        _deleteBtn = new Button { Content = "Delete selected channel", Width = 160, Height = 24,
+        _deleteBtn = new Button { Content = "Delete selected channel", MinWidth = 160, MinHeight = 24,
             ToolTip = "Delete the channel selected in the list above (the primary channel 0 can't be deleted)." };
-        _setKeyBtn = new Button { Content = "Set key", Width = 70, Height = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
-        _setTriggerBtn = new Button { Content = "Set", Width = 50, Height = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
-        _deleteChatBtn = new Button { Content = "Delete chat", Width = 90, Height = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
+        _setKeyBtn = new Button { Content = "Set key", MinWidth = 70, MinHeight = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
+        _setTriggerBtn = new Button { Content = "Set", MinWidth = 50, MinHeight = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
+        _deleteChatBtn = new Button { Content = "Delete chat", MinWidth = 90, MinHeight = 24, Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
         _fetchBtn.Click += Fetch_Click;
         _createBtn.Click += Create_Click;
         _updateBtn.Click += Update_Click;
@@ -176,7 +176,7 @@ internal sealed class ChannelsWindow : Window
             "any other text is treated as a passphrase and hashed to a 256-bit key. Leave empty for an open channel " +
             "(when updating a channel whose key couldn't be read back, an empty box keeps the existing key — type 'none' to clear it).";
         nameRow.Children.Add(_pskBox);
-        var randomBtn = new Button { Content = "Random", Width = 64, Height = 24, Margin = new Thickness(6, 0, 0, 0) };
+        var randomBtn = new Button { Content = "Random", MinWidth = 64, MinHeight = 24, Margin = new Thickness(6, 0, 0, 0) };
         randomBtn.Click += (_, _) => _pskBox.Text = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         nameRow.Children.Add(randomBtn);
         root.Children.Add(nameRow);
@@ -229,7 +229,7 @@ internal sealed class ChannelsWindow : Window
 
         root.Children.Add(_status);
 
-        var closeBtn = new Button { Content = "Done", Width = 80, Height = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+        var closeBtn = new Button { Content = "Done", MinWidth = 80, MinHeight = 26, IsDefault = true, IsCancel = true, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
         closeBtn.Click += Done_Click;
         root.Children.Add(closeBtn);
 
@@ -499,8 +499,7 @@ internal sealed class ChannelsWindow : Window
     {
         if (_busy || _list.SelectedItem is not ChannelRow row) return;
         if (row.Index == 0) { Status("The primary channel (0) cannot be deleted.", true); return; }
-        if (MessageBox.Show(this, $"Disable channel [{row.Index}] on the device?", "Delete channel",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!ThemedDialog.Confirm(this, $"Disable channel [{row.Index}] on the device?", "Delete channel", defaultYes: true))
             return;
 
         _busy = true; SetButtons(false); Status($"Disabling channel [{row.Index}]…", false);
@@ -529,7 +528,7 @@ internal sealed class ChannelsWindow : Window
         string prompt = count > 0
             ? $"Delete {count} cached chat message(s) for channel [{row.Index}] and clear it from the chat window?"
             : $"Clear channel [{row.Index}]'s chat from the chat window?";
-        if (MessageBox.Show(this, prompt, "Delete chat", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        if (!ThemedDialog.Confirm(this, prompt, "Delete chat", defaultYes: true))
             return;
         DeviceCache.ClearChat(_host, row.Index);   // wipe the cached history
         _onClearChat?.Invoke(row.Index);           // and drop the channel's rows from the live chat view

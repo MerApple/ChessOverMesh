@@ -2,8 +2,9 @@ using ChessOverMesh.Mesh;
 
 namespace ChessOverMesh.Maui;
 
-/// <summary>Chat message settings: how many chat messages to keep per channel, plus a per-channel auto-delete
-/// age. Both apply to the on-screen list and the disk cache. Changes persist immediately.</summary>
+/// <summary>Chat message settings: how many chat messages to keep per channel, a per-channel receiver auto-delete
+/// age, and a per-channel sender self-destruct that stamps outgoing messages to auto-delete on every recipient.
+/// Changes persist immediately.</summary>
 public sealed class ChatSettingsPage : ContentPage
 {
     static readonly Color Bg = Color.FromArgb("#1E1E1E");
@@ -70,20 +71,23 @@ public sealed class ChatSettingsPage : ContentPage
             foreach (var ch in channels)
             {
                 var channel = ch;   // capture for the closures
-                var valEntry = new Entry { Keyboard = Keyboard.Numeric, TextColor = Fg, WidthRequest = 64 };
-                var unit = new Picker { TextColor = Fg, BackgroundColor = Bg, WidthRequest = 100 };
-                unit.Items.Add("Days");
+                var valEntry = new Entry { Keyboard = Keyboard.Numeric, TextColor = Fg, MinimumWidthRequest = 64 };
+                var unit = new Picker { TextColor = Fg, BackgroundColor = Bg, MinimumWidthRequest = 110 };
+                unit.Items.Add("Minutes");
                 unit.Items.Add("Hours");
-                int hrs = retention.TryGetValue(channel.Index, out var h) ? h : 0;
-                if (hrs > 0 && hrs % 24 == 0) { valEntry.Text = (hrs / 24).ToString(); unit.SelectedIndex = 0; }
-                else if (hrs > 0) { valEntry.Text = hrs.ToString(); unit.SelectedIndex = 1; }
-                else { valEntry.Text = ""; unit.SelectedIndex = 0; }
+                unit.Items.Add("Days");
+                int mins = retention.TryGetValue(channel.Index, out var mv) ? mv : 0;
+                if (mins > 0 && mins % 1440 == 0) { valEntry.Text = (mins / 1440).ToString(); unit.SelectedIndex = 2; }
+                else if (mins > 0 && mins % 60 == 0) { valEntry.Text = (mins / 60).ToString(); unit.SelectedIndex = 1; }
+                else if (mins > 0) { valEntry.Text = mins.ToString(); unit.SelectedIndex = 0; }
+                else { valEntry.Text = ""; unit.SelectedIndex = 1; }   // default unit: Hours
 
                 void Apply()
                 {
-                    int hours = 0;
-                    if (int.TryParse(valEntry.Text, out var v) && v > 0) hours = v * (unit.SelectedIndex == 1 ? 1 : 24);
-                    DeviceCache.SetChannelRetention(host, channel.Index, hours);
+                    int minutes = 0;
+                    if (int.TryParse(valEntry.Text, out var v) && v > 0)
+                        minutes = v * (unit.SelectedIndex == 2 ? 1440 : unit.SelectedIndex == 1 ? 60 : 1);
+                    DeviceCache.SetChannelRetention(host, channel.Index, minutes);
                     _main.ApplyChatRetention();
                 }
                 valEntry.Completed += (_, _) => Apply();
@@ -99,7 +103,59 @@ public sealed class ChatSettingsPage : ContentPage
             }
         }
 
-        var closeBtn = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
+        // ---- Per-channel sender self-destruct (rides in the message; every receiver honours it) ----
+        root.Add(new BoxView { HeightRequest = 1, Color = Color.FromArgb("#3F3F46"), Margin = new Thickness(0, 8, 0, 4) });
+        root.Add(new Label { Text = "Self-destruct sent messages", TextColor = Fg, FontAttributes = FontAttributes.Bold });
+        root.Add(new Label
+        {
+            Text = "When you send on a channel, stamp your message to auto-delete after this — on every recipient " +
+                   "and here — with a live countdown shown under it. Cooperative: a recipient not running this app " +
+                   "keeps the message. Blank or 0 = off.",
+            TextColor = Dim, FontSize = 11,
+        });
+
+        if (channels.Count == 0 || host.Length == 0)
+        {
+            root.Add(new Label { Text = "Connect to a device to set per-channel self-destruct.", TextColor = Dim, FontSize = 12 });
+        }
+        else
+        {
+            var sendTtl = DeviceCache.GetChannelSendTtl(host);
+            foreach (var ch in channels)
+            {
+                var channel = ch;   // capture for the closures
+                var valEntry = new Entry { Keyboard = Keyboard.Numeric, TextColor = Fg, MinimumWidthRequest = 64 };
+                var unit = new Picker { TextColor = Fg, BackgroundColor = Bg, MinimumWidthRequest = 110 };
+                unit.Items.Add("Minutes");
+                unit.Items.Add("Hours");
+                unit.Items.Add("Days");
+                int mins = sendTtl.TryGetValue(channel.Index, out var mm) ? mm : 0;
+                if (mins > 0 && mins % 1440 == 0) { valEntry.Text = (mins / 1440).ToString(); unit.SelectedIndex = 2; }
+                else if (mins > 0 && mins % 60 == 0) { valEntry.Text = (mins / 60).ToString(); unit.SelectedIndex = 1; }
+                else if (mins > 0) { valEntry.Text = mins.ToString(); unit.SelectedIndex = 0; }
+                else { valEntry.Text = ""; unit.SelectedIndex = 0; }   // default unit: Minutes
+
+                void Apply()
+                {
+                    int minutes = 0;
+                    if (int.TryParse(valEntry.Text, out var v) && v > 0)
+                        minutes = v * (unit.SelectedIndex == 2 ? 1440 : unit.SelectedIndex == 1 ? 60 : 1);
+                    DeviceCache.SetChannelSendTtl(host, channel.Index, minutes);
+                }
+                valEntry.Completed += (_, _) => Apply();
+                valEntry.Unfocused += (_, _) => Apply();
+                unit.SelectedIndexChanged += (_, _) => Apply();
+
+                var row = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2),
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) } };
+                row.Add(new Label { Text = channel.DisplayName, TextColor = Fg, VerticalOptions = LayoutOptions.Center }, 0, 0);
+                row.Add(valEntry, 1, 0);
+                row.Add(unit, 2, 0);
+                root.Add(row);
+            }
+        }
+
+        var closeBtn = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
         closeBtn.Clicked += async (_, _) => await Navigation.PopModalAsync();
         root.Add(closeBtn);
 

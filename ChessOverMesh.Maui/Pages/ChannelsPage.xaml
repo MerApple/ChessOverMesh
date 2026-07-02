@@ -9,7 +9,7 @@
 
             <Grid ColumnDefinitions="*,Auto">
                 <Label Text="Device channels" TextColor="#E0E0E0" FontAttributes="Bold" VerticalOptions="Center"/>
-                <Button x:Name="FetchBtn" Grid.Column="1" Text="Fetch from device" Clicked="OnFetch" HeightRequest="34" Padding="10,0" FontSize="13"/>
+                <Button x:Name="FetchBtn" Grid.Column="1" Text="Fetch from device" Clicked="OnFetch" MinimumHeightRequest="34" Padding="10,0"/>
             </Grid>
 
             <CollectionView x:Name="ChannelList" SelectionMode="Single" SelectionChanged="OnChannelSelected"
@@ -27,7 +27,7 @@
             <Label Text="App key (selected) — optional AES layered on the channel PSK:" TextColor="#E0E0E0" Margin="0,6,0,0"/>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                 <Entry x:Name="AppKeyBox" Grid.Column="0" IsEnabled="False" TextColor="#E0E0E0" Placeholder="passphrase"/>
-                <Button x:Name="SetKeyBtn" Grid.Column="1" Text="Set key" Clicked="OnSetKey" IsEnabled="False" HeightRequest="38" Padding="10,0" FontSize="13"/>
+                <Button x:Name="SetKeyBtn" Grid.Column="1" Text="Set key" Clicked="OnSetKey" IsEnabled="False" MinimumHeightRequest="38" Padding="10,0"/>
             </Grid>
             <HorizontalStackLayout Spacing="8" Margin="0,2,0,0">
                 <Switch x:Name="AckSwitch" IsEnabled="False" Toggled="OnAckToggled"/>
@@ -41,7 +41,7 @@
             <Label Text="Auto-ack keywords (RSSI) — comma-separated:" TextColor="#E0E0E0" Margin="0,6,0,0"/>
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                 <Entry x:Name="TriggerBox" Grid.Column="0" IsEnabled="False" TextColor="#E0E0E0" BackgroundColor="#1E1E1E" Placeholder="ping, test, rssi"/>
-                <Button x:Name="SetTriggerBtn" Grid.Column="1" Text="Set" Clicked="OnSetTrigger" IsEnabled="False" HeightRequest="38" Padding="10,0" FontSize="13"/>
+                <Button x:Name="SetTriggerBtn" Grid.Column="1" Text="Set" Clicked="OnSetTrigger" IsEnabled="False" MinimumHeightRequest="38" Padding="10,0"/>
             </Grid>
             <Label Text="Case-insensitive. A message matching any of these gets an RSSI ack even when acks are off for this channel. A plain word (ping) matches anywhere in the message; quote it (&quot;ping&quot;) to match only when the whole message is exactly that word." TextColor="#B0B0B0" FontSize="11"/>
 
@@ -58,7 +58,7 @@
                 <Switch x:Name="PositionSwitch" IsEnabled="False"/>
                 <Label Text="Share position on this channel" TextColor="#E0E0E0" VerticalOptions="Center"/>
             </HorizontalStackLayout>
-            <Button x:Name="SaveOptionsBtn" Text="Save options" Clicked="OnSaveOptions" IsEnabled="False" HeightRequest="36" Padding="14,0" FontSize="13" HorizontalOptions="Start" Margin="0,4,0,0"/>
+            <Button x:Name="SaveOptionsBtn" Text="Save options" Clicked="OnSaveOptions" IsEnabled="False" MinimumHeightRequest="36" Padding="14,0" HorizontalOptions="Start" Margin="0,4,0,0"/>
 
             <BoxView HeightRequest="1" Color="#3F3F46" Margin="0,10,0,6"/>
 
@@ -70,9 +70,9 @@
                 <Entry x:Name="PskBox" Grid.Row="1" Grid.Column="1" TextColor="#E0E0E0" Placeholder="base64 key, passphrase, or empty"/>
             </Grid>
             <HorizontalStackLayout Spacing="6">
-                <Button x:Name="RandomBtn" Text="Random PSK" Clicked="OnRandomPsk" HeightRequest="36" Padding="10,0" FontSize="13"/>
-                <Button x:Name="CreateBtn" Text="Create" Clicked="OnCreate" HeightRequest="36" Padding="14,0" FontSize="13"/>
-                <Button x:Name="DeleteBtn" Text="Delete" Clicked="OnDelete" IsEnabled="False" HeightRequest="36" Padding="14,0" FontSize="13"/>
+                <Button x:Name="RandomBtn" Text="Random PSK" Clicked="OnRandomPsk" MinimumHeightRequest="36" Padding="10,0"/>
+                <Button x:Name="CreateBtn" Text="Create" Clicked="OnCreate" MinimumHeightRequest="36" Padding="14,0"/>
+                <Button x:Name="DeleteBtn" Text="Delete" Clicked="OnDelete" IsEnabled="False" MinimumHeightRequest="36" Padding="14,0"/>
             </HorizontalStackLayout>
 
             <BoxView HeightRequest="1" Color="#3F3F46" Margin="0,10,0,6"/>
@@ -87,7 +87,7 @@
 
             <Label x:Name="StatusLabel" TextColor="#B0B0B0" FontSize="12" Margin="0,8,0,0"/>
 
-            <Button x:Name="DoneBtn" Text="Done" Clicked="OnDone" HeightRequest="40" Margin="0,12,0,0"/>
+            <Button x:Name="DoneBtn" Text="Done" Clicked="OnDone" MinimumHeightRequest="40" Margin="0,12,0,0"/>
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

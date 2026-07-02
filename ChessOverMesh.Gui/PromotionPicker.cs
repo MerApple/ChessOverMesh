@@ -38,8 +38,8 @@ internal static class PromotionPicker
             var btn = new Button
             {
                 Content = new TextBlock { Text = glyph, FontSize = 34, Foreground = fg },
-                Width = 56,
-                Height = 56,
+                MinWidth = 56,
+                MinHeight = 56,
                 Margin = new Thickness(4),
                 Tag = type
             };

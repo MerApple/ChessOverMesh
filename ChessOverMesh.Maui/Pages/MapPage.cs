@@ -19,7 +19,7 @@ public sealed class MapPage : ContentPage
 
         var web = new WebView { Source = new HtmlWebViewSource { Html = NodeMap.Html(positions) } };
 
-        var close = new Button { Text = "Close", Padding = new Thickness(14, 0), HeightRequest = 40 };
+        var close = new Button { Text = "Close", Padding = new Thickness(14, 0), MinimumHeightRequest = 40 };
         close.Clicked += async (_, _) => await Navigation.PopModalAsync();
 
         string count = positions.Count == 0

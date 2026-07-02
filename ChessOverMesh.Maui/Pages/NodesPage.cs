@@ -67,15 +67,15 @@ public sealed class NodesPage : ContentPage
         sortRow.Add(new Label { Text = "Sort", TextColor = Dim, VerticalOptions = LayoutOptions.Center }, 0, 0);
         sortRow.Add(_sort, 1, 0);
 
-        _updateBtn = new Button { Text = "Update nodes", HeightRequest = 40, Padding = new Thickness(12, 0) };
+        _updateBtn = new Button { Text = "Update nodes", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         _updateBtn.Clicked += OnUpdate;
-        _mapBtn = new Button { Text = "Map", HeightRequest = 40, Padding = new Thickness(12, 0) };
+        _mapBtn = new Button { Text = "Map", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         _mapBtn.Clicked += OnMap;
         var btnRow = new Grid { ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
         btnRow.Add(_updateBtn, 0, 0);
         btnRow.Add(_mapBtn, 1, 0);
 
-        var close = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 8, 0, 0) };
+        var close = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 8, 0, 0) };
         close.Clicked += async (_, _) => await CloseAsync();
 
         // Pinned controls (top) and Close (bottom); only the node list scrolls, so Close stays visible no matter

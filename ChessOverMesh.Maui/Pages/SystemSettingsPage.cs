@@ -93,7 +93,66 @@ public sealed class SystemSettingsPage : ContentPage
             TextColor = Dim, FontSize = 11,
         });
 
-        var closeBtn = new Button { Text = "Close", HeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
+        // ---- Cache password (per device) ----
+        root.Add(new BoxView { HeightRequest = 1, Color = Color.FromArgb("#3F3F46"), Margin = new Thickness(0, 8, 0, 4) });
+        root.Add(new Label { Text = "Cache encryption", TextColor = Fg, FontAttributes = FontAttributes.Bold });
+        string host = _main.CurrentHost;
+        var cacheStatus = new Label { TextColor = Dim, FontSize = 11 };
+        var setPwBtn = new Button { Text = "Set / change password", MinimumHeightRequest = 44 };
+        var removePwBtn = new Button { Text = "Remove password", MinimumHeightRequest = 44 };
+
+        void RefreshCacheState()
+        {
+            if (host.Length == 0)
+            {
+                cacheStatus.Text = "Connect to a device to set a cache password.";
+                setPwBtn.IsEnabled = removePwBtn.IsEnabled = false;
+                return;
+            }
+            bool enc = DeviceCache.IsEncrypted(host);
+            cacheStatus.Text = enc
+                ? "This device's cache is ENCRYPTED. You'll be asked for the password when connecting."
+                : "This device's cache is not encrypted. Set a password to encrypt it.";
+            setPwBtn.IsEnabled = true;
+            removePwBtn.IsEnabled = enc;
+        }
+        setPwBtn.Clicked += async (_, _) =>
+        {
+            // Changing an existing password requires the current one — verified via Unlock, which also loads the
+            // session key so the change re-encrypts the existing cache instead of losing it.
+            if (DeviceCache.IsEncrypted(host))
+            {
+                string? cur = await DisplayPromptAsync("Change cache password", "Current password:", "OK", "Cancel");
+                if (string.IsNullOrEmpty(cur)) return;
+                if (!DeviceCache.Unlock(host, cur)) { await DisplayAlert("Incorrect password", "The current password is incorrect.", "OK"); return; }
+            }
+            string? p1 = await DisplayPromptAsync("Set cache password", "New password:", "OK", "Cancel");
+            if (string.IsNullOrEmpty(p1)) return;
+            string? p2 = await DisplayPromptAsync("Set cache password", "Confirm password:", "OK", "Cancel");
+            if (p1 != p2) { await DisplayAlert("Passwords don't match", "Please try again.", "OK"); return; }
+            DeviceCache.SetPassword(host, p1);
+            RefreshCacheState();
+        };
+        removePwBtn.Clicked += async (_, _) =>
+        {
+            bool ok = await DisplayAlert("Remove cache password",
+                "Remove the cache password for this device? Its cache will be stored unencrypted.", "Remove", "Cancel");
+            if (!ok) return;
+            DeviceCache.SetPassword(host, "");
+            RefreshCacheState();
+        };
+        RefreshCacheState();
+        root.Add(cacheStatus);
+        root.Add(setPwBtn);
+        root.Add(removePwBtn);
+        root.Add(new Label
+        {
+            Text = "Encrypts this device's cached chat, node and telemetry data (AES) with a password you enter on " +
+                   "connect. The password isn't stored. If you forget it, you can delete the cache when connecting.",
+            TextColor = Dim, FontSize = 11,
+        });
+
+        var closeBtn = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };
         closeBtn.Clicked += async (_, _) => await Navigation.PopModalAsync();
         root.Add(closeBtn);
 

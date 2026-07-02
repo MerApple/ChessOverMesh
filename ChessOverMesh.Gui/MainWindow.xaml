@@ -33,19 +33,19 @@
                         <Setter Property="Margin" Value="8,0,4,0"/>
                     </Style>
                 </WrapPanel.Resources>
-                <Button x:Name="FindBtn" Content="Find" Width="56" Height="24" Margin="0,0,8,0" Click="FindBtn_Click"
+                <Button x:Name="FindBtn" Content="Find" MinWidth="56" MinHeight="24" Margin="0,0,8,0" Click="FindBtn_Click"
                         ToolTip="Find Meshtastic devices on the local network (mDNS)"/>
                 <TextBlock Text="Host:" Margin="0,0,4,0"/>
-                <TextBox x:Name="HostBox" Width="190" Height="24" Text="http://192.168.2.183"/>
-                <Button x:Name="ConnectBtn" Content="Connect" Width="92" Height="24" Margin="6,0,0,0" Click="ConnectBtn_Click"/>
-                <Button x:Name="ChannelsBtn" Content="Channels…" Width="92" Height="24" Margin="8,0,0,0"
+                <TextBox x:Name="HostBox" MinWidth="190" MinHeight="24" Text="http://192.168.2.183"/>
+                <Button x:Name="ConnectBtn" Content="Connect" MinWidth="92" MinHeight="24" Margin="6,0,0,0" Click="ConnectBtn_Click"/>
+                <Button x:Name="ChannelsBtn" Content="Channels…" MinWidth="92" MinHeight="24" Margin="8,0,0,0"
                         IsEnabled="False" Click="ChannelsBtn_Click"
                         ToolTip="Create/delete channels on the radio, and choose the chess and chat channels"/>
-                <Button x:Name="StartBtn" Content="Chess" Width="70" Height="24"
+                <Button x:Name="StartBtn" Content="Chess" MinWidth="70" MinHeight="24"
                         Margin="8,0,0,0" Click="StartBtn_Click" IsEnabled="False"/>
-                <Button x:Name="NodesBtn" Content="Nodes…" Width="70" Height="24"
+                <Button x:Name="NodesBtn" Content="Nodes…" MinWidth="70" MinHeight="24"
                         Margin="8,0,0,0" Click="NodesBtn_Click" IsEnabled="False"/>
-                <Button x:Name="SettingsBtn" Content="Settings…" Width="84" Height="24"
+                <Button x:Name="SettingsBtn" Content="Settings…" MinWidth="84" MinHeight="24"
                         Margin="8,0,0,0" Click="SettingsBtn_Click"
                         ToolTip="Device, color and sound settings"/>
             </WrapPanel>
@@ -94,7 +94,7 @@
 
                 <Grid Grid.Row="0" Margin="0,0,0,4">
                     <TextBlock Text="Moves" Foreground="#FFB0B0B0" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <Button x:Name="ResendBtn" Content="Resend" HorizontalAlignment="Right" Height="22" Padding="10,0"
+                    <Button x:Name="ResendBtn" Content="Resend" HorizontalAlignment="Right" MinHeight="22" Padding="10,0"
                             IsEnabled="False" Click="ResendBtn_Click"
                             ToolTip="Resend your last move — enabled once it goes unacknowledged after the auto-retries"/>
                 </Grid>
@@ -120,11 +120,11 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Button x:Name="ResignBtn" Grid.Column="0" Content="Resign" Height="28"
+                    <Button x:Name="ResignBtn" Grid.Column="0" Content="Resign" MinHeight="28"
                             Margin="0,0,3,0" Click="ResignBtn_Click" IsEnabled="False"/>
-                    <Button x:Name="SaveBtn" Grid.Column="1" Content="Save…" Height="28"
+                    <Button x:Name="SaveBtn" Grid.Column="1" Content="Save…" MinHeight="28"
                             Margin="3,0,3,0" Click="SaveBtn_Click" IsEnabled="False"/>
-                    <Button x:Name="CancelBtn" Grid.Column="2" Content="Cancel" Height="28"
+                    <Button x:Name="CancelBtn" Grid.Column="2" Content="Cancel" MinHeight="28"
                             Margin="3,0,0,0" Click="CancelBtn_Click" IsEnabled="False"/>
                 </Grid>
                 </Grid>
@@ -143,7 +143,7 @@
 
                 <Grid Grid.Row="0" Margin="0,0,0,4">
                     <TextBlock Text="System messages" Foreground="#FFB0B0B0" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <Button x:Name="SystemFilterBtn" Content="Filter ▾" HorizontalAlignment="Right" Height="20" Padding="8,0"
+                    <Button x:Name="SystemFilterBtn" Content="Filter ▾" HorizontalAlignment="Right" MinHeight="20" Padding="8,0"
                             Click="SystemFilterBtn_Click" ToolTip="Show or hide types of system messages"/>
                     <Popup x:Name="SystemFilterPopup" PlacementTarget="{Binding ElementName=SystemFilterBtn}" Placement="Bottom"
                            StaysOpen="False" AllowsTransparency="True">
@@ -197,11 +197,11 @@
                     <TextBlock Text="Channel chat" Foreground="#FFB0B0B0" FontWeight="Bold" Margin="0,0,0,4"/>
                     <WrapPanel>
                         <TextBlock Text="TX:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <ComboBox x:Name="ChatTxCombo" Width="150" Height="22" IsEnabled="False"
+                        <ComboBox x:Name="ChatTxCombo" MinWidth="150" MinHeight="22" IsEnabled="False"
                                   SelectionChanged="ChatTxCombo_Changed"
                                   ToolTip="Where chat is transmitted: a channel (group broadcast) or a DM-enabled node (direct message)"/>
                         <TextBlock Text="RX:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="12,0,4,0"/>
-                        <Button x:Name="RxButton" Content="Show ▾" MinWidth="90" Height="22" IsEnabled="False" Click="RxButton_Click"
+                        <Button x:Name="RxButton" Content="Show ▾" MinWidth="90" MinHeight="22" IsEnabled="False" Click="RxButton_Click"
                                 ToolTip="Choose which channels and DMs are shown in chat. A dot marks unread messages on hidden ones."/>
                         <Popup x:Name="RxPopup" StaysOpen="False" Placement="Bottom" PlacementTarget="{Binding ElementName=RxButton}" AllowsTransparency="True">
                             <Border Background="#FF2D2D30" BorderBrush="#FF55555A" BorderThickness="1" Padding="6">
@@ -271,6 +271,20 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
+                                <!-- Sender self-destruct countdown ("🕓 deletes in …"), hidden when the message
+                                     has no expiry. Dim like the metadata line so it reads as a soft note. -->
+                                <TextBlock Text="{Binding Expiry}" Foreground="#FF8A8A8A" FontSize="10"
+                                           TextWrapping="Wrap" Margin="0,1,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Expiry}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                                 <!-- Emoji reactions (tapbacks) on this message, hidden when there are none. -->
                                 <TextBlock Text="{Binding Reactions}" FontSize="14" TextWrapping="Wrap" Margin="0,1,0,0">
                                     <TextBlock.Style>
@@ -302,7 +316,7 @@
                             Background="#FF2D2D30" BorderBrush="#FF3F3F46" BorderThickness="1"
                             Padding="6,2" Margin="0,0,0,4" Visibility="Collapsed">
                         <DockPanel>
-                            <Button x:Name="ReplyCancelBtn" DockPanel.Dock="Right" Content="✕" Width="20" Height="18"
+                            <Button x:Name="ReplyCancelBtn" DockPanel.Dock="Right" Content="✕" MinWidth="20" MinHeight="18"
                                     Padding="0" Margin="4,0,0,0" Click="ReplyCancel_Click" ToolTip="Cancel reply"/>
                             <TextBlock x:Name="ReplyText" Foreground="#FFB0B0B0" FontSize="11"
                                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
@@ -313,9 +327,9 @@
                              VerticalAlignment="Top" MaxHeight="96"
                              PreviewKeyDown="ChatBox_KeyDown" TextChanged="ChatBox_TextChanged"/>
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="4,0,0,0" VerticalAlignment="Top">
-                        <Button x:Name="EmojiBtn" Content="🙂" Width="30" Height="26" IsEnabled="False"
+                        <Button x:Name="EmojiBtn" Content="🙂" MinWidth="30" MinHeight="26" IsEnabled="False"
                                 Click="EmojiBtn_Click" ToolTip="Insert a smiley"/>
-                        <Button x:Name="ChatSendBtn" Content="Send" Width="56" Height="26"
+                        <Button x:Name="ChatSendBtn" Content="Send" MinWidth="56" MinHeight="26"
                                 Margin="4,0,0,0" IsEnabled="False" Click="ChatSendBtn_Click"/>
                     </StackPanel>
                     <TextBlock x:Name="CharCounter" Grid.Row="2" Grid.Column="1" Text="0 / 200"

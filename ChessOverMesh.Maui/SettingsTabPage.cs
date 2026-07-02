@@ -31,7 +31,7 @@ public sealed class SettingsTabPage : ContentPage
     // A full-width section button. If it needs a connection and there isn't one, it prompts instead of opening.
     Button Section(string text, bool needsConnection, Action open)
     {
-        var btn = new Button { Text = text, HeightRequest = 48, HorizontalOptions = LayoutOptions.Fill };
+        var btn = new Button { Text = text, MinimumHeightRequest = 48, HorizontalOptions = LayoutOptions.Fill };
         btn.Clicked += async (_, _) =>
         {
             if (needsConnection && !_main.IsConnected)

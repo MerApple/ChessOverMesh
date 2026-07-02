@@ -9,6 +9,10 @@
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <!-- App-wide text size for buttons/labels/inputs (window chrome). The chat/moves/system content
+                 lines bind their own FontSize, so they keep their independent sizes. Seeded from AppSettings
+                 at startup and updated live when changed. -->
+            <x:Double x:Key="UiTextSize">14</x:Double>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

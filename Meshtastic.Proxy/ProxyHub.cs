@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using ChessOverMesh.Mesh;
 using Google.Protobuf;
 using Meshtastic.Protobufs;
@@ -34,6 +36,12 @@ internal sealed class ProxyHub
     private readonly Action<string> _log;
     private readonly bool _verbose;
 
+    // Optional client authentication. When a username is configured, a client must present matching credentials
+    // (over the already-encrypted TLS link) before it's served; otherwise the proxy greets clients as open.
+    private readonly string? _authUser;
+    private readonly string? _authPass;
+    private bool AuthRequired => !string.IsNullOrEmpty(_authUser);
+
     private readonly object _sync = new();
     private readonly List<Client> _clients = new();
 
@@ -58,9 +66,11 @@ internal sealed class ProxyHub
     private readonly SortedDictionary<int, byte[]> _channels = new(); // channel index -> frame
     private readonly Dictionary<uint, byte[]> _nodes = new();         // node num -> frame
 
-    public ProxyHub(Func<CancellationToken, Task<IMeshTransport>> connectDevice, X509Certificate2 cert, int port, Action<string> log, bool verbose = false)
+    public ProxyHub(Func<CancellationToken, Task<IMeshTransport>> connectDevice, X509Certificate2 cert, int port, Action<string> log,
+                    bool verbose = false, string? authUser = null, string? authPass = null)
     {
         _connectDevice = connectDevice; _cert = cert; _port = port; _log = log; _verbose = verbose;
+        _authUser = authUser; _authPass = authPass;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -227,8 +237,18 @@ internal sealed class ProxyHub
             ssl = new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false);
             await ssl.AuthenticateAsServerAsync(_cert, clientCertificateRequired: false, checkCertificateRevocation: false);
             client = new Client(ssl);
+
+            // Greet the client, stating whether auth is required, then (if so) require valid credentials before
+            // serving anything. A rejected client is dropped here and never added to the served set.
+            await SendFrameAsync(client, HelloPayload(), ct);
+            if (AuthRequired && !await AuthenticateClientAsync(client, remote, ct))
+            {
+                _log($"Client {remote} failed authentication — disconnecting.");
+                return;   // finally disposes the socket
+            }
+
             lock (_sync) _clients.Add(client);
-            _log($"Client connected: {remote}  (total {_clients.Count})");
+            _log($"Client connected: {remote}  (total {_clients.Count}){(AuthRequired ? " [authenticated]" : "")}");
 
             while (!ct.IsCancellationRequested)
             {
@@ -393,6 +413,41 @@ internal sealed class ProxyHub
         lock (_sync) _clients.Remove(c);
         try { c.Stream.Dispose(); } catch { }
     }
+
+    // ---- Client authentication (control frames over the already-encrypted TLS link) ----
+    private static readonly byte[] Mpxy = { (byte)'M', (byte)'P', (byte)'X', (byte)'Y' };
+
+    // "MPXY" + 0x04 + [authRequired] — the opening frame telling a client whether it must send credentials.
+    private byte[] HelloPayload() => new byte[] { Mpxy[0], Mpxy[1], Mpxy[2], Mpxy[3], 0x04, (byte)(AuthRequired ? 1 : 0) };
+
+    // Reads the client's first frame ("MPXY" + 0x02 + [userLen][user][pass]) and replies "MPXY" + 0x03 + result.
+    private async Task<bool> AuthenticateClientAsync(Client client, string remote, CancellationToken ct)
+    {
+        byte[]? frame;
+        try { frame = await client.ReadFrameAsync(ct); }
+        catch { return false; }
+        bool ok = TryParseAuth(frame, out var user, out var pass) && CredsMatch(user, pass);
+        try { await SendFrameAsync(client, new byte[] { Mpxy[0], Mpxy[1], Mpxy[2], Mpxy[3], 0x03, (byte)(ok ? 1 : 0) }, ct); } catch { }
+        return ok;
+    }
+
+    private static bool TryParseAuth(byte[]? f, out string user, out string pass)
+    {
+        user = ""; pass = "";
+        if (f == null || f.Length < 6 || f[0] != Mpxy[0] || f[1] != Mpxy[1] || f[2] != Mpxy[2] || f[3] != Mpxy[3] || f[4] != 0x02) return false;
+        int ul = f[5];
+        if (6 + ul > f.Length) return false;
+        user = Encoding.UTF8.GetString(f, 6, ul);
+        pass = Encoding.UTF8.GetString(f, 6 + ul, f.Length - (6 + ul));
+        return true;
+    }
+
+    private bool CredsMatch(string user, string pass) =>
+        FixedEquals(user, _authUser ?? "") && FixedEquals(pass, _authPass ?? "");
+
+    // Length-tolerant constant-time compare (FixedTimeEquals returns false on a length mismatch without early-exiting).
+    private static bool FixedEquals(string a, string b) =>
+        CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
 
     private static byte[] Frame(byte[] p)
     {
