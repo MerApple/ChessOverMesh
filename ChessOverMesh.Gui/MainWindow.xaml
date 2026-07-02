@@ -221,7 +221,8 @@
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
                          SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
                     <ListBox.ContextMenu>
-                        <ContextMenu>
+                        <!-- FontSize matches the app's default button/label text (12) so the menu isn't the larger system-menu size -->
+                        <ContextMenu FontSize="12">
                             <MenuItem Header="Reply" Click="Reply_Click"/>
                             <MenuItem Header="React">
                                 <MenuItem Header="👍" Click="React_Click"/>
