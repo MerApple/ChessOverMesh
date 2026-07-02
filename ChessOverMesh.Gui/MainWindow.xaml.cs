@@ -3389,23 +3389,25 @@ public partial class MainWindow : Window
     {
         if (CharCounter == null) return;
         string text = ChatBox.Text.Trim();
+        // Self-destruct rides an SOH-delimited TTL header in the wire text (see SendChat), so it adds a few bytes to
+        // the payload. Measure the exact string SendChat transmits — header included — or the count would be short.
+        int ttlMinutes = (text.Length > 0 && _currentHost.Length > 0)
+            ? DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel)
+            : 0;
+        string wireText = ProtocolMessage.EncodeChatTtl(ttlMinutes * 60, text);
         string key = _mesh?.GetChannelKey(_chatTxChannel) ?? "";   // wire length depends on the chat TX channel's key
         // The radio limit is on the payload BYTES, so count UTF-8 bytes (emoji are multi-byte); for an app-keyed
-        // channel the payload is the AES base64 ciphertext (ASCII, so length == bytes).
-        int wireLen = text.Length == 0 ? 0 : (key.Length > 0 ? AesText.Encrypt(text, key).Length : System.Text.Encoding.UTF8.GetByteCount(text));
-        CharCounter.Text = $"{wireLen} / {MaxChatChars}{SendDeleteSuffix(text.Length > 0)}";
+        // channel the payload is the AES base64 ciphertext (ASCII, so length == bytes) of that whole wire text.
+        int wireLen = text.Length == 0 ? 0 : (key.Length > 0 ? AesText.Encrypt(wireText, key).Length : System.Text.Encoding.UTF8.GetByteCount(wireText));
+        CharCounter.Text = $"{wireLen} / {MaxChatChars}{SendDeleteSuffix(ttlMinutes)}";
         CharCounter.Foreground = wireLen > MaxChatChars ? WarningText : CounterNormal;
     }
 
-    /// <summary>The " · 🕓 deletes …" tail for the char counter: the wall-clock time a message sent right now on the
-    /// current TX channel would self-destruct, or "" if the channel has no send-TTL (or there's nothing to send).
-    /// Shows the time of day, adding the date when the deletion falls on a later day.</summary>
-    private string SendDeleteSuffix(bool hasText)
+    /// <summary>The " 🕓 deletes …" tail for the char counter: the wall-clock time a message sent right now would
+    /// self-destruct, given the current TX channel's send-TTL in minutes, or "" when there is no TTL. Shows the time
+    /// of day, adding the date when the deletion falls on a later day.</summary>
+    private static string SendDeleteSuffix(int ttlMinutes)
     {
-        if (!hasText) return "";
-        int ttlMinutes = _currentHost.Length > 0
-            ? DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel)
-            : 0;
         if (ttlMinutes <= 0) return "";
         DateTime deleteAt = DateTime.Now.AddMinutes(ttlMinutes);
         string when = deleteAt.Date == DateTime.Today ? deleteAt.ToString("HH:mm") : deleteAt.ToString("MMM d HH:mm");
