@@ -3276,7 +3276,10 @@ public partial class MainWindow : Window
             if (ProtocolMessage.TryDecodeChatTtl(body, out var ttlS, out var strippedBody)) { ttlSeconds = ttlS; body = strippedBody; }
             bool resent = body.StartsWith(ProtocolMessage.ChatResendPrefix, StringComparison.Ordinal);
             if (resent) body = body.Substring(ProtocolMessage.ChatResendPrefix.Length);
-            string detail = $"{Stamp()}{dmTag}{chan}{sig}".Trim();   // dim metadata line under the message
+            // Flag app-level encryption (extra AES key on this channel) with a lock, like the TX picker — but not on a
+            // decrypt failure, which already shows its own ⚠ and would make the lock misleading.
+            string lockTag = msg.DecryptFailed ? "" : ChatLockTag(msg.Channel, isDm);
+            string detail = $"{Stamp()}{dmTag}{chan}{lockTag}{sig}".Trim();   // dim metadata line under the message
             if (resent) detail = detail.Length > 0 ? detail + "  · resent" : "resent";
             // Note when the device got this off MQTT rather than over the air (shown regardless of the signal toggle).
             if (msg.ViaMqtt) detail = detail.Length > 0 ? detail + "  · via MQTT" : "via MQTT";
@@ -3841,6 +3844,13 @@ public partial class MainWindow : Window
     // whole split has been transmitted.
     private bool ChatInFlight => _pending.Values.Any(p => p.IsChat) || _chunkSending || _chunkSendStarting || _chatSplitQueue.Count > 0;
 
+    /// <summary>"🔒 " when a channel broadcast rides an app encryption key (the extra AES layer a peer needs the
+    /// same key to read), else "". DMs return "" — the app key is a per-channel setting. Mirrors the lock shown in
+    /// the TX channel picker so encrypted chat is flagged the same way on the metadata line of sent and received
+    /// messages.</summary>
+    private string ChatLockTag(uint channel, bool isDm)
+        => (!isDm && (_mesh?.GetChannelKey(channel).Length ?? 0) > 0) ? "🔒 " : "";
+
     private async void SendChat()
     {
         if (_mesh == null) return;
@@ -3911,7 +3921,8 @@ public partial class MainWindow : Window
         uint replyId = _replyToId;
         string replyRef = ReplyRef(replyId);
         ClearReply();
-        string detailBase = $"{Stamp()}{dmTag}{chan}".Trim();    // dim metadata line; marks append here
+        string lockTag = ChatLockTag(_chatTxChannel, isDm);   // 🔒 when this channel has an app encryption key set
+        string detailBase = $"{Stamp()}{dmTag}{chan}{lockTag}".Trim();    // dim metadata line; marks append here
         if (replyRef.Length > 0) detailBase = $"{replyRef}  ·  {detailBase}".Trim(' ', '·');
         // A DM is confirmed by the recipient's routing ack (handled in MarkAcked). On ack-off channels a
         // broadcast is confirmed by overhearing a relay instead of a CHATACK; either way the message is held
