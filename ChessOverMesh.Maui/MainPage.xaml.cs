@@ -148,6 +148,12 @@ public partial class MainPage : ContentPage
     /// <summary>The chat wire-length limit (chars actually transmitted), for the composer's character counter.</summary>
     public static int MaxChatLength => MaxChatChars;
 
+    /// <summary>The self-destruct lifetime (minutes) that outgoing messages on the current TX channel are stamped
+    /// with, or 0 when the channel has no send-TTL. The send-TTL is per broadcast channel, so a DM uses the same
+    /// lookup as a broadcast (both keyed by <c>_chatTxChannel</c>), matching <see cref="SendChatMessageAsync"/>.</summary>
+    public int ChatSendTtlMinutes() =>
+        _currentHost.Length > 0 ? DeviceCache.GetChannelSendTtl(_currentHost).GetValueOrDefault(_chatTxChannel) : 0;
+
     /// <summary>The wire length (chars actually transmitted) of a prospective chat message on the current TX
     /// channel: the AES-base64 ciphertext length when the channel has an app key, else the trimmed text length.
     /// Mirrors the check in <see cref="SendChatAsync"/> so the composer's counter agrees with the send limit.</summary>
@@ -155,8 +161,12 @@ public partial class MainPage : ContentPage
     {
         string t = (text ?? "").Trim();
         if (t.Length == 0) return 0;
+        // Self-destruct rides an SOH-delimited TTL header in the wire text (see SendChatMessageAsync), so it adds a
+        // few bytes in front of the body. Measure the exact string that gets sent — header included — or the counter
+        // under-reports (and, on an app-keyed channel, would encrypt the wrong plaintext length).
+        string wireText = ProtocolMessage.EncodeChatTtl(ChatSendTtlMinutes() * 60, t);
         string key = _mesh?.GetChannelKey(_chatTxChannel) ?? "";
-        return key.Length > 0 ? AesText.Encrypt(t, key).Length : t.Length;
+        return key.Length > 0 ? AesText.Encrypt(wireText, key).Length : wireText.Length;
     }
     static readonly TimeSpan MoveSendDelay = TimeSpan.FromSeconds(5);
     DateTime _moveSendAllowedUtc = DateTime.MinValue;
