@@ -57,6 +57,10 @@ internal static class AppSettings
         // keep their own sizes. Default 12 = the WPF default, so it's a no-op until changed.
         public double UiTextSize { get; set; } = 12;
 
+        // Per-hardware-type noise-floor calibration offsets (dBm), keyed by hardware model display name. Added to
+        // the reported noise floor for nodes of that hardware. Only non-zero entries are stored (missing = 0).
+        public Dictionary<string, int> NoiseCalibrations { get; set; } = new();
+
         // Remembered proxy sign-in credentials, keyed by proxy host. The password is DPAPI-protected.
         public Dictionary<string, ProxyCred> ProxyCreds { get; set; } = new();
 
@@ -235,6 +239,21 @@ internal static class AppSettings
 
     // App-wide text size for buttons and settings/labels (window chrome). Content lists keep their own sizes.
     public static double UiTextSize { get => Load().UiTextSize; set => Mutate(d => d.UiTextSize = value); }
+
+    /// <summary>Per-hardware-type noise-floor calibration offsets (dBm), keyed by hardware model display name.
+    /// Only non-zero offsets are kept; a hardware type with no entry uses the default of 0 (no adjustment).</summary>
+    public static IReadOnlyDictionary<string, int> NoiseCalibrations => Load().NoiseCalibrations;
+
+    /// <summary>The calibration offset (dBm) configured for <paramref name="hardware"/>, or 0 if none.</summary>
+    public static int GetNoiseCalibration(string hardware) =>
+        Load().NoiseCalibrations.TryGetValue(hardware, out var v) ? v : 0;
+
+    /// <summary>Replaces the per-hardware noise-floor calibration offsets, dropping any that are 0 so the file
+    /// keeps only meaningful (non-default) entries.</summary>
+    public static void SetNoiseCalibrations(IReadOnlyDictionary<string, int> calibrations) =>
+        Mutate(d => d.NoiseCalibrations = calibrations
+            .Where(kv => kv.Value != 0)
+            .ToDictionary(kv => kv.Key, kv => kv.Value));
 
     /// <summary>The remembered proxy login for <paramref name="host"/> (password decrypted), or null if none saved.</summary>
     public static (string User, string Pass)? GetProxyCred(string host)
