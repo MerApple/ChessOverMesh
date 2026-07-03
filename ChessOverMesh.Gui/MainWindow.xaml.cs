@@ -12,6 +12,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using ChessOverMesh.Chess;
 using ChessOverMesh.Game;
+using ChessOverMesh.Map;
 using ChessOverMesh.Mesh;
 using MediaColor = System.Windows.Media.Color;
 using GameColor = ChessOverMesh.Chess.Color;
@@ -69,6 +70,10 @@ public partial class MainWindow : Window
     private bool _refreshing;
 
     private MeshtasticHttpClient? _mesh;
+    // Offline map: a disk tile cache + a loopback server that feeds Leaflet and the tiles to the browser-opened
+    // map so it works with no internet. Created lazily the first time the map is opened or an area is cached.
+    private MapTileCache? _mapCache;
+    private MapTileServer? _mapServer;
     private Board _board = Board.CreateStartingPosition();
     private GameColor _myColor = GameColor.White;
     private string _gameId = "";
@@ -482,7 +487,7 @@ public partial class MainWindow : Window
         LoadFonts();
         _rainbowEffect = AppSettings.RainbowEffect;
 
-        Closed += (_, _) => { StopMoveWave(); _pollTimer.Stop(); _ackTimer.Stop(); _probeTimer.Stop(); _autoReconnectTimer.Stop(); _chatHoldTimer.Stop(); _mesh?.Dispose(); };
+        Closed += (_, _) => { StopMoveWave(); _pollTimer.Stop(); _ackTimer.Stop(); _probeTimer.Stop(); _autoReconnectTimer.Stop(); _chatHoldTimer.Stop(); _mesh?.Dispose(); _mapServer?.Dispose(); };
 
         ApplyConnectionState();
     }
@@ -5041,9 +5046,13 @@ public partial class MainWindow : Window
         var updateBtn = new Button { Content = "Update nodes", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         var mapBtn = new Button { Content = "Map", MinWidth = 70, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         mapBtn.Click += (_, _) => ShowMap();
+        var cacheMapBtn = new Button { Content = "Cache map area…", MinWidth = 120, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0),
+            ToolTip = "Download a chosen area's map tiles so the map works offline." };
+        cacheMapBtn.Click += (_, _) => CacheMapArea(dialog);
         var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28 };
         buttons.Children.Add(updateBtn);
         buttons.Children.Add(mapBtn);
+        buttons.Children.Add(cacheMapBtn);
         buttons.Children.Add(closeBtn);
 
         var greyBrush = new SolidColorBrush(MediaColor.FromRgb(0xB0, 0xB0, 0xB0));
@@ -5386,9 +5395,31 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
     }
 
+    /// <summary>The folder holding the offline map tile cache (under the app's LocalAppData).</summary>
+    private static string MapCacheDir => System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChessOverMesh", "mapcache");
+
+    /// <summary>The shared tile cache, created on first use.</summary>
+    private MapTileCache MapCache => _mapCache ??= new MapTileCache(MapCacheDir);
+
+    /// <summary>Starts (once) the loopback tile server that serves Leaflet + cached tiles to the map page, and
+    /// returns its base URL (e.g. http://127.0.0.1:PORT) — or null if the socket couldn't be bound, in which case
+    /// the map falls back to loading Leaflet and tiles online.</summary>
+    private string? EnsureMapServer()
+    {
+        if (_mapServer == null)
+        {
+            var server = new MapTileServer(MapCache, allowOnlineFallback: true);
+            if (!server.Start()) { server.Dispose(); return null; }
+            _mapServer = server;
+        }
+        return _mapServer.BaseUrl;
+    }
+
     /// <summary>Generates an OpenStreetMap/Leaflet page of all known node positions (with a search box,
-    /// centred on Stockholm by default) and opens it in the default browser. No in-app map control is used,
-    /// so there's no extra dependency; the tiles need an internet connection.</summary>
+    /// centred on Stockholm by default) and opens it in the default browser. Tiles + Leaflet are served by a local
+    /// loopback server backed by the on-disk cache, so areas cached with "Cache map area…" work with no internet
+    /// (and browsing online fills the cache). Falls back to loading them online if the local server can't start.</summary>
     private void ShowMap(uint? focusNum = null)
     {
         if (_mesh == null) return;
@@ -5400,15 +5431,33 @@ public partial class MainWindow : Window
         }
         try
         {
+            string? assetBase = EnsureMapServer();   // null → the map loads Leaflet + tiles online (CDN/OSM)
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chessmesh-nodes-map.html");
             // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
-            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum));
+            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum, assetBase));
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             Status(positions.Count == 0
                 ? "Opened the map (no nodes have a known position yet — right-click a node → Request position)."
                 : $"Opened the map with {positions.Count} node position(s).");
         }
         catch (Exception ex) { Status($"Could not open the map: {ex.Message}"); }
+    }
+
+    /// <summary>Opens the "Cache map area for offline use" dialog, centred on the mean of known node positions
+    /// (or Stockholm when none), and downloads the chosen area's tiles into the cache.</summary>
+    private void CacheMapArea(Window owner)
+    {
+        // Suggest a centre: the mean of known node positions, else the map's default (Stockholm).
+        double cLat = 59.3293, cLon = 18.0686;
+        var positions = _mesh?.GetNodePositions();
+        if (positions is { Count: > 0 })
+        {
+            var pts = positions.Where(p => p.Latitude != 0 || p.Longitude != 0).ToList();
+            if (pts.Count > 0) { cLat = pts.Average(p => p.Latitude); cLon = pts.Average(p => p.Longitude); }
+        }
+        var dlg = new MapCacheDialog(MapCache, cLat, cLon) { Owner = owner };
+        dlg.ShowDialog();
+        Status(dlg.ResultText ?? "Closed the offline-map dialog.");
     }
 
     /// <summary>Relative "X ago" for an epoch-seconds timestamp ("" when unknown/future).</summary>

@@ -5,8 +5,10 @@ namespace ChessOverMesh.Mesh;
 /// <summary>
 /// Builds a self-contained OpenStreetMap/Leaflet HTML page plotting known mesh node positions, with a search
 /// box and markers that show last-heard / position times. Shared by the desktop GUI (opened in the system
-/// browser) and the MAUI app (shown in an in-app WebView), so both render the identical map. The Leaflet JS/CSS
-/// and the map tiles load from CDNs, so an internet connection is needed to display it.
+/// browser) and the MAUI app (shown in an in-app WebView), so both render the identical map. By default the
+/// Leaflet JS/CSS and the map tiles load from CDNs (an internet connection is needed); pass an
+/// <c>assetBase</c> pointing at a running <see cref="ChessOverMesh.Map.MapTileServer"/> to render fully
+/// offline from the local tile cache instead.
 /// </summary>
 public static class NodeMap
 {
@@ -16,9 +18,12 @@ public static class NodeMap
     /// track (oldest first) is embedded so the user can left-click a pin and press "Show last positions" to see
     /// only that node's latest positions, drawn newest-blue → oldest-red with lines between them. Pass
     /// <paramref name="focusNum"/> to open the map straight into that node's track (the "Show on map" button).</summary>
+    /// <param name="assetBase">When set (e.g. <c>http://127.0.0.1:49152</c>, a running
+    /// <see cref="ChessOverMesh.Map.MapTileServer"/>), Leaflet and the tiles load from that local server so the
+    /// map works with no internet. When null, the unpkg CDN + OpenStreetMap tile URLs are used (online only).</param>
     public static string Html(IEnumerable<MeshNodePosition> positions,
         IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null,
-        uint? focusNum = null)
+        uint? focusNum = null, string? assetBase = null)
     {
         var data = positions.Select(p => new
         {
@@ -34,13 +39,29 @@ public static class NodeMap
                 : Array.Empty<double[]>(),
         });
         var focus = focusNum is { } f ? "'" + f.ToString("x8") + "'" : "null";
-        return Template.Replace("__NODES__", JsonSerializer.Serialize(data)).Replace("__FOCUS__", focus);
+
+        // Offline: pull Leaflet + tiles from the local MapTileServer and point the default marker icon at its
+        // bundled images. Online (assetBase null): the unpkg CDN + OpenStreetMap tile server, as before. The
+        // local tile server has no {s} subdomain shard, so its URL uses a single host.
+        bool offline = !string.IsNullOrEmpty(assetBase);
+        string leafletCss = offline ? assetBase + "/leaflet/leaflet.css" : "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        string leafletJs = offline ? assetBase + "/leaflet/leaflet.js" : "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        string tileUrl = offline ? assetBase + "/tiles/{z}/{x}/{y}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+        string iconFix = offline ? "L.Icon.Default.imagePath = '" + assetBase + "/leaflet/images/';" : "";
+
+        return Template
+            .Replace("__LEAFLET_CSS__", leafletCss)
+            .Replace("__LEAFLET_JS__", leafletJs)
+            .Replace("__TILE_URL__", tileUrl)
+            .Replace("__ICON_FIX__", iconFix)
+            .Replace("__NODES__", JsonSerializer.Serialize(data))
+            .Replace("__FOCUS__", focus);
     }
 
     private const string Template = @"<!DOCTYPE html><html><head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Mesh nodes</title>
-<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
-<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+<link rel='stylesheet' href='__LEAFLET_CSS__'/>
+<script src='__LEAFLET_JS__'></script>
 <style>html,body{height:100%;margin:0} #map{height:100%}
 #search{position:absolute;z-index:1000;top:10px;left:60px;padding:6px;width:220px;border:1px solid #888;border-radius:4px}
 #back{position:absolute;z-index:1000;top:10px;right:10px;padding:6px 10px;display:none;border:1px solid #888;border-radius:4px;background:#fff;cursor:pointer;font:14px sans-serif}
@@ -55,8 +76,9 @@ public static class NodeMap
 <script>
 var nodes = __NODES__;
 var focus = __FOCUS__;
+__ICON_FIX__
 var map = L.map('map').setView([59.3293, 18.0686], 6);   // default: Stockholm
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '(c) OpenStreetMap'}).addTo(map);
+L.tileLayer('__TILE_URL__', {maxZoom: 19, attribution: '(c) OpenStreetMap'}).addTo(map);
 var markers = {};      // node num -> main marker
 var group = [];        // all main markers
 var track = null;      // the layer group for a single node's track (polyline + point markers), or null

@@ -16,6 +16,28 @@
     <Compile Include="..\ChessOverMesh\Chess\**\*.cs" />
     <Compile Include="..\ChessOverMesh\Game\**\*.cs" />
     <Compile Include="..\ChessOverMesh\Mesh\**\*.cs" />
+    <Compile Include="..\ChessOverMesh\Map\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Leaflet JS/CSS + marker images, bundled for the offline map. These are linked source files (outside the
+         project cone), so set explicit resource names identical to the ChessOverMesh project's default scheme —
+         MapTileServer looks them up by suffix (e.g. ".leaflet.js", ".images.marker-icon.png"). -->
+    <EmbeddedResource Include="..\ChessOverMesh\Map\leaflet\leaflet.js">
+      <LogicalName>ChessOverMesh.Map.leaflet.leaflet.js</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\ChessOverMesh\Map\leaflet\leaflet.css">
+      <LogicalName>ChessOverMesh.Map.leaflet.leaflet.css</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\ChessOverMesh\Map\leaflet\images\marker-icon.png">
+      <LogicalName>ChessOverMesh.Map.leaflet.images.marker-icon.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\ChessOverMesh\Map\leaflet\images\marker-icon-2x.png">
+      <LogicalName>ChessOverMesh.Map.leaflet.images.marker-icon-2x.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\ChessOverMesh\Map\leaflet\images\marker-shadow.png">
+      <LogicalName>ChessOverMesh.Map.leaflet.images.marker-shadow.png</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

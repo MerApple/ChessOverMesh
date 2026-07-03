@@ -15,4 +15,10 @@
     <ProjectReference Include="..\c-sharp-master\Meshtastic\Meshtastic.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Leaflet JS/CSS + marker images, bundled so the offline map renders with zero connectivity.
+         Served by MapTileServer at /leaflet/*. See Map/MapTileServer.cs. -->
+    <EmbeddedResource Include="Map\leaflet\**\*" />
+  </ItemGroup>
+
 </Project>
