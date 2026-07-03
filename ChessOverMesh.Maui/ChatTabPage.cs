@@ -52,11 +52,14 @@ public sealed class ChatTabPage : ContentPage
                 msg.SetBinding(Label.TextColorProperty, nameof(LogEntry.TextColor));
                 msg.SetBinding(Label.FontFamilyProperty, nameof(LogEntry.FontFamily));
                 msg.SetBinding(Label.FontSizeProperty, nameof(LogEntry.FontSize));
-                var detail = new Label { TextColor = Color.FromArgb("#8A8A8A"), FontSize = 10 };
+                // FontSize tracks the message (DetailFontSize = message size × a <1 factor) so it scales with the chat text setting.
+                var detail = new Label { TextColor = Color.FromArgb("#8A8A8A") };
                 detail.SetBinding(Label.TextProperty, nameof(LogEntry.Detail));
+                detail.SetBinding(Label.FontSizeProperty, nameof(LogEntry.DetailFontSize));
                 // Sender self-destruct countdown ("🕓 deletes in …"), dim; hidden when the message has no expiry.
-                var expiry = new Label { TextColor = Color.FromArgb("#8A8A8A"), FontSize = 10 };
+                var expiry = new Label { TextColor = Color.FromArgb("#8A8A8A") };
                 expiry.SetBinding(Label.TextProperty, nameof(LogEntry.Expiry));
+                expiry.SetBinding(Label.FontSizeProperty, nameof(LogEntry.DetailFontSize));
                 expiry.SetBinding(Label.IsVisibleProperty, new Binding(nameof(LogEntry.Expiry), converter: NotEmpty));
                 // Emoji reactions (tapbacks) on this message, hidden when there are none.
                 var reactions = new Label { FontSize = 16 };

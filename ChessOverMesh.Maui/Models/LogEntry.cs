@@ -45,8 +45,13 @@ public sealed class LogEntry : INotifyPropertyChanged
     public double FontSize
     {
         get => _fontSize;
-        set { _fontSize = value; PropertyChanged?.Invoke(this, FontSizeArgs); }
+        set { _fontSize = value; PropertyChanged?.Invoke(this, FontSizeArgs); PropertyChanged?.Invoke(this, DetailFontSizeArgs); }
     }
+
+    // The dim detail/expiry lines size at a fraction of the message so they scale together when the chat text
+    // size changes, while staying visibly smaller. Notified alongside FontSize so the list restyles live.
+    public double DetailFontSize => _fontSize * 0.72;
+    private static readonly PropertyChangedEventArgs DetailFontSizeArgs = new(nameof(DetailFontSize));
 
     // For received chat rows: the raw mesh message, so the long-press menu can request the sender's node info
     // and show the signal/relay breakdown. Null for sent/system rows.

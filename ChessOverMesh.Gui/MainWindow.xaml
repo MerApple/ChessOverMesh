@@ -1,10 +1,13 @@
 <Window x:Class="ChessOverMesh.Gui.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ChessOverMesh.Gui"
         Title="Chess over Meshtastic" Height="680" Width="1000"
         Icon="app.ico"
         Background="#FF1E1E1E" MinHeight="600" MinWidth="880">
     <Window.Resources>
+        <!-- Sizes the dim chat metadata/expiry lines at a fraction of the message size so they scale together. -->
+        <local:FontScaleConverter x:Key="FontScale"/>
         <!-- Flat, chrome-less button used for each board square (clickable + automatable). -->
         <Style x:Key="CellButton" TargetType="Button">
             <Setter Property="BorderThickness" Value="0"/>
@@ -264,7 +267,8 @@
                             <StackPanel Margin="0,2,0,3">
                                 <TextBlock Text="{Binding Text}" Foreground="{Binding Foreground}"
                                            FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                <TextBlock Text="{Binding Detail}" Foreground="#FF8A8A8A" FontSize="10"
+                                <TextBlock Text="{Binding Detail}" Foreground="#FF8A8A8A"
+                                           FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource FontScale}, ConverterParameter=0.72}"
                                            TextWrapping="Wrap" Margin="0,1,0,0">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
@@ -278,7 +282,8 @@
                                 </TextBlock>
                                 <!-- Sender self-destruct countdown ("🕓 deletes in …"), hidden when the message
                                      has no expiry. Dim like the metadata line so it reads as a soft note. -->
-                                <TextBlock Text="{Binding Expiry}" Foreground="#FF8A8A8A" FontSize="10"
+                                <TextBlock Text="{Binding Expiry}" Foreground="#FF8A8A8A"
+                                           FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource FontScale}, ConverterParameter=0.72}"
                                            TextWrapping="Wrap" Margin="0,1,0,0">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
