@@ -1945,8 +1945,11 @@ public partial class MainPage : ContentPage
     public IReadOnlyList<ChatTxTarget> ChatTxTargets()
     {
         var names = _mesh?.GetAvailableChannels().ToDictionary(c => c.Index, c => c.DisplayName) ?? new();
+        // Flag channels with an app encryption key with the same 🔒 shown on sent chat lines (see SendChat).
         var list = _chatListen.OrderBy(i => i)
-            .Select(i => new ChatTxTarget(false, i, $"[{i}] {(names.TryGetValue(i, out var n) ? n : "")}".TrimEnd()))
+            .Select(i => new ChatTxTarget(false, i,
+                $"[{i}] {(names.TryGetValue(i, out var n) ? n : "")}".TrimEnd()
+                + ((_mesh?.GetChannelKey(i).Length ?? 0) > 0 ? " 🔒" : "")))
             .ToList();
         if (_mesh != null)
         {
