@@ -4591,11 +4591,10 @@ public partial class MainWindow : Window
         {
             Title = "Nodes",
             Owner = this,
-            Width = 520,
-            Height = 500,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = new SolidColorBrush(MediaColor.FromRgb(0x25, 0x25, 0x26)),
         };
+        dialog.RememberSize("Nodes", 520, 500);
 
         var root = new DockPanel { Margin = new Thickness(10) };
 
@@ -5022,11 +5021,10 @@ public partial class MainWindow : Window
         {
             Title = "Node info",
             Owner = owner,
-            Width = 560,
-            Height = 520,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = new SolidColorBrush(MediaColor.FromRgb(0x25, 0x25, 0x26)),
         };
+        win.RememberSize("NodeInfo", 560, 520);
 
         var root = new DockPanel { Margin = new Thickness(12) };
 
