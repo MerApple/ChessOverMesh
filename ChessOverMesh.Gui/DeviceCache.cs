@@ -62,6 +62,16 @@ internal static class DeviceCache
         public long PosTime { get; set; }      // epoch seconds this position was recorded (0 if unknown)
     }
 
+    /// <summary>A cached radio signal reading for a node — the latest RSSI/SNR/hop-count we measured, persisted
+    /// so the last-known signal survives a restart (Hops is null when the packet's hop count was unknown).</summary>
+    public sealed class CachedSignal
+    {
+        public int Rssi { get; set; }     // dBm
+        public double Snr { get; set; }   // dB
+        public int? Hops { get; set; }    // hops the packet travelled (0 = direct); null = unknown
+        public long When { get; set; }    // epoch seconds of the packet this reading came from
+    }
+
     /// <summary>Per-channel options we set on the device: MQTT uplink/downlink and whether position is shared.
     /// Cached so the toggles persist across runs — in particular position, which the device can't report back.</summary>
     public sealed class ChannelOptions
@@ -80,7 +90,7 @@ internal static class DeviceCache
         public Dictionary<uint, string> NodeShortNames { get; set; } = new();   // node num -> short name (e.g. "ABCD")
         public Dictionary<uint, bool> NodeFavorites { get; set; } = new();     // node num -> device "favorite" flag
         public Dictionary<uint, bool> NodeIgnored { get; set; } = new();       // node num -> device "ignored" flag
-        public Dictionary<uint, uint> NodeHopsAway { get; set; } = new();      // node num -> hops away (mesh distance)
+        public Dictionary<uint, CachedSignal> NodeSignals { get; set; } = new();   // node num -> last radio signal (RSSI/SNR/hops/when)
         public Dictionary<uint, long> NodeLastHeard { get; set; } = new();     // node num -> last-heard epoch seconds
         public Dictionary<uint, string> NodeRoles { get; set; } = new();     // node num -> device role (Client/Router/…)
         public Dictionary<uint, string> NodeHw { get; set; } = new();        // node num -> hardware model (Heltec V3/…)
@@ -301,7 +311,7 @@ internal static class DeviceCache
                             IReadOnlyDictionary<uint, string>? nodeShortNames = null,
                             IReadOnlyDictionary<uint, bool>? nodeFavorites = null,
                             IReadOnlyDictionary<uint, bool>? nodeIgnored = null,
-                            IReadOnlyDictionary<uint, uint>? nodeHopsAway = null,
+                            IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When)>? nodeSignals = null,
                             IReadOnlyDictionary<uint, long>? nodeLastHeard = null)
     {
         try
@@ -327,9 +337,10 @@ internal static class DeviceCache
                 NodeIgnored = nodeIgnored != null
                     ? new Dictionary<uint, bool>(nodeIgnored)
                     : existing?.NodeIgnored ?? new Dictionary<uint, bool>(),
-                NodeHopsAway = nodeHopsAway != null
-                    ? new Dictionary<uint, uint>(nodeHopsAway)
-                    : existing?.NodeHopsAway ?? new Dictionary<uint, uint>(),
+                NodeSignals = nodeSignals != null
+                    ? nodeSignals.ToDictionary(kv => kv.Key,
+                        kv => new CachedSignal { Rssi = kv.Value.Rssi, Snr = kv.Value.Snr, Hops = kv.Value.Hops, When = kv.Value.When })
+                    : existing?.NodeSignals ?? new Dictionary<uint, CachedSignal>(),
                 NodeLastHeard = nodeLastHeard != null
                     ? new Dictionary<uint, long>(nodeLastHeard)
                     : existing?.NodeLastHeard ?? new Dictionary<uint, long>(),
@@ -446,7 +457,7 @@ internal static class DeviceCache
             entry.NodeShortNames.Remove(nodeNum);
             entry.NodeFavorites.Remove(nodeNum);
             entry.NodeIgnored.Remove(nodeNum);
-            entry.NodeHopsAway.Remove(nodeNum);
+            entry.NodeSignals.Remove(nodeNum);
             entry.NodeLastHeard.Remove(nodeNum);
             entry.NodeRoles.Remove(nodeNum);
             entry.NodeHw.Remove(nodeNum);

@@ -141,10 +141,9 @@ public readonly record struct MeshNodePosition(uint Num, string Name, double Lat
 /// "" when unknown. LastHeard is when the device last heard from it (epoch seconds, 0 if unknown).</summary>
 public readonly record struct MeshNode(uint Num, string LongName, string ShortName, bool IsSelf, string Role = "", long LastHeard = 0, string HwModel = "")
 {
-    // Device NodeDB flags + mesh distance, surfaced for the node list marker and "show all info".
+    // Device NodeDB flags, surfaced for the node list marker and "show all info".
     public bool IsFavorite { get; init; }
     public bool IsIgnored { get; init; }
-    public uint? HopsAway { get; init; }
 
     public string Display =>
         string.IsNullOrWhiteSpace(LongName) && string.IsNullOrWhiteSpace(ShortName)
@@ -170,7 +169,6 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly Dictionary<uint, string> _shortNameCache = new();   // node num -> short name, seeded from disk cache
     private readonly Dictionary<uint, bool> _favoriteCache = new();      // node num -> device "favorite" flag
     private readonly Dictionary<uint, bool> _ignoredCache = new();       // node num -> device "ignored" flag
-    private readonly Dictionary<uint, uint> _hopsAwayCache = new();      // node num -> hops away (mesh distance)
     private readonly Dictionary<uint, long> _lastHeardCache = new();     // node num -> last-heard (epoch s), standalone
     private readonly Dictionary<uint, (ByteString Key, DateTime When)> _sessionPasskeys = new();   // remote-admin session passkeys captured from admin responses
     private readonly Dictionary<uint, string> _roleCache = new();   // node num -> device role, seeded from disk cache
@@ -314,14 +312,18 @@ public sealed class MeshtasticHttpClient : IDisposable
                           IReadOnlyDictionary<uint, string>? nodeShortNames = null,
                           IReadOnlyDictionary<uint, bool>? nodeFavorites = null,
                           IReadOnlyDictionary<uint, bool>? nodeIgnored = null,
-                          IReadOnlyDictionary<uint, uint>? nodeHopsAway = null,
+                          IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When)>? nodeSignals = null,
                           IReadOnlyDictionary<uint, long>? nodeLastHeard = null)
     {
         if (nodeNames != null) foreach (var kv in nodeNames) _nameCache[kv.Key] = kv.Value;
         if (nodeShortNames != null) foreach (var kv in nodeShortNames) _shortNameCache[kv.Key] = kv.Value;
         if (nodeFavorites != null) foreach (var kv in nodeFavorites) _favoriteCache[kv.Key] = kv.Value;
         if (nodeIgnored != null) foreach (var kv in nodeIgnored) _ignoredCache[kv.Key] = kv.Value;
-        if (nodeHopsAway != null) foreach (var kv in nodeHopsAway) _hopsAwayCache[kv.Key] = kv.Value;
+        // Only seed a cached signal when we haven't already heard a fresher one live this session.
+        if (nodeSignals != null)
+            foreach (var kv in nodeSignals)
+                if (!_signalCache.TryGetValue(kv.Key, out var cur) || cur.When < kv.Value.When)
+                    _signalCache[kv.Key] = kv.Value;
         if (nodeLastHeard != null) foreach (var kv in nodeLastHeard) _lastHeardCache[kv.Key] = kv.Value;
         if (nodeRoles != null) foreach (var kv in nodeRoles) _roleCache[kv.Key] = kv.Value;
         if (nodeHw != null) foreach (var kv in nodeHw) _hwCache[kv.Key] = kv.Value;
@@ -365,13 +367,9 @@ public sealed class MeshtasticHttpClient : IDisposable
         return map.Where(kv => kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
     }
 
-    /// <summary>node-num → hops away (cached + live), for caching.</summary>
-    public IReadOnlyDictionary<uint, uint> GetNodeHopsAwayMap()
-    {
-        var map = new Dictionary<uint, uint>(_hopsAwayCache);
-        foreach (var n in _state.Nodes) if (n.HasHopsAway) map[n.Num] = n.HopsAway;
-        return map;
-    }
+    /// <summary>node-num → latest radio signal (RSSI/SNR/hops/when), for caching so it survives a restart.</summary>
+    public IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When)> GetNodeSignalMap() =>
+        new Dictionary<uint, (int Rssi, float Snr, int? Hops, long When)>(_signalCache);
 
     /// <summary>node-num → last-heard epoch seconds (cached + live), for caching a standalone last-heard.</summary>
     public IReadOnlyDictionary<uint, long> GetNodeLastHeardMap()
@@ -499,7 +497,6 @@ public sealed class MeshtasticHttpClient : IDisposable
         // Device NodeDB flags + mesh distance.
         if (node.IsFavorite) lines.Add("Favorite: yes");
         if (node.IsIgnored) lines.Add("Ignored (device): yes");
-        if (node.HopsAway is uint ha) lines.Add($"Hops away: {ha}");
         if (ni?.ViaMqtt == true) lines.Add("Heard via MQTT: yes");
         if (ni != null && ni.Channel > 0) lines.Add($"Heard on channel: {ni.Channel}");
         // User identity extras (public key / MAC / licensed / messagability) — live nodes only.
@@ -694,7 +691,6 @@ public sealed class MeshtasticHttpClient : IDisposable
             {
                 IsFavorite = n.IsFavorite,
                 IsIgnored = n.IsIgnored,
-                HopsAway = n.HasHopsAway ? n.HopsAway : (uint?)(_hopsAwayCache.TryGetValue(n.Num, out var ha) ? ha : null),
             });
         var liveNums = _state.Nodes.Select(n => n.Num).ToHashSet();
         var cached = _nameCache
@@ -707,7 +703,6 @@ public sealed class MeshtasticHttpClient : IDisposable
             {
                 IsFavorite = _favoriteCache.GetValueOrDefault(kv.Key),
                 IsIgnored = _ignoredCache.GetValueOrDefault(kv.Key),
-                HopsAway = _hopsAwayCache.TryGetValue(kv.Key, out var ha) ? ha : (uint?)null,
             });
         return live.Concat(cached)
             .OrderByDescending(n => n.IsSelf)
@@ -1283,7 +1278,6 @@ public sealed class MeshtasticHttpClient : IDisposable
         _shortNameCache.Remove(nodeNum);
         _favoriteCache.Remove(nodeNum);
         _ignoredCache.Remove(nodeNum);
-        _hopsAwayCache.Remove(nodeNum);
         _lastHeardCache.Remove(nodeNum);
         _roleCache.Remove(nodeNum);
         _hwCache.Remove(nodeNum);

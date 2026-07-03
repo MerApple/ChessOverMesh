@@ -854,7 +854,9 @@ public partial class MainPage : ContentPage
             // nodes list (and aren't dropped from the saved cache when we next persist the live set).
             var cached = DeviceCache.Get(host);
             if (cached != null) _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw, nodeShortNames: cached.NodeShortNames,
-                nodeFavorites: cached.NodeFavorites, nodeIgnored: cached.NodeIgnored, nodeHopsAway: cached.NodeHopsAway, nodeLastHeard: cached.NodeLastHeard);
+                nodeFavorites: cached.NodeFavorites, nodeIgnored: cached.NodeIgnored,
+                nodeSignals: cached.NodeSignals.ToDictionary(kv => kv.Key, kv => (kv.Value.Rssi, (float)kv.Value.Snr, kv.Value.Hops, kv.Value.When)),
+                nodeLastHeard: cached.NodeLastHeard);
 
             // Seed cached node positions so the map / "open in Google Maps" works immediately on reconnect, before
             // any live position is heard again (MAUI now persists positions, matching the desktop app).
@@ -1838,7 +1840,7 @@ public partial class MainPage : ContentPage
                 }
             }
             catch { /* non-fatal: keep the connection even if the channel re-check fails */ }
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
             SyncDeviceClockIfAhead();   // correct a radio whose clock is set in the future (bad "last heard" stamps)
             // On a proxy link, ask it to replay any received messages we missed while away (newer than our newest
@@ -2590,7 +2592,7 @@ public partial class MainPage : ContentPage
         if (_mesh == null || _currentHost.Length == 0) return;
         DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum,
             _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(),
-            _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
     }
 
     /// <summary>Raised when node prefs change (so an open Nodes page can refresh its rows).</summary>
@@ -3314,7 +3316,7 @@ public partial class MainPage : ContentPage
                 report($"Updating… {_mesh.GetNodes().Count} nodes so far");
                 if (r.PacketCount < chunk) break;
             }
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
             return _mesh.GetNodes().Count;
         }
