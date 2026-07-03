@@ -318,6 +318,10 @@ public partial class MainWindow : Window
         // kept so "More information" can always show the signal even when the inline view hides it. Null otherwise.
         public string? RelayAckInfo;
 
+        // For a reassembled split ("chunked") message: the packet ids of the parts it was combined from (shown in
+        // "More information"). Also set on a sent headers-on split (the ids of the parts we transmitted). Null otherwise.
+        public List<uint>? PartPacketIds;
+
         // Emoji reactions on this chat message ("👍 ❤️ 2"), shown on its own line. Empty when none.
         private string _reactions = "";
         public string Reactions
@@ -438,6 +442,7 @@ public partial class MainWindow : Window
         _ackTimer.Tick += async (_, _) =>
         {
             await CheckPendingAcksAsync();
+            PumpChatSplitQueue();       // send the next headers-off split chunk once the previous clears the gate
             UpdateChatSendButton();
             UpdateExpiryCountdowns();   // live "deletes in …" countdown + self-destruct removal, every second
             if (++_retentionTick >= 60) { _retentionTick = 0; ApplyChatRetention(); }   // auto-delete sweep ~once a minute
@@ -3193,6 +3198,9 @@ public partial class MainWindow : Window
         _incomingRxTime = msg.RxTime;
         try
         {
+        // One part of a split ("chunked", headers-on) message: show it as it arrives and collapse into the whole
+        // message once every part is in (handled entirely in HandleChunkPart).
+        if (msg.IsChunkPart) { HandleChunkPart(msg, onChat, wasDm, sentDmFromUs); return; }
         // Chess protocol messages drive the board; everything else is channel chat.
         if (ProtocolMessage.TryParse(msg.Text, out var pm))
         {
@@ -3445,6 +3453,47 @@ public partial class MainWindow : Window
         // The radio limit is on the payload BYTES, so count UTF-8 bytes (emoji are multi-byte); for an app-keyed
         // channel the payload is the AES base64 ciphertext (ASCII, so length == bytes) of that whole wire text.
         int wireLen = text.Length == 0 ? 0 : (key.Length > 0 ? AesText.Encrypt(wireText, key).Length : System.Text.Encoding.UTF8.GetByteCount(wireText));
+        // When the message is over one packet but "split long messages" is on for this channel, show how many parts
+        // it will send as (in the normal colour) rather than flagging it red — it isn't an error, it'll be split.
+        bool splitOn = _currentHost.Length > 0 && DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel);
+        if (wireLen > MaxChatChars && splitOn)
+        {
+            bool headersOff = key.Length == 0 && _currentHost.Length > 0 && DeviceCache.IsSplitHeadersOff(_currentHost, _chatTxChannel);
+            if (headersOff)
+            {
+                // Headers off: independent plain messages, each re-stamping its own TTL header. Show message count.
+                int ttlHdr = System.Text.Encoding.UTF8.GetByteCount(ProtocolMessage.EncodeChatTtl(ttlMinutes * 60, ""));
+                var chunks = ProtocolMessage.SplitPlainChunks(text, MaxChatChars - ttlHdr, ProtocolMessage.MaxChatChunks);
+                if (chunks != null)
+                {
+                    CharCounter.Text = $"{wireLen} chars · {chunks.Count} messages{SendDeleteSuffix(ttlMinutes)}";
+                    CharCounter.Foreground = CounterNormal;
+                }
+                else
+                {
+                    CharCounter.Text = $"too long even split (max {ProtocolMessage.MaxChatChunks} parts){SendDeleteSuffix(ttlMinutes)}";
+                    CharCounter.Foreground = WarningText;
+                }
+                return;
+            }
+            // Headers on: total bytes actually put on the air across all parts (crypto + TTL header + text PLUS each
+            // part's sequence header). Max = MaxChatChunks packets × MaxChatChars each.
+            string payload = key.Length > 0 ? AesText.Encrypt(wireText, key) : wireText;
+            var parts = ProtocolMessage.SplitChatChunks(payload, "000000", MaxChatChars);
+            if (parts != null)
+            {
+                int onAirBytes = parts.Sum(p => System.Text.Encoding.UTF8.GetByteCount(p));
+                int maxBytes = ProtocolMessage.MaxChatChunks * MaxChatChars;
+                CharCounter.Text = $"{onAirBytes} / {maxBytes}  ·  {parts.Count} parts{SendDeleteSuffix(ttlMinutes)}";
+                CharCounter.Foreground = CounterNormal;
+            }
+            else
+            {
+                CharCounter.Text = $"too long even split (max {ProtocolMessage.MaxChatChunks} parts){SendDeleteSuffix(ttlMinutes)}";
+                CharCounter.Foreground = WarningText;
+            }
+            return;
+        }
         CharCounter.Text = $"{wireLen} / {MaxChatChars}{SendDeleteSuffix(ttlMinutes)}";
         CharCounter.Foreground = wireLen > MaxChatChars ? WarningText : CounterNormal;
     }
@@ -3766,7 +3815,10 @@ public partial class MainWindow : Window
     // One chat in flight at a time — the next send waits until this one is confirmed (an explicit ack, an
     // overheard relay, or a reply on the channel) or times out. This applies to relay-confirm (ack-off) chats
     // and DMs too, so we don't flood the mesh faster than it can forward.
-    private bool ChatInFlight => _pending.Values.Any(p => p.IsChat);
+    // In flight while a normal chat awaits its ack, OR while a split send is in progress (a headers-on framed
+    // driver, or a headers-off queue that still has chunks to send) — so the composer stays blocked until the
+    // whole split has been transmitted.
+    private bool ChatInFlight => _pending.Values.Any(p => p.IsChat) || _chunkSending || _chunkSendStarting || _chatSplitQueue.Count > 0;
 
     private async void SendChat()
     {
@@ -3800,12 +3852,33 @@ public partial class MainWindow : Window
         int wireLen = encrypted ? AesText.Encrypt(wireText, key).Length : System.Text.Encoding.UTF8.GetByteCount(wireText);
         if (wireLen > MaxChatChars)
         {
-            AddSystemWarning($"{Stamp()}Chat NOT sent — {wireLen} chars" +
-                (encrypted ? " once encrypted" : "") + $" exceeds the {MaxChatChars}-char limit. Shorten your message.");
-            return;   // keep the text in the box so it can be edited
+            // Over the single-packet limit. If "split long messages" is on for this channel, split it (into a headers
+            // sequence, or independent plain messages when headers are off); otherwise refuse and keep the text.
+            bool splitOn = _currentHost.Length > 0 && DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel);
+            if (!splitOn)
+            {
+                AddSystemWarning($"{Stamp()}Chat NOT sent — {wireLen} chars" +
+                    (encrypted ? " once encrypted" : "") + $" exceeds the {MaxChatChars}-char limit. Shorten it, " +
+                    "or turn on \"Split long messages\" for this channel in Chat settings.");
+                return;   // keep the text in the box so it can be edited
+            }
+            ChatBox.Clear();
+            StartSplitSend(text, ttlSeconds);
+            return;
         }
 
         ChatBox.Clear();
+        await SendChatCore(text, ttlSeconds);
+    }
+
+    /// <summary>Sends one ordinary chat message (the normal single-packet path): builds the display row, transmits,
+    /// and registers it in the ack/resend machinery so the "in flight" gate serialises the next send. Used by the
+    /// composer and by the headers-off split pump (which feeds each chunk through here as an independent message).
+    /// The caller has already cleared the composer and checked the in-flight gate.</summary>
+    private async Task SendChatCore(string text, int ttlSeconds)
+    {
+        if (_mesh == null) return;
+        string wireText = ProtocolMessage.EncodeChatTtl(ttlSeconds, text);
         bool isDm = _chatTxDest.HasValue;
         string dmName = isDm ? (_mesh.DescribeNode(_chatTxDest!.Value)) : "";
         // Show which channel we transmitted on (matching the [channel] prefix on received lines); for a DM,
@@ -3857,14 +3930,8 @@ public partial class MainWindow : Window
                 Label = isDm ? $"direct message to {dmName}" : "chat message",
                 Entry = entry,
                 BaseText = detailBase,   // for chat, BaseText holds the dim detail line (status marks append to it)
-                // Latest moment we'll still be waiting if nothing is heard: each attempt waits AckTimeout, and
-                // we make up to MaxSendAttempts of them before giving up. The Send button counts down to this;
-                // a CHATACK / relay / reply removes the pending earlier, which cancels the countdown.
                 SendDeadlineUtc = DateTime.UtcNow + TimeSpan.FromSeconds(MaxSendAttempts * AckTimeout.TotalSeconds),
             };
-            // Track acks for every channel broadcast (not DMs, which the firmware routing-acks): even when WE don't
-            // send acks on this channel, the recipient might still ack us (their ack setting, or our keyword auto-ack),
-            // and we should show that as "acked" — with RSSI when the ack carries it — rather than dropping it.
             if (!isDm) _chatAckers[id] = new ChatAckInfo { Entry = entry, BaseText = detailBase };
             ApplyConnectionState();   // disable Send until confirmed or the retries run out
         }
@@ -3876,6 +3943,281 @@ public partial class MainWindow : Window
         }
     }
 
+    // ---- Long-message splitting -----------------------------------------------------------------------------
+    // Two modes, chosen per channel (see Chat settings). HEADERS ON (always when the channel has an app key —
+    // encrypted parts can't be reassembled without them): one message is split into a sequence of framed parts,
+    // sent one-at-a-time through the ack machine (RunHeadersOnSplit); the receiver shows each part then collapses
+    // them into the whole. HEADERS OFF (only allowed without an app key): the text is split into up to 5 ordinary,
+    // independent chat messages, queued and sent one-at-a-time via the normal path (SendChatCore) so each carries
+    // its own reply/ack/resend; the receiver just sees them as separate messages.
+
+    // Remaining plain chunks of a headers-off split, sent one per free "in flight" slot by PumpChatSplitQueue.
+    private readonly Queue<(string Text, int Ttl)> _chatSplitQueue = new();
+    // True while a headers-on framed split is transmitting its parts (holds the send gate closed).
+    private bool _chunkSending;
+    // True from the moment the pump dequeues a chunk until that chunk's send has registered its pending (or failed),
+    // so a second tick can't dequeue-and-send another chunk in the await gap before the pending exists (a race that
+    // would put two chunks in flight, out of order).
+    private bool _chunkSendStarting;
+    // In-flight framed parts awaiting their ack/relay/reply (part packet id → waiter completed on confirmation).
+    private readonly Dictionary<uint, TaskCompletionSource<bool>> _partAckWaiters = new();
+
+    /// <summary>Completes the ack-waiter for a framed part packet id, if a headers-on split is waiting on it. Called
+    /// from the positive-confirmation paths (CHATACK received, or a routing/relay ack) so the driver sends the next
+    /// part. No-op for non-chunk packets.</summary>
+    private void SignalPartAck(uint packetId)
+    {
+        if (_partAckWaiters.TryGetValue(packetId, out var tcs)) tcs.TrySetResult(true);
+    }
+
+    /// <summary>Decides the split mode for the current TX channel and kicks it off. Headers are forced on when the
+    /// channel has an app key (encrypted parts need them to reassemble); otherwise the per-channel "headers off"
+    /// preference splits into independent plain messages.</summary>
+    private void StartSplitSend(string text, int ttlSeconds)
+    {
+        if (_mesh == null) return;
+        uint ch = _chatTxChannel;
+        bool hasKey = _mesh.GetChannelKey(ch).Length > 0;
+        bool headersOff = !hasKey && _currentHost.Length > 0 && DeviceCache.IsSplitHeadersOff(_currentHost, ch);
+        if (headersOff)
+        {
+            // Each chunk is sent as its own normal message and re-stamps its own TTL header, so reserve its bytes.
+            int ttlHdr = System.Text.Encoding.UTF8.GetByteCount(ProtocolMessage.EncodeChatTtl(ttlSeconds, ""));
+            var chunks = ProtocolMessage.SplitPlainChunks(text, MaxChatChars - ttlHdr, ProtocolMessage.MaxChatChunks);
+            if (chunks == null)
+            {
+                AddSystemWarning($"{Stamp()}Chat NOT sent — too long even split (max {ProtocolMessage.MaxChatChunks} parts). Shorten it.");
+                return;
+            }
+            foreach (var c in chunks) _chatSplitQueue.Enqueue((c, ttlSeconds));
+            ApplyConnectionState();   // gate stays closed while the queue drains
+            PumpChatSplitQueue();     // send the first chunk now; the rest follow as each confirms/times out
+        }
+        else
+        {
+            string wireText = ProtocolMessage.EncodeChatTtl(ttlSeconds, text);
+            _ = RunHeadersOnSplit(text, wireText, ttlSeconds);
+        }
+    }
+
+    /// <summary>Sends the next queued headers-off chunk when the previous one is no longer in flight (confirmed or
+    /// timed out) and the post-receive hold has passed. Called each ack-timer tick and right after queuing.</summary>
+    private void PumpChatSplitQueue()
+    {
+        if (_mesh == null || _chunkSending || _chunkSendStarting) return;
+        if (_pending.Values.Any(p => p.IsChat)) return;   // a previous chunk still awaiting its outcome
+        if (_chatSplitQueue.Count == 0) return;
+        if (DateTime.UtcNow < _chatSendAllowedUtc) return;   // brief post-receive ack hold
+        var (next, ttl) = _chatSplitQueue.Dequeue();
+        _chunkSendStarting = true;
+        _ = SendSplitChunkAsync(next, ttl);   // an independent normal message (own row + ack/resend)
+        ApplyConnectionState();
+    }
+
+    // Sends one headers-off chunk via the normal path, clearing the reentrancy guard once its pending is registered
+    // (or it failed to transmit) so the pump can release the next chunk.
+    private async Task SendSplitChunkAsync(string text, int ttl)
+    {
+        try { await SendChatCore(text, ttl); }
+        finally { _chunkSendStarting = false; }
+    }
+
+    /// <summary>Headers-on split driver: encrypts the whole message, splits it into framed parts, and sends them
+    /// one-at-a-time — waiting for each part's ack/relay (up to <see cref="MaxSendAttempts"/> × <see cref="AckTimeout"/>,
+    /// so ~time×parts total) before the next. One combined row tracks progress. If any part fails to transmit OR is
+    /// never acknowledged, the whole message is marked failed with the reason and the rest are not sent.</summary>
+    private async Task RunHeadersOnSplit(string displayText, string wireText, int ttlSeconds)
+    {
+        if (_mesh == null) return;
+        uint ch = _chatTxChannel;
+        uint? dest = _chatTxDest;
+        bool isDm = dest.HasValue;
+        string key = _mesh.GetChannelKey(ch);
+        string payload = key.Length > 0 ? AesText.Encrypt(wireText, key) : wireText;
+        string gid = Random.Shared.Next(0, 0x1000000).ToString("x6");
+        var parts = ProtocolMessage.SplitChatChunks(payload, gid, MaxChatChars, ProtocolMessage.MaxChatChunks);
+        if (parts == null)
+        {
+            AddSystemWarning($"{Stamp()}Chat NOT sent — too long even split (max {ProtocolMessage.MaxChatChunks} parts). Shorten it.");
+            return;
+        }
+
+        _chunkSending = true;
+        ApplyConnectionState();
+        uint replyId = _replyToId;
+        string replyRef = ReplyRef(replyId);
+        ClearReply();
+        string dmName = isDm ? _mesh.DescribeNode(dest!.Value) : "";
+        string chan = (!isDm && _chatListen.Count > 1) ? $"[{ch}] " : "";
+        string msgLine = isDm ? $"You → {dmName}: {displayText}" : $"You: {displayText}";
+        string dmTag = isDm ? "DM  " : "";
+        string baseDetail = $"{Stamp()}{dmTag}{chan}".Trim();
+        if (replyRef.Length > 0) baseDetail = $"{replyRef}  ·  {baseDetail}".Trim(' ', '·');
+        var entry = AddChatLine(msgLine, baseDetail + $"  · sending 1/{parts.Count}" + MarkSending, PendingText);
+        entry.Channel = ch;
+        DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
+        if (ttlSeconds > 0) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(TimeSpan.FromSeconds(ttlSeconds)); }
+        TrimChatChannel(ch);
+        RouteRx(entry, isDm, isDm ? dest!.Value : 0, incoming: false);
+
+        var sentIds = new List<uint>();
+        bool ok = true;
+        string failReason = "";
+        for (int i = 0; i < parts.Count && ok; i++)
+        {
+            entry.Detail = baseDetail + $"  · sending {i + 1}/{parts.Count}" + MarkSending;
+            bool confirmed = false;
+            for (int attempt = 1; attempt <= MaxSendAttempts && !confirmed; attempt++)
+            {
+                uint id;
+                try { id = await _mesh.SendTextAsync(parts[i], ch, encrypt: false, destination: dest); }
+                catch (Exception ex) { ok = false; failReason = ex.Message; break; }
+                sentIds.Add(id);
+                var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _partAckWaiters[id] = tcs;
+                var done = await Task.WhenAny(tcs.Task, Task.Delay(AckTimeout));
+                _partAckWaiters.Remove(id);
+                if (done == tcs.Task) confirmed = true;   // acked/relayed → this part is done
+            }
+            if (ok && !confirmed) { ok = false; failReason = "no acknowledgement (never acked or relayed)"; }
+        }
+
+        if (ok)
+        {
+            entry.Detail = baseDetail + $"  · chunked ({parts.Count} parts)" + MarkDelivered;
+            entry.Foreground = AckedText;
+            entry.PacketId = sentIds.Count > 0 ? sentIds[0] : 0;
+            entry.PartPacketIds = sentIds;
+            if (sentIds.Count > 0) { _chatEntryById[sentIds[0]] = entry; _chatById[sentIds[0]] = displayText; }
+            entry.CacheId = CacheChat(ch, msgLine, entry.Detail, 0, expiresAt);
+        }
+        else
+        {
+            entry.Detail = baseDetail + MarkFailed + $" — send failed: {failReason}";
+            entry.Foreground = WarningText;
+        }
+        _chunkSending = false;
+        ApplyConnectionState();
+    }
+
+
+    // ---- Receiving a split ("chunked", headers-on) message ------------------------------------------------
+    // Each part arrives as its own packet (a raw slice + its group/index/total). We show every part as it comes in
+    // so the reader sees progress, and once all parts of a group are in we concatenate + decrypt the whole,
+    // remove the part rows, and show one combined message whose "More information" lists the parts' packet ids.
+    private sealed class RxChunkGroup
+    {
+        public int Total;
+        public readonly SortedDictionary<int, string> Slices = new();   // part index (1-based) → raw slice
+        public readonly List<uint> PacketIds = new();
+        public readonly List<LogEntry> PartRows = new();
+        public MeshTextMessage First;
+        public bool WasDm, SentFromUs;
+        public uint DmPeer;
+    }
+    private readonly Dictionary<(uint From, string Group), RxChunkGroup> _rxChunks = new();
+
+    /// <summary>Handles one received part of a split message: shows it as its own row, and once all parts of the
+    /// group are in, collapses them into the full message (see <see cref="CombineChunkGroup"/>).</summary>
+    private void HandleChunkPart(MeshTextMessage msg, bool onChat, bool wasDm, bool sentDmFromUs)
+    {
+        if (_mesh == null || (!onChat && !wasDm && !sentDmFromUs)) return;   // not a conversation we show
+        bool isDm = wasDm || sentDmFromUs;
+        uint dmPeer = sentDmFromUs ? msg.ToNode : msg.FromNode;
+        string gid = msg.ChunkGroupId!;
+        var key = (msg.FromNode, gid);
+        if (!_rxChunks.TryGetValue(key, out var g))
+        {
+            g = new RxChunkGroup { Total = msg.ChunkTotal, First = msg, WasDm = wasDm, SentFromUs = sentDmFromUs, DmPeer = dmPeer };
+            _rxChunks[key] = g;
+        }
+        if (!g.Slices.ContainsKey(msg.ChunkIndex))   // ignore a duplicate/replayed part
+        {
+            g.Slices[msg.ChunkIndex] = msg.Text;
+            g.PacketIds.Add(msg.PacketId);
+            string who = _mesh.DescribeNode(dmPeer);
+            bool keyed = _mesh.GetChannelKey(msg.Channel).Length > 0;
+            string preview = keyed ? "🔒 encrypted" : Snippet(msg.Text, 60);
+            string chan = (!isDm && ReceiveChannels().Count > 1) ? $"[{msg.Channel}] " : "";
+            string dmTag = sentDmFromUs ? "DM → " : (wasDm ? "DM ← " : "");
+            string detail = $"{Stamp()}{dmTag}{chan}part {msg.ChunkIndex}/{msg.ChunkTotal}".Trim();
+            var row = AddChatLine($"{who}: [{msg.ChunkIndex}/{msg.ChunkTotal}] {preview}", detail, CachedText, msg);
+            row.Channel = msg.Channel;
+            row.PacketId = msg.PacketId;
+            g.PartRows.Add(row);
+            RouteRx(row, isDm, dmPeer, incoming: !sentDmFromUs);
+            // Ack each received part on an ack-on channel (or a keyword match), so the sender's headers-on driver
+            // gets the per-part confirmation it waits on. DMs are routing-acked by the firmware, so skip those.
+            bool fromUs = msg.FromNode == _mesh.MyNodeNum;
+            bool ackSuppressed = !_synced || DateTime.UtcNow < _suppressAcksUntil;
+            bool keywordAck = !wasDm && !fromUs && !ackSuppressed && MatchesAckTrigger(msg.Channel, msg.Text);
+            if (!wasDm && !fromUs && !ackSuppressed && (_chatAckOn.Contains(msg.Channel) || keywordAck))
+            {
+                string ackSignal = (keywordAck || _chatAckSignalOn.Contains(msg.Channel)) ? AckSignalText(msg) : "";
+                SendChatAck(msg.PacketId, msg.Channel, ackSignal);
+                _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;
+                if (_chatHoldTimer != null) { _chatHoldTimer.Stop(); _chatHoldTimer.Interval = ChatSendDelay + TimeSpan.FromMilliseconds(200); _chatHoldTimer.Start(); }
+            }
+        }
+        // Complete once every 1..Total index is present.
+        if (g.Slices.Count >= g.Total && Enumerable.Range(1, g.Total).All(g.Slices.ContainsKey))
+            CombineChunkGroup(key, g, wasDm, sentDmFromUs, dmPeer);
+    }
+
+    /// <summary>Collapses a fully-received split message: removes its part rows, concatenates the slices in order,
+    /// decrypts the whole (when the channel has an app key), and shows one combined message whose details list the
+    /// parts' packet ids.</summary>
+    private void CombineChunkGroup((uint From, string Group) key, RxChunkGroup g, bool wasDm, bool sentDmFromUs, uint dmPeer)
+    {
+        if (_mesh == null) return;
+        _rxChunks.Remove(key);
+        foreach (var r in g.PartRows) ChatList.Items.Remove(r);   // replace the part rows with the combined message
+
+        uint ch = g.First.Channel;
+        string body = string.Concat(g.Slices.Values);   // SortedDictionary → in part order
+        string keyStr = _mesh.GetChannelKey(ch);
+        bool decryptFailed = false;
+        string text = body;
+        if (keyStr.Length > 0)
+        {
+            if (AesText.TryDecrypt(body, keyStr, out var dec)) text = dec;
+            else decryptFailed = true;
+        }
+        int ttlSeconds = 0;
+        if (!decryptFailed && ProtocolMessage.TryDecodeChatTtl(text, out var ts, out var stripped)) { ttlSeconds = ts; text = stripped; }
+        bool resent = !decryptFailed && text.StartsWith(ProtocolMessage.ChatResendPrefix, StringComparison.Ordinal);
+        if (resent) text = text.Substring(ProtocolMessage.ChatResendPrefix.Length);
+
+        bool isDm = wasDm || sentDmFromUs;
+        string who = _mesh.DescribeNode(dmPeer);
+        string chan = (!isDm && ReceiveChannels().Count > 1) ? $"[{ch}] " : "";
+        string dmTag = sentDmFromUs ? "DM → " : (wasDm ? "DM ← " : "");
+        string sig = SignalTag(g.First, _showSignal);
+        string detail = $"{Stamp()}{dmTag}{chan}{sig}".Trim();
+        if (resent) detail = detail.Length > 0 ? detail + "  · resent" : "resent";
+        detail += $"  · chunked ({g.Total} parts)";
+        var msg0 = g.First;
+        LogEntry entry = decryptFailed
+            ? AddChatLine($"{who}: {body}  ⚠ decryption failed (wrong/missing key)", detail, WarningText, msg0)
+            : AddChatLine($"{who}: {text}", detail, NormalText, msg0);
+        entry.Channel = ch;
+        entry.PacketId = g.PacketIds.Count > 0 ? g.PacketIds[0] : 0;
+        entry.PartPacketIds = new List<uint>(g.PacketIds);
+        DateTime rxLocal = msg0.RxTime != 0 ? DateTimeOffset.FromUnixTimeSeconds(msg0.RxTime).LocalDateTime : DateTime.Now;
+        DateTime expiresAt = (ttlSeconds > 0 && !decryptFailed) ? rxLocal.AddSeconds(ttlSeconds) : default;
+        if (expiresAt != default) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now); }
+        TrimChatChannel(ch);
+        if (entry.PacketId != 0) _chatEntryById[entry.PacketId] = entry;
+        if (!decryptFailed)
+        {
+            if (entry.PacketId != 0) _chatById[entry.PacketId] = text;
+            entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt);
+        }
+        bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
+        if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil) { FlashNotify(); PlayChatSound(); }
+        if (wasDm) EnsureDmEnabled(msg0.FromNode);
+        else if (sentDmFromUs) EnsureDmEnabled(msg0.ToNode);
+    }
 
     // The device's rx_time (epoch s) for the message currently being dispatched, or 0 (use local now).
     private uint _incomingRxTime;
@@ -4182,6 +4524,11 @@ public partial class MainWindow : Window
         string reactions = ReactionDetails(entry.PacketId);
         if (reactions.Length > 0) baseText = $"{baseText}{Environment.NewLine}{Environment.NewLine}{reactions}";
 
+        // For a split ("chunked") message, list the packet ids of the parts it was assembled from (or sent as).
+        if (entry.PartPacketIds is { Count: > 0 } partIds)
+            baseText = $"{baseText}{Environment.NewLine}{Environment.NewLine}Assembled from {partIds.Count} parts:" +
+                       $"{Environment.NewLine}" + string.Join(Environment.NewLine, partIds.Select(id => $"  • packet id {id}"));
+
         ShowNotice("Message details", baseText);
     }
 
@@ -4265,6 +4612,8 @@ public partial class MainWindow : Window
     /// </summary>
     private void MarkAcked(MeshAck ack)
     {
+        // A positive routing/relay ack for a framed split part confirms it, so the headers-on driver sends the next.
+        if (!ack.Failed) SignalPartAck(ack.PacketId);
         if (!_pending.TryGetValue(ack.PacketId, out var p) || !p.IsChat) return;
         bool stick = IsScrolledToBottom(ChatList);   // updating the row's detail below can grow it
 
@@ -4385,6 +4734,8 @@ public partial class MainWindow : Window
     /// status) or, if not ours, a message we received (so its details can list who else acked it).</summary>
     private void RegisterChatAck(uint chatPacketId, uint ackerNum, string signal = "", string myReception = "")
     {
+        // A CHATACK for a framed split part confirms it, so the headers-on driver sends the next part.
+        SignalPartAck(chatPacketId);
         if (_chatAckers.TryGetValue(chatPacketId, out var info))
         {
             if (!info.Ackers.Add(ackerNum)) return;          // already recorded this acker

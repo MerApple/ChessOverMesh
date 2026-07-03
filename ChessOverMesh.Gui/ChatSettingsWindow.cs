@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using ChessOverMesh.Game;
 using ChessOverMesh.Mesh;
 
 namespace ChessOverMesh.Gui;
@@ -164,6 +165,90 @@ internal sealed class ChatSettingsWindow : Window
                 row.Children.Add(valBox);
                 row.Children.Add(unit);
                 root.Children.Add(row);
+            }
+        }
+
+        // ---- Per-channel split long messages ----
+        root.Children.Add(new TextBlock
+        {
+            Text = "Split long messages", Foreground = Fg, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 14, 0, 2),
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = $"When on, a message too long for one packet is split into a sequence (up to {ProtocolMessage.MaxChatChunks} parts) " +
+                   "and reassembled by the receiver. The sequence markers travel unencrypted; the message text stays encrypted " +
+                   "if the channel has a key. Cooperative: a recipient not running this app sees the separate parts. Off = long " +
+                   "messages are refused instead.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8),
+        });
+
+        if (channels.Count == 0 || host.Length == 0)
+        {
+            root.Children.Add(new TextBlock
+            {
+                Text = "Connect to a device to set per-channel message splitting.",
+                Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12),
+            });
+        }
+        else
+        {
+            var splitOn = DeviceCache.GetChannelSplitOn(host);
+            foreach (var ch in channels)
+            {
+                var channel = ch;   // capture for the closure
+                var cb = new CheckBox
+                {
+                    Content = channel.DisplayName,
+                    Foreground = Fg,
+                    IsChecked = splitOn.Contains(channel.Index),
+                    Margin = new Thickness(0, 0, 0, 4),
+                };
+                cb.Checked += (_, _) => DeviceCache.SetChannelSplit(host, channel.Index, true);
+                cb.Unchecked += (_, _) => DeviceCache.SetChannelSplit(host, channel.Index, false);
+                root.Children.Add(cb);
+            }
+        }
+
+        // ---- Per-channel: add sequence headers when splitting ----
+        root.Children.Add(new TextBlock
+        {
+            Text = "Add sequence headers", Foreground = Fg, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 14, 0, 2),
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = "On (default): the parts carry sequence markers so the receiver reassembles them into one message, " +
+                   "and each part is sent one-at-a-time waiting for its acknowledgement. Off: the message is split into " +
+                   "separate independent messages (no reassembly) — only possible on a channel with no app key, since an " +
+                   "encrypted split always needs headers (those channels stay ticked and locked).",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8),
+        });
+
+        if (channels.Count == 0 || host.Length == 0)
+        {
+            root.Children.Add(new TextBlock
+            {
+                Text = "Connect to a device to set per-channel headers.",
+                Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12),
+            });
+        }
+        else
+        {
+            foreach (var ch in channels)
+            {
+                var channel = ch;   // capture for the closure
+                bool hasKey = DeviceCache.GetChannelKey(host, channel.Index).Length > 0;
+                var cb = new CheckBox
+                {
+                    Content = hasKey ? $"{channel.DisplayName}  (required — encrypted)" : channel.DisplayName,
+                    Foreground = Fg,
+                    // Headers on unless the user turned them off; a keyed channel forces (and locks) them on.
+                    IsChecked = hasKey || !DeviceCache.IsSplitHeadersOff(host, channel.Index),
+                    IsEnabled = !hasKey,
+                    Margin = new Thickness(0, 0, 0, 4),
+                };
+                cb.Checked += (_, _) => DeviceCache.SetSplitHeaders(host, channel.Index, true);
+                cb.Unchecked += (_, _) => DeviceCache.SetSplitHeaders(host, channel.Index, false);
+                root.Children.Add(cb);
             }
         }
 

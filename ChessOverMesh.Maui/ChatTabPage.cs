@@ -247,8 +247,26 @@ public sealed class ChatTabPage : ContentPage
         int max = MainPage.MaxChatLength;
         int used = _main.ChatWireLength(_input.Text);
         int left = max - used;
-        _charCounter.Text = $"{used} / {max}  ·  {left} left";
-        _charCounter.TextColor = used > max ? Color.FromArgb("#FF6B6B") : Color.FromArgb("#B0B0B0");
+        var split = _main.ChatSplitInfo(_input.Text);   // Parts>0 = will split; -1 = too long even split
+        if (used > max && split.Parts > 0)
+        {
+            // Not an error — it'll be split. Headers mode: total on-air bytes (payload + text + each part's header)
+            // out of the budget (MaxChatChunks × 200). Headers off: independent messages, so just show the count.
+            _charCounter.Text = split.Headers
+                ? $"{split.OnAirBytes} / {MainPage.MaxChatSplitBytes}  ·  {split.Parts} parts"
+                : $"{used} chars · {split.Parts} messages";
+            _charCounter.TextColor = Color.FromArgb("#B0B0B0");
+        }
+        else if (used > max && split.Parts < 0)
+        {
+            _charCounter.Text = "too long even split";
+            _charCounter.TextColor = Color.FromArgb("#FF6B6B");
+        }
+        else
+        {
+            _charCounter.Text = $"{used} / {max}  ·  {left} left";
+            _charCounter.TextColor = used > max ? Color.FromArgb("#FF6B6B") : Color.FromArgb("#B0B0B0");
+        }
         UpdateSelfDestruct();
     }
 

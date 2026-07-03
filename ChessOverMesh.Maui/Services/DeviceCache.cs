@@ -95,6 +95,13 @@ internal static class DeviceCache
         public uint? ChatTxChannel { get; set; }
         public List<uint> ChatAckOn { get; set; } = new();
         public List<uint> ChatAckSignalOn { get; set; } = new();   // channels whose ack also reports RSSI/SNR/hops
+        // Channels where "split long messages" is on (default off): a too-long chat message is split into a sequence
+        // of parts and reassembled by the receiver.
+        public List<uint> ChannelSplitOn { get; set; } = new();
+        // Channels where sequence HEADERS are OFF for splitting (default on, so we store the exceptions). Headers off
+        // = split into independent plain messages; only honoured when the channel has no app key (encrypted splits
+        // always need headers to reassemble).
+        public List<uint> ChannelSplitHeadersOff { get; set; } = new();
         // Channel for position/telemetry/node-info requests + manual node-info/position broadcasts (null = auto).
         public uint? UtilityChannel { get; set; }
         // Per-channel auto-ack keywords (channel index → lowercased triggers): a received message whose text
@@ -306,6 +313,8 @@ internal static class DeviceCache
                 ChatTxChannel = existing?.ChatTxChannel,
                 ChatAckOn = existing?.ChatAckOn ?? new List<uint>(),
                 ChatAckSignalOn = existing?.ChatAckSignalOn ?? new List<uint>(),
+                ChannelSplitOn = existing?.ChannelSplitOn ?? new List<uint>(),
+                ChannelSplitHeadersOff = existing?.ChannelSplitHeadersOff ?? new List<uint>(),
                 UtilityChannel = existing?.UtilityChannel,
                 AckTriggers = existing?.AckTriggers ?? new Dictionary<uint, List<string>>(),
             };
@@ -690,6 +699,49 @@ internal static class DeviceCache
 
     public static bool IsChatAckEnabled(string host, uint channelIndex) =>
         Load().GetValueOrDefault(host)?.ChatAckOn.Contains(channelIndex) ?? false;
+
+    public static IReadOnlyCollection<uint> GetChannelSplitOn(string host) =>
+        Load().GetValueOrDefault(host)?.ChannelSplitOn ?? new List<uint>();
+
+    /// <summary>Sets whether long messages sent on a device + channel are split into a sequence (default off).</summary>
+    public static void SetChannelSplit(string host, uint channelIndex, bool enabled)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            if (enabled) { if (!entry.ChannelSplitOn.Contains(channelIndex)) entry.ChannelSplitOn.Add(channelIndex); }
+            else entry.ChannelSplitOn.Remove(channelIndex);
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>True when "split long messages" is enabled for a device + channel (default off).</summary>
+    public static bool IsSplitEnabled(string host, uint channelIndex) =>
+        Load().GetValueOrDefault(host)?.ChannelSplitOn.Contains(channelIndex) ?? false;
+
+    /// <summary>Sets whether split messages carry sequence headers on a device + channel (default on). Headers off
+    /// splits into independent plain messages; ignored when the channel has an app key.</summary>
+    public static void SetSplitHeaders(string host, uint channelIndex, bool headersOn)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            if (headersOn) entry.ChannelSplitHeadersOff.Remove(channelIndex);
+            else if (!entry.ChannelSplitHeadersOff.Contains(channelIndex)) entry.ChannelSplitHeadersOff.Add(channelIndex);
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>True when the user turned sequence headers OFF for a device + channel (default false = headers on).
+    /// The effective mode also forces headers on when the channel has an app key.</summary>
+    public static bool IsSplitHeadersOff(string host, uint channelIndex) =>
+        Load().GetValueOrDefault(host)?.ChannelSplitHeadersOff.Contains(channelIndex) ?? false;
 
     public static IReadOnlyCollection<uint> GetAckSignalOn(string host) =>
         Load().GetValueOrDefault(host)?.ChatAckSignalOn ?? new List<uint>();

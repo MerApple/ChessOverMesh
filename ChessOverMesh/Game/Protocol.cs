@@ -1,4 +1,5 @@
-﻿using ChessOverMesh.Chess;
+﻿using System.Text;
+using ChessOverMesh.Chess;
 
 namespace ChessOverMesh.Game;
 
@@ -47,6 +48,100 @@ public readonly struct ProtocolMessage
         body = text.Substring(end + 1);
         return true;
     }
+
+    // ---- Long-message chunking ----------------------------------------------------------------------------
+    // When "split long messages" is on for a channel, a chat message that doesn't fit one packet is encrypted
+    // as a whole (if the channel has an app key), then the ciphertext (or plaintext) is sliced into parts, and
+    // each part is transmitted as its own packet carrying a SHORT PLAINTEXT header that stays OUTSIDE the AES
+    // layer: <STX><groupId><STX><part><STX><total><STX><bodySlice>. The receiver peels the header off BEFORE
+    // decrypting (the reverse of the TTL header), buffers the slices, concatenates them in order and decrypts
+    // the whole — so the sequence markers are readable on the wire while the body stays encrypted. STX (U+0002)
+    // never appears in ordinary chat or in AES base64, so it can't collide with real content.
+
+    /// <summary>Delimiter for the chunk header (STX, U+0002) — a single-byte control char absent from chat and
+    /// from base64, so it unambiguously frames the plaintext sequence markers around an encrypted body slice.</summary>
+    private const char ChunkMark = (char)2;
+
+    /// <summary>Hard cap on the number of parts a single message may split into (keeps one long paste from
+    /// hogging mesh airtime). A message that would need more parts than this is refused, not sent.</summary>
+    public const int MaxChatChunks = 5;
+
+    /// <summary>Frames one slice of a split message: <c>&lt;STX&gt;groupId&lt;STX&gt;part&lt;STX&gt;total&lt;STX&gt;bodySlice</c>.
+    /// <paramref name="part"/> is 1-based. The header is plaintext even when <paramref name="bodySlice"/> is ciphertext.</summary>
+    public static string EncodeChatChunk(string groupId, int part, int total, string bodySlice) =>
+        $"{ChunkMark}{groupId}{ChunkMark}{part}{ChunkMark}{total}{ChunkMark}{bodySlice}";
+
+    /// <summary>Parses a chunk header off <paramref name="text"/>. On success returns the group id (correlates the
+    /// parts of one message), this part's 1-based index, the total part count, and the body slice. Returns false
+    /// (leaving outputs empty) for anything that isn't a chunk — i.e. all ordinary chat and protocol traffic.</summary>
+    public static bool TryDecodeChatChunk(string text, out string groupId, out int part, out int total, out string bodySlice)
+    {
+        groupId = ""; part = 0; total = 0; bodySlice = "";
+        if (text.Length < 8 || text[0] != ChunkMark) return false;
+        int a = text.IndexOf(ChunkMark, 1); if (a < 2) return false;             // groupId in [1, a)
+        int b = text.IndexOf(ChunkMark, a + 1); if (b < 0) return false;         // part in (a, b)
+        int c = text.IndexOf(ChunkMark, b + 1); if (c < 0) return false;         // total in (b, c)
+        if (!int.TryParse(text.AsSpan(a + 1, b - a - 1), out part) || part < 1) return false;
+        if (!int.TryParse(text.AsSpan(b + 1, c - b - 1), out total) || total < 1 || total > MaxChatChunks) return false;
+        if (part > total) return false;
+        groupId = text.Substring(1, a - 1);
+        bodySlice = text.Substring(c + 1);
+        return true;
+    }
+
+    /// <summary>Splits <paramref name="text"/> into whole-character slices each no larger than
+    /// <paramref name="sliceBudget"/> UTF-8 bytes (never splitting a surrogate pair). Returns null when it would
+    /// need more than <paramref name="maxChunks"/> slices, or when <paramref name="sliceBudget"/> is not positive.</summary>
+    public static List<string>? SliceByBytes(string text, int sliceBudget, int maxChunks)
+    {
+        if (sliceBudget <= 0) return null;
+        var slices = new List<string>();
+        var sb = new StringBuilder();
+        int bytes = 0;
+        for (int i = 0; i < text.Length;)
+        {
+            int adv = char.IsSurrogatePair(text, i) ? 2 : 1;   // keep a surrogate pair whole
+            int cb = Encoding.UTF8.GetByteCount(text.AsSpan(i, adv));
+            if (bytes + cb > sliceBudget && sb.Length > 0)
+            {
+                slices.Add(sb.ToString());
+                sb.Clear();
+                bytes = 0;
+                if (slices.Count >= maxChunks) return null;   // still more to place, but no slices left
+            }
+            sb.Append(text, i, adv);
+            bytes += cb;
+            i += adv;
+        }
+        if (sb.Length > 0) slices.Add(sb.ToString());
+        return slices.Count == 0 || slices.Count > maxChunks ? null : slices;
+    }
+
+    /// <summary>Splits an already-encrypted (or plaintext) <paramref name="payload"/> into framed chunks (each
+    /// carrying a sequence header), each no larger than <paramref name="maxWireLen"/> UTF-8 bytes on the wire.
+    /// Returns the framed parts, or null when the payload would need more than <paramref name="maxChunks"/> parts
+    /// (caller should then refuse to send). <paramref name="groupId"/> ties the parts together on the receiver.</summary>
+    public static List<string>? SplitChatChunks(string payload, string groupId, int maxWireLen, int maxChunks = MaxChatChunks)
+    {
+        // Header overhead upper bound: STX×4 + groupId + part digits + total digits (parts capped at MaxChatChunks,
+        // so each index is a single digit, but reserve two apiece for safety).
+        int overhead = 4 + groupId.Length + 2 + 2;
+        var slices = SliceByBytes(payload, maxWireLen - overhead, maxChunks);
+        if (slices == null) return null;
+
+        int totalParts = slices.Count;
+        var chunks = new List<string>(totalParts);
+        for (int i = 0; i < totalParts; i++)
+            chunks.Add(EncodeChatChunk(groupId, i + 1, totalParts, slices[i]));
+        return chunks;
+    }
+
+    /// <summary>Splits plaintext <paramref name="text"/> into up to <paramref name="maxChunks"/> raw slices, each no
+    /// larger than <paramref name="maxWireLen"/> UTF-8 bytes, with NO sequence header. Used for the "headers off"
+    /// split mode (only allowed when the channel has no app key): each slice is sent as an ordinary, independent
+    /// chat message. Returns null when it would need more than <paramref name="maxChunks"/> slices.</summary>
+    public static List<string>? SplitPlainChunks(string text, int maxWireLen, int maxChunks = MaxChatChunks) =>
+        SliceByBytes(text, maxWireLen, maxChunks);
 
     public MessageKind Kind { get; init; }
     public string GameId { get; init; }
