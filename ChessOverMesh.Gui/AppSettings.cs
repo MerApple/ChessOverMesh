@@ -61,6 +61,9 @@ internal static class AppSettings
 
         // Remembered proxy sign-in credentials, keyed by proxy host. The password is DPAPI-protected.
         public Dictionary<string, ProxyCred> ProxyCreds { get; set; } = new();
+
+        // Remembered size of resizable pop-up windows, keyed by a stable window name (see WindowSizeMemory).
+        public Dictionary<string, WinSize> WindowSizes { get; set; } = new();
     }
 
     /// <summary>A remembered proxy login: username plus the DPAPI-protected password.</summary>
@@ -68,6 +71,13 @@ internal static class AppSettings
     {
         public string User { get; set; } = "";
         public string Pass { get; set; } = "";   // DPAPI-protected ciphertext
+    }
+
+    /// <summary>A remembered window size, in device-independent pixels.</summary>
+    public sealed class WinSize
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
     }
 
     private static readonly string FilePath = Path.Combine(
@@ -255,4 +265,29 @@ internal static class AppSettings
 
     /// <summary>Forgets the remembered proxy login for <paramref name="host"/>.</summary>
     public static void ClearProxyCred(string host) => Mutate(d => d.ProxyCreds.Remove(host));
+
+    /// <summary>The last size the user left the window named <paramref name="key"/> at, or null if never resized.</summary>
+    public static (double Width, double Height)? GetWindowSize(string key)
+    {
+        var s = Load().WindowSizes.GetValueOrDefault(key);
+        return s == null ? null : (s.Width, s.Height);
+    }
+
+    /// <summary>Remembers the size of the window named <paramref name="key"/> for next time it opens.</summary>
+    public static void SetWindowSize(string key, double width, double height) =>
+        Mutate(d => d.WindowSizes[key] = new WinSize { Width = width, Height = height });
+
+    /// <summary>Restores every app setting to its built-in default by overwriting the settings file with a fresh
+    /// default set — colours, fonts, text sizes, sounds, message limits and display toggles, and also the last
+    /// host, saved proxy logins and remembered window sizes. Does NOT touch the per-device cache (devices.json):
+    /// cached chat, node and telemetry data and channel settings are kept.</summary>
+    public static void ResetToDefaults()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(new Data(), new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch { /* best effort */ }
+    }
 }

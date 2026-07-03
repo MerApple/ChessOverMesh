@@ -142,6 +142,29 @@ internal sealed class SystemSettingsWindow : Window
             Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 14),
         });
 
+        // ---- Reset all app settings ----
+        root.Children.Add(new TextBlock { Text = "Reset", Foreground = Fg, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 2) });
+        var resetBtn = new Button { Content = "Reset app settings to defaults…", MinHeight = 26, Padding = new Thickness(10, 0, 10, 0), HorizontalAlignment = HorizontalAlignment.Left };
+        resetBtn.Click += (_, _) =>
+        {
+            if (!ThemedDialog.Confirm(this,
+                "Reset ALL app settings to their defaults? This restores colours, fonts, text sizes, sounds, message " +
+                "limits and display toggles, and also forgets the last connected device, saved proxy logins and " +
+                "remembered window sizes.\n\n" +
+                "Your cached chat, node and telemetry data is NOT affected. Restart the app for all changes to take effect.",
+                "Reset app settings?")) return;
+            AppSettings.ResetToDefaults();
+            ThemedDialog.Info(this, "App settings have been reset to defaults. Restart the app for all changes to take effect.", "Settings reset");
+        };
+        root.Children.Add(resetBtn);
+        root.Children.Add(new TextBlock
+        {
+            Text = "Restores every app setting (colours, fonts, sizes, sounds, message limits, display toggles) to default " +
+                   "and forgets the last device, saved proxy logins and remembered window sizes. Cached chat, node and " +
+                   "telemetry data is kept. Some changes apply only after a restart.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 14),
+        });
+
         var closeBtn = new Button
         {
             Content = "Close", MinWidth = 80, MinHeight = 26, IsDefault = true, IsCancel = true,
