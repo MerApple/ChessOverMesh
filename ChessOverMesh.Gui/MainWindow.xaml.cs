@@ -526,15 +526,7 @@ public partial class MainWindow : Window
     private void SettingsBtn_Click(object sender, RoutedEventArgs e)
     {
         bool deviceEnabled = _connected && !_refreshing && !_joining && _mesh != null;
-        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemMessagesSettings, OpenSystemSettings, OpenChatSettings).ShowDialog();
-    }
-
-    private void OpenSystemMessagesSettings()
-    {
-        var dlg = new SystemMessagesWindow(this, AppSettings.ShowPositionUpdates, AppSettings.ShowNewNodeInfo);
-        if (dlg.ShowDialog() != true) return;
-        AppSettings.ShowPositionUpdates = dlg.ShowPositions;
-        AppSettings.ShowNewNodeInfo = dlg.ShowNewNodes;
+        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemSettings, OpenChatSettings).ShowDialog();
     }
 
     // System settings (cached-messages toggle): the window applies its changes immediately.
@@ -3028,7 +3020,7 @@ public partial class MainWindow : Window
             string line = ni.IsRequest
                 ? $"Node info request received from {name} — replying with ours."
                 : $"Node info received from {name}.";
-            if (AppSettings.ShowNewNodeInfo) AddSystem(Stamp() + line, SysCategory.Nodes);
+            AddSystem(Stamp() + line, SysCategory.Nodes);   // shown/hidden via the System-messages filter (Nodes)
             _nodeDiagHandler?.Invoke(line);
         }
 
@@ -3037,7 +3029,7 @@ public partial class MainWindow : Window
         {
             string name = nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}";
             string line = $"New node heard: {name}.";
-            if (AppSettings.ShowNewNodeInfo) AddSystem(Stamp() + line, SysCategory.Nodes);
+            AddSystem(Stamp() + line, SysCategory.Nodes);   // shown/hidden via the System-messages filter (Nodes)
             _nodeDiagHandler?.Invoke(line);
         }
 
@@ -3046,9 +3038,9 @@ public partial class MainWindow : Window
             DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
 
         // Position heard from another node (broadcast or a reply to our request): note it in the system log, and
-        // refresh the Nodes dialog/map since the node DB position just changed.
-        if (AppSettings.ShowPositionUpdates)
-            foreach (var pos in r.Positions)
+        // refresh the Nodes dialog/map since the node DB position just changed. Shown/hidden via the
+        // System-messages filter (Position category).
+        foreach (var pos in r.Positions)
             {
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
                 AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", SysCategory.Position);

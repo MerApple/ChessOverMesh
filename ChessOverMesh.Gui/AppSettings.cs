@@ -14,8 +14,6 @@ internal static class AppSettings
         public bool RainbowEffect { get; set; }   // rainbow wave on each move (default off)
         public bool HeartbeatEnabled { get; set; } = false;   // opt-in TCP keep-alive (off by default)
         public bool AutoReconnect { get; set; } = true;       // retry once a minute when the device drops (on by default)
-        public bool ShowPositionUpdates { get; set; } = true;   // log "Position received from X" in system messages
-        public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
         public int ChatMessageLimit { get; set; } = 100;        // max chat messages kept per channel (cache + on-screen)
         public int SystemMessageLimit { get; set; } = 200;      // max system messages kept on screen
@@ -162,19 +160,6 @@ internal static class AppSettings
         set => Mutate(d => d.AutoReconnect = value);
     }
 
-    /// <summary>Whether received position broadcasts are logged in the system messages pane (default on).</summary>
-    public static bool ShowPositionUpdates
-    {
-        get => Load().ShowPositionUpdates;
-        set => Mutate(d => d.ShowPositionUpdates = value);
-    }
-
-    /// <summary>Whether new-node / node-info events are logged in the system messages pane (default on).</summary>
-    public static bool ShowNewNodeInfo
-    {
-        get => Load().ShowNewNodeInfo;
-        set => Mutate(d => d.ShowNewNodeInfo = value);
-    }
 
     /// <summary>Whether chat messages are cached to disk per device for reload on reconnect (default on).
     /// When off, nothing new is cached and the existing cache should be cleared.</summary>

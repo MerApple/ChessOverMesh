@@ -14,8 +14,6 @@ internal static class AppSettings
         public bool HeartbeatEnabled { get; set; } = false;   // opt-in TCP keep-alive (off by default)
         public bool AutoReconnect { get; set; } = true;       // retry once a minute when the device drops (on by default)
         public bool BackgroundPoll { get; set; } = true;      // periodic ~15-min poll for messages while asleep (on by default)
-        public bool ShowPositionUpdates { get; set; } = true;   // log "Position received from X" in system messages
-        public bool ShowNewNodeInfo { get; set; } = true;       // log new-node / node-info in system messages
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
         public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages only
         public int ChatMessageLimit { get; set; } = 100;        // max chat messages kept per channel (cache + on-screen)
@@ -114,8 +112,6 @@ internal static class AppSettings
     public static bool HeartbeatEnabled { get => Load().HeartbeatEnabled; set => Mutate(d => d.HeartbeatEnabled = value); }
     public static bool AutoReconnect { get => Load().AutoReconnect; set => Mutate(d => d.AutoReconnect = value); }
     public static bool BackgroundPoll { get => Load().BackgroundPoll; set => Mutate(d => d.BackgroundPoll = value); }
-    public static bool ShowPositionUpdates { get => Load().ShowPositionUpdates; set => Mutate(d => d.ShowPositionUpdates = value); }
-    public static bool ShowNewNodeInfo { get => Load().ShowNewNodeInfo; set => Mutate(d => d.ShowNewNodeInfo = value); }
     public static bool CacheMessages { get => Load().CacheMessages; set => Mutate(d => d.CacheMessages = value); }
     public static bool ShowChessboard { get => Load().ShowChessboard; set => Mutate(d => d.ShowChessboard = value); }
     public static int ChatMessageLimit { get => Load().ChatMessageLimit; set => Mutate(d => d.ChatMessageLimit = value); }

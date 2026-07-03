@@ -1062,13 +1062,16 @@ public partial class MainPage : ContentPage
 
     /// <summary>Applies the "Show chessboard" setting: when off, the board, game buttons and the Moves/System
     /// toggle are hidden and only the system-messages list is shown (the bottom tab is renamed by AppShell).
-    /// Called at startup and live from the System settings switch.</summary>
+    /// The toolbar row stays visible either way so the Filter and Copy buttons remain reachable in
+    /// system-messages-only mode. Called at startup and live from the Chess settings switch.</summary>
     public void ApplyChessboardVisibility()
     {
         bool show = AppSettings.ShowChessboard;
         GameButtons.IsVisible = show;   // New game / Join / Resign … (chess actions)
         BoardHost.IsVisible = show;     // the board
-        TabButtons.IsVisible = show;    // Moves / System toggle + Copy
+        TabMoves.IsVisible = show;      // the Moves/System toggle only makes sense alongside the board
+        TabSystem.IsVisible = show;
+        SystemOnlyTitle.IsVisible = !show;   // a plain "System messages" heading replaces the toggle
         SelectTab(show ? TabMoves : TabSystem, show ? MovesView : SystemView);
     }
 
@@ -2874,8 +2877,8 @@ public partial class MainPage : ContentPage
             if (_tracerouteWaiters.TryGetValue(t.Node, out var waiter)) waiter(t);
         }
         // Position heard from another node (broadcast, or a reply to our request): note it in the system log.
-        if (AppSettings.ShowPositionUpdates)
-            foreach (var pos in result.Positions)
+        // Always logged; the System-messages filter (Position category) controls whether it's shown.
+        foreach (var pos in result.Positions)
             {
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
                 AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", cat: SysCategory.Position);
@@ -2903,8 +2906,8 @@ public partial class MainPage : ContentPage
             AddSystem(Stamp() + $"Noise floor for {(nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}")}: {nf.NoiseFloorDbm} dBm", cat: SysCategory.Telemetry);
         if (result.NoiseFloors.Count > 0) { _telemetryRefresh?.Invoke(); NodesChanged?.Invoke(); StateChanged?.Invoke(); }   // StateChanged → Device tab noise-floor row
 
-        // New-node / node-info events in the system log (optional).
-        if (AppSettings.ShowNewNodeInfo)
+        // New-node / node-info events in the system log. Always logged; the System-messages filter
+        // (Nodes category) controls whether these are shown.
         {
             foreach (var nn in result.NewNodes)
                 AddSystem(Stamp() + $"New node heard: {(nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}")}.", cat: SysCategory.Nodes);
@@ -2994,7 +2997,6 @@ public partial class MainPage : ContentPage
     public void OpenChannels() => OnChannelsClicked(this, EventArgs.Empty);
     public void OpenColours() => OnColorsClicked(this, EventArgs.Empty);
     public void OpenSound() => OnSoundClicked(this, EventArgs.Empty);
-    public async void OpenSystemMessages() => await Navigation.PushModalAsync(new SystemMessagesPage());
     public async void OpenSystemSettings() => await Navigation.PushModalAsync(new SystemSettingsPage(this));
     public async void OpenChatSettings() => await Navigation.PushModalAsync(new ChatSettingsPage(this));
     public async void OpenChessSettings() => await Navigation.PushModalAsync(new ChessSettingsPage(this));
