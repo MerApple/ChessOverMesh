@@ -32,21 +32,31 @@ internal sealed class MapSettingsWindow : Window
         Title = "Map settings";
         Owner = owner;
         Width = 420;
-        SizeToContent = SizeToContent.Height;
+        Height = 460;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
+        MinWidth = 360;
+        MinHeight = 240;
         Background = Bg;
 
-        var root = new StackPanel { Margin = new Thickness(14) };
+        // Grid so the region list (star row) soaks up any extra height when the user resizes the window.
+        var root = new Grid { Margin = new Thickness(14) };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // description
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // summary
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // regions
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
 
-        root.Children.Add(new TextBlock
+        var intro = new TextBlock
         {
             Text = "Offline map: download the tiles for an area so the node map works with no internet. " +
                    "When something is cached, the map lets you switch between the online and cached layers.",
             Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12),
-        });
+        };
+        Grid.SetRow(intro, 0);
+        root.Children.Add(intro);
 
         _summary = new TextBlock { Foreground = Fg, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+        Grid.SetRow(_summary, 1);
         root.Children.Add(_summary);
 
         _regions = new ItemsControl { Margin = new Thickness(0, 0, 0, 8) };
@@ -54,12 +64,13 @@ internal sealed class MapSettingsWindow : Window
         {
             Content = _regions,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            MaxHeight = 160,
             Margin = new Thickness(0, 0, 0, 8),
         };
+        Grid.SetRow(scroll, 2);
         root.Children.Add(scroll);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        Grid.SetRow(buttons, 3);
 
         var cacheBtn = new Button { Content = "Cache map area…", MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0),
             ToolTip = "Download a chosen area's map tiles for offline use." };
