@@ -3,9 +3,10 @@ using Meshtastic.Proxy;
 
 const string Usage =
     "Meshtastic.Proxy — share one Meshtastic device with several GUI/MAUI clients over TLS.\n\n" +
-    "Usage: Meshtastic.Proxy --device <target> [--port <listen>] [--pfx <file>] [--pfx-pass <pw>] [--users <file>]\n\n" +
+    "Usage: Meshtastic.Proxy [--device <target>] [--port <listen>] [--pfx <file>] [--pfx-pass <pw>] [--users <file>]\n\n" +
     "  --device, -d   The device to proxy: host[:port] for the TCP stream API (default port 4403),\n" +
-    "                 or http(s)://host for the HTTP API.\n" +
+    "                 or http(s)://host for the HTTP API. OPTIONAL — omit it to run a device-less relay where\n" +
+    "                 connected clients only chat with each other (nothing is written to a radio).\n" +
     "  --port,   -p   TCP port the proxy listens on for clients (TLS). Default 4403.\n" +
     "  --pfx          PFX certificate for the TLS server. Generated (self-signed) if missing.\n" +
     "  --pfx-pass     Password for the PFX. Default 'meshtastic'.\n" +
@@ -67,7 +68,8 @@ if (addUser != null)
     return 0;
 }
 
-if (deviceTarget.Length == 0) { Console.Error.WriteLine("Missing --device.\n\n" + Usage); return 1; }
+// --device is optional: with one, the proxy shares that radio; without one it runs as a pure local relay so clients
+// can still connect and chat with each other (nothing is written to a radio).
 
 // A factory the hub calls to (re)connect to the device. TCP throws if the port is closed (clean retry); HTTP is
 // connectionless, so it returns immediately and a failed first read drives the hub's reconnect instead.
@@ -95,13 +97,17 @@ else if (!string.IsNullOrEmpty(authUser))
     users = UserStore.FromUsers(new[] { new ProxyUser(authUser, UserStore.HashPassword(authPass ?? ""), CanUseDevice: true) });
 
 var cert = SelfSignedCert.GetOrCreate(pfxPath, pfxPass);
-var hub = new ProxyHub(ConnectDevice, cert, listenPort, Log, verbose, users);
+// No --device → pass a null factory so the hub skips the device loop and runs as a local-chat relay.
+Func<CancellationToken, Task<IMeshTransport>>? connectDevice = deviceTarget.Length == 0 ? null : ConnectDevice;
+var hub = new ProxyHub(connectDevice, cert, listenPort, Log, verbose, users);
 if (users is { Count: > 0 }) Log($"Client authentication ENABLED ({users.Count} user(s)). Clients must sign in.");
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); Log("Stopping…"); };
 
-Log($"Meshtastic.Proxy: device '{deviceTarget}', listening on :{listenPort} (TLS). Clients connect with proxy://<host>:{listenPort}.");
+Log(deviceTarget.Length == 0
+    ? $"Meshtastic.Proxy: NO device (local-chat relay), listening on :{listenPort} (TLS). Clients connect with proxy://<host>:{listenPort}."
+    : $"Meshtastic.Proxy: device '{deviceTarget}', listening on :{listenPort} (TLS). Clients connect with proxy://<host>:{listenPort}.");
 try { await hub.RunAsync(cts.Token); }
 catch (OperationCanceledException) { }
 catch (Exception ex) { Log($"Proxy error: {ex.Message}"); }

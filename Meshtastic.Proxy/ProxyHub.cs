@@ -18,6 +18,9 @@ namespace Meshtastic.Proxy;
 ///   * Apps can connect to the proxy before the device is up (their want_config waits briefly for the device).
 ///   * If the device drops, the proxy stays up, drops its clients (so the apps clearly show "disconnected" and
 ///     auto-reconnect), and keeps trying to reconnect to the device. When it's back, clients re-sync on reconnect.
+///   * With no device at all — never connected, currently offline, or started with no --device — clients still
+///     connect and chat with EACH OTHER: their packets are relayed client-to-client under a synthetic shared node
+///     (SyntheticNodeNum) instead of being written to a radio. Nothing reaches a physical mesh in that state.
 ///
 /// Wire model (both sides use the Meshtastic stream framing [0x94 0xc3][len-hi][len-lo][payload]):
 ///   * Device -> clients: every FromRadio.packet is broadcast to all clients (this includes the device's echo of
@@ -29,7 +32,14 @@ internal sealed class ProxyHub
 {
     private const uint ProxyWantConfigId = 0xC0FFEE01;   // the proxy's own want_config id (distinct from clients')
 
-    private readonly Func<CancellationToken, Task<IMeshTransport>> _connectDevice;
+    // The node number the proxy presents while it has no real device. All proxy-local (radio-less) messages appear to
+    // come from this one shared node, exactly as they'd appear to come from the real device node when one is connected
+    // — so clients behave the same whether or not a radio is present. A real device, once primed, replaces it.
+    private const uint SyntheticNodeNum = 0xC0FFEE00;
+
+    // The device-connect factory, or null when the proxy is started with no --device: a pure local-chat relay where
+    // connected clients only talk to each other and nothing is ever written to a radio.
+    private readonly Func<CancellationToken, Task<IMeshTransport>>? _connectDevice;
     private readonly X509Certificate2 _cert;
     private readonly int _port;
     private readonly Action<string> _log;
@@ -66,7 +76,7 @@ internal sealed class ProxyHub
     private readonly SortedDictionary<int, byte[]> _channels = new(); // channel index -> frame
     private readonly Dictionary<uint, byte[]> _nodes = new();         // node num -> frame
 
-    public ProxyHub(Func<CancellationToken, Task<IMeshTransport>> connectDevice, X509Certificate2 cert, int port, Action<string> log,
+    public ProxyHub(Func<CancellationToken, Task<IMeshTransport>>? connectDevice, X509Certificate2 cert, int port, Action<string> log,
                     bool verbose = false, UserStore? users = null)
     {
         _connectDevice = connectDevice; _cert = cert; _port = port; _log = log; _verbose = verbose;
@@ -75,9 +85,32 @@ internal sealed class ProxyHub
 
     public async Task RunAsync(CancellationToken ct)
     {
-        var accept = AcceptLoopAsync(ct);     // clients can connect any time, even before the device is up
+        // Give the proxy a shared identity up front so clients can connect and chat among themselves even before (or
+        // entirely without) a device. When a device is configured, this is provisional: its real MyInfo replaces the
+        // synthetic one on prime, and early clients are re-synced. With no device configured, it's the final identity.
+        SeedSyntheticIdentity(permanent: _connectDevice == null);
+
+        var accept = AcceptLoopAsync(ct);     // clients can connect any time, even before/without a device
+        if (_connectDevice == null) { await accept; return; }   // no device configured: pure local-chat relay
         var device = DeviceConnectLoopAsync(ct);
         await Task.WhenAny(accept, device);
+    }
+
+    // Presents SyntheticNodeNum as the shared node so device-less clients get a usable config (a MyInfo carrying the
+    // node number) and the local relay has a non-zero From to stamp on messages. Only fills in when no real device has
+    // provided an identity yet, so it never clobbers a device's cached MyInfo (which survives a device drop).
+    private void SeedSyntheticIdentity(bool permanent)
+    {
+        lock (_sync)
+        {
+            if (_myNodeNum == 0)
+            {
+                _myNodeNum = SyntheticNodeNum;
+                _myInfo = new FromRadio { MyInfo = new MyNodeInfo { MyNodeNum = SyntheticNodeNum } }.ToByteArray();
+            }
+        }
+        // No device will ever come, so serve config immediately (don't wait) and don't mark clients for a later re-sync.
+        if (permanent) _deviceSynced = true;
     }
 
     // ---- Device side: connect, prime, pump, and reconnect forever ----
@@ -88,7 +121,7 @@ internal sealed class ProxyHub
         while (!ct.IsCancellationRequested)
         {
             IMeshTransport dev;
-            try { dev = await _connectDevice(ct); }
+            try { dev = await _connectDevice!(ct); }   // non-null: RunAsync only starts this loop when a device is configured
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
@@ -293,37 +326,17 @@ internal sealed class ProxyHub
             return;
         }
 
-        // Restricted user: never touch the radio. Deliver a text/packet to every OTHER connected client, plus back to
-        // the sender itself (there's no radio loopback to confirm its own send), and remember text for backfill. Any
-        // non-packet frame (heartbeat, etc.) from a restricted client is simply dropped.
-        if (!client.CanUseDevice)
+        // Two cases where the packet must NOT reach a radio, but proxy clients should still see it: a restricted user
+        // (never allowed on the radio), or no device connected right now (offline, reconnecting, or none configured).
+        // In both, relay it directly to the other connected clients so apps keep chatting regardless of the radio.
+        var dev = _device;
+        if (!client.CanUseDevice || dev == null)
         {
-            if (tr.PayloadVariantCase == ToRadio.PayloadVariantOneofCase.Packet && tr.Packet.Decoded != null
-                && _myNodeNum != 0 && tr.Packet.Id != 0)
-            {
-                _log($"Restricted client -> proxy clients only: {tr.Packet.Decoded.Portnum} id 0x{tr.Packet.Id:x8}");
-                var synth = tr.Packet.Clone();
-                synth.From = _myNodeNum;                       // present it as coming from the shared device node
-                // No radio stamps a receive time for a local-only message, so the proxy does — otherwise other
-                // clients render it at epoch 0 and it sorts wrong in the backfill ring.
-                if (synth.RxTime == 0) synth.RxTime = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                var synthBytes = new FromRadio { Packet = synth }.ToByteArray();
-                await MirrorToOthersAsync(client, synthBytes);
-                try { await SendFrameAsync(client, synthBytes, ct); } catch { Remove(client); }
-                if (tr.Packet.Decoded.Portnum == PortNum.TextMessageApp)
-                    lock (_sync)
-                    {
-                        _recent.Add((tr.Packet.RxTime, synthBytes));
-                        if (_recent.Count > RecentCap) _recent.RemoveAt(0);
-                    }
-            }
+            await RelayLocallyAsync(client, tr, client.CanUseDevice ? "Device offline" : "Restricted client", ct);
             return;
         }
 
-        // A packet / heartbeat / anything else: send it to the device (if we have one).
-        var dev = _device;
-        if (dev == null) { _log("Dropping client packet: device offline."); return; }
-
+        // A packet / heartbeat / anything else with a live device: forward it to the radio (plus mirror below).
         if (tr.PayloadVariantCase == ToRadio.PayloadVariantOneofCase.Packet && tr.Packet.Decoded != null)
         {
             _log($"Client -> device: {tr.Packet.Decoded.Portnum} to !{tr.Packet.To:x8} (want_response={tr.Packet.Decoded.WantResponse})");
@@ -375,6 +388,33 @@ internal sealed class ProxyHub
             _echoSuppress[id] = sender;
             while (_echoOrder.Count > 512) _echoSuppress.Remove(_echoOrder.Dequeue());
         }
+    }
+
+    // Relays a client's packet to every OTHER connected client, plus back to the sender itself, WITHOUT touching a
+    // radio — so apps connected to the proxy chat among themselves. Used for restricted users (never allowed on the
+    // radio) and for any client while no device is connected. The sender gets the echo because there's no radio
+    // loopback to confirm its own send. Text is remembered for backfill. Non-packet frames have nowhere local to go.
+    private async Task RelayLocallyAsync(Client client, ToRadio tr, string why, CancellationToken ct)
+    {
+        if (tr.PayloadVariantCase != ToRadio.PayloadVariantOneofCase.Packet || tr.Packet.Decoded == null
+            || _myNodeNum == 0 || tr.Packet.Id == 0)
+            return;
+
+        _log($"{why} -> proxy clients only: {tr.Packet.Decoded.Portnum} id 0x{tr.Packet.Id:x8}");
+        var synth = tr.Packet.Clone();
+        synth.From = _myNodeNum;                       // present it as coming from the shared node
+        // No radio stamps a receive time for a local-only message, so the proxy does — otherwise other clients render
+        // it at epoch 0 and it sorts wrong in the backfill ring.
+        if (synth.RxTime == 0) synth.RxTime = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var synthBytes = new FromRadio { Packet = synth }.ToByteArray();
+        await MirrorToOthersAsync(client, synthBytes);
+        try { await SendFrameAsync(client, synthBytes, ct); } catch { Remove(client); }
+        if (tr.Packet.Decoded.Portnum == PortNum.TextMessageApp)
+            lock (_sync)
+            {
+                _recent.Add((synth.RxTime, synthBytes));   // key on the stamped rx_time so backfill can replay it
+                if (_recent.Count > RecentCap) _recent.RemoveAt(0);
+            }
     }
 
     // Sends a frame to every connected client except the one that originated it.
