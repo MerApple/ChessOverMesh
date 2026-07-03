@@ -304,6 +304,9 @@ internal sealed class ProxyHub
                 _log($"Restricted client -> proxy clients only: {tr.Packet.Decoded.Portnum} id 0x{tr.Packet.Id:x8}");
                 var synth = tr.Packet.Clone();
                 synth.From = _myNodeNum;                       // present it as coming from the shared device node
+                // No radio stamps a receive time for a local-only message, so the proxy does — otherwise other
+                // clients render it at epoch 0 and it sorts wrong in the backfill ring.
+                if (synth.RxTime == 0) synth.RxTime = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 var synthBytes = new FromRadio { Packet = synth }.ToByteArray();
                 await MirrorToOthersAsync(client, synthBytes);
                 try { await SendFrameAsync(client, synthBytes, ct); } catch { Remove(client); }
