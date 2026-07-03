@@ -449,8 +449,8 @@ public sealed class DeviceConfigPage : ContentPage
         btn.Clicked += async (_, _) =>
         {
             if (_busy || !_loaded) return;
-            if (!await DisplayAlert(text, confirm, "Yes", "No")) return;
-            if (doubleConfirm && !await DisplayAlert(text, "Are you absolutely sure? This cannot be undone.", "Yes", "No")) return;
+            if (!await ThemedDialogs.Alert(this, text, confirm, "Yes", "No")) return;
+            if (doubleConfirm && !await ThemedDialogs.Alert(this, text, "Are you absolutely sure? This cannot be undone.", "Yes", "No")) return;
             _busy = true; SetBusy(true); _status.Text = $"Sending {text}…";
             try { await action(); _status.Text = $"{text} sent."; }
             catch (Exception ex) { _status.Text = $"{text} failed: {ex.Message}"; }

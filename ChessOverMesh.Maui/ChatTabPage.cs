@@ -365,7 +365,7 @@ public sealed class ChatTabPage : ContentPage
             _input.Text = "";       // accepted — clear the box
             CollapseComposer();     // and shrink it back to a single line (drops focus/keyboard, like reading mode)
         }
-        else await DisplayAlert("Message not sent", reason, "OK");   // blocked — tell the user why
+        else await ThemedDialogs.Alert(this, "Message not sent", reason, "OK");   // blocked — tell the user why
     }
 
     // Long-press menu on a chat message — mirrors the desktop right-click options.
@@ -381,7 +381,7 @@ public sealed class ChatTabPage : ContentPage
         opts.Add("Copy");
         opts.Add("Remove message");
 
-        string choice = await DisplayActionSheet("Message", "Cancel", null, opts.ToArray());
+        string choice = await ThemedDialogs.ActionSheet(this, "Message", "Cancel", null, opts.ToArray());
         switch (choice)
         {
             case "Reply":
@@ -391,37 +391,37 @@ public sealed class ChatTabPage : ContentPage
             case "React":
                 // Quick picks, plus "More…" which opens the phone's keyboard so any emoji can be chosen.
                 var reactOpts = MainPage.ReactionEmojis.Append("More…").ToArray();
-                string emoji = await DisplayActionSheet("React", "Cancel", null, reactOpts);
+                string emoji = await ThemedDialogs.ActionSheet(this, "React", "Cancel", null, reactOpts);
                 if (emoji == "More…")
-                    emoji = await DisplayPromptAsync("React", "Type or pick any emoji from your keyboard:",
+                    emoji = await ThemedDialogs.Prompt(this, "React", "Type or pick any emoji from your keyboard:",
                                                      accept: "Send", cancel: "Cancel", placeholder: "🙂", maxLength: 16);
                 if (!string.IsNullOrWhiteSpace(emoji) && emoji != "Cancel" && emoji != "More…")
                     await _main.ReactToAsync(le, emoji.Trim());
                 break;
             case "DM" when le.Rx is { } dm:
-                await DisplayAlert("Direct message", _main.StartDmWith(dm.FromNode), "OK");
+                await ThemedDialogs.Alert(this, "Direct message", _main.StartDmWith(dm.FromNode), "OK");
                 break;
             case "Request node info" when le.Rx is { } r:
-                await DisplayAlert("Node info", await _main.RequestNodeInfoForAsync(r.FromNode), "OK");
+                await ThemedDialogs.Alert(this, "Node info", await _main.RequestNodeInfoForAsync(r.FromNode), "OK");
                 break;
             case "Node info" when le.Rx is { } ni:
                 // Same full "all info" view as the Nodes list's "Show all info" button.
                 var node = _main.GetNodes().FirstOrDefault(n => n.Num == ni.FromNode);
                 if (node == null)
-                    await DisplayAlert("Node info", $"No node entry yet for !{ni.FromNode:x8} — use \"Request node info\" first, then try again.", "OK");
+                    await ThemedDialogs.Alert(this, "Node info", $"No node entry yet for !{ni.FromNode:x8} — use \"Request node info\" first, then try again.", "OK");
                 else
                     await Navigation.PushModalAsync(new TelemetryPage(_main, node));
                 break;
             case "Open location in Google Maps" when le.Rx is { } loc:
                 var url = _main.NodeMapsUrl(loc.FromNode);
                 if (url == null)
-                    await DisplayAlert("No location",
+                    await ThemedDialogs.Alert(this, "No location",
                         "No position data found for this node.\n\nIt hasn't shared its location yet. Use \"Request position\" to ask for it, then try again.", "OK");
                 else
                     await Launcher.Default.OpenAsync(url);
                 break;
             case "Message details":
-                await DisplayAlert("Message details",
+                await ThemedDialogs.Alert(this, "Message details",
                     _main.MessageDetailsFor(le) ?? "No additional details for this message yet. Only messages received " +
                     "over the mesh, or sent messages that have been acknowledged, carry signal information.", "OK");
                 break;

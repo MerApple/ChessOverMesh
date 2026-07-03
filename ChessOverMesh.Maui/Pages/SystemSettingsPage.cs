@@ -87,14 +87,14 @@ public sealed class SystemSettingsPage : ContentPage
             // session key so the change re-encrypts the existing cache instead of losing it.
             if (DeviceCache.IsEncrypted(host))
             {
-                string? cur = await DisplayPromptAsync("Change cache password", "Current password:", "OK", "Cancel");
+                string? cur = await ThemedDialogs.Prompt(this, "Change cache password", "Current password:", "OK", "Cancel");
                 if (string.IsNullOrEmpty(cur)) return;
-                if (!DeviceCache.Unlock(host, cur)) { await DisplayAlert("Incorrect password", "The current password is incorrect.", "OK"); return; }
+                if (!DeviceCache.Unlock(host, cur)) { await ThemedDialogs.Alert(this, "Incorrect password", "The current password is incorrect.", "OK"); return; }
             }
-            string? p1 = await DisplayPromptAsync("Set cache password", "New password:", "OK", "Cancel");
+            string? p1 = await ThemedDialogs.Prompt(this, "Set cache password", "New password:", "OK", "Cancel");
             if (string.IsNullOrEmpty(p1)) return;
-            string? p2 = await DisplayPromptAsync("Set cache password", "Confirm password:", "OK", "Cancel");
-            if (p1 != p2) { await DisplayAlert("Passwords don't match", "Please try again.", "OK"); return; }
+            string? p2 = await ThemedDialogs.Prompt(this, "Set cache password", "Confirm password:", "OK", "Cancel");
+            if (p1 != p2) { await ThemedDialogs.Alert(this, "Passwords don't match", "Please try again.", "OK"); return; }
             DeviceCache.SetPassword(host, p1);
             RefreshCacheState();
         };
@@ -103,10 +103,10 @@ public sealed class SystemSettingsPage : ContentPage
             // Removing the password keeps the cached data but stores it in plaintext, so require the current
             // password first (unlike deleting the cache, which destroys the data and needs no password). Unlock
             // also loads the session key so SetPassword("") decrypts the existing cache before re-writing it.
-            string? cur = await DisplayPromptAsync("Remove cache password",
+            string? cur = await ThemedDialogs.Prompt(this, "Remove cache password",
                 "Enter the current password to store this device's cache unencrypted.", "Remove", "Cancel");
             if (string.IsNullOrEmpty(cur)) return;
-            if (!DeviceCache.Unlock(host, cur)) { await DisplayAlert("Incorrect password", "The current password is incorrect.", "OK"); return; }
+            if (!DeviceCache.Unlock(host, cur)) { await ThemedDialogs.Alert(this, "Incorrect password", "The current password is incorrect.", "OK"); return; }
             DeviceCache.SetPassword(host, "");
             RefreshCacheState();
         };
@@ -119,7 +119,7 @@ public sealed class SystemSettingsPage : ContentPage
                 AppSettings.CacheMessages = true;
                 return;
             }
-            bool ok = await DisplayAlert("Delete cached messages?",
+            bool ok = await ThemedDialogs.Alert(this, "Delete cached messages?",
                 "Turning off cached messages deletes ALL cached data for every device on this phone — chat history, " +
                 "node and telemetry data, saved channel settings and app keys — and removes any cache passwords. " +
                 "This cannot be undone. Continue?",

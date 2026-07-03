@@ -73,7 +73,7 @@ public sealed class RxFilterPage : ContentPage
 
     async Task DeletePromptAsync(MainPage.ChatTxTarget t)
     {
-        bool ok = await DisplayAlert("Delete messages",
+        bool ok = await ThemedDialogs.Alert(this, "Delete messages",
             $"Delete all messages on {t.Label}?\n\nThis removes them from chat and the saved history on this phone.", "Delete", "Cancel");
         if (!ok) return;
         _main.DeleteChatTarget(t.IsDm, t.Id);

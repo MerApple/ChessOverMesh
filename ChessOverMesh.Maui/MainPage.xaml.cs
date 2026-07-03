@@ -785,7 +785,7 @@ public partial class MainPage : ContentPage
             if (Navigation.ModalStack.Contains(page)) await Navigation.PopModalAsync();
             if (delete)
             {
-                bool ok = await DisplayAlert("Delete cache",
+                bool ok = await ThemedDialogs.Alert(this, "Delete cache",
                     "Delete all cached data for this device and reset its password? This cannot be undone.", "Delete", "Cancel");
                 if (ok) { DeviceCache.ClearDevice(host); return true; }
                 continue;
@@ -1121,7 +1121,7 @@ public partial class MainPage : ContentPage
     async Task<bool> EnsureChessChannelSelectedAsync()
     {
         if (_mesh != null && _mesh.ChannelIndex != 0) return true;
-        await DisplayAlert("Choose a chess channel",
+        await ThemedDialogs.Alert(this, "Choose a chess channel",
             "No chess channel is set for this device.\n\n" +
             "Chess needs a dedicated secondary channel — it can't use the primary channel (0). " +
             "Open Channels to pick an existing channel for chess, or create one, then start a game.",
@@ -1133,7 +1133,7 @@ public partial class MainPage : ContentPage
     {
         if (_mesh == null) return;
         if (!await EnsureChessChannelSelectedAsync()) return;   // chess needs a non-primary channel to host
-        string choice = await DisplayActionSheet("Create game", "Cancel", null, "New game", "Load saved game…");
+        string choice = await ThemedDialogs.ActionSheet(this, "Create game", "Cancel", null, "New game", "Load saved game…");
         if (choice == "Load saved game…")
         {
             if (!await LoadGameFromFile()) return;
@@ -1141,7 +1141,7 @@ public partial class MainPage : ContentPage
         else if (choice == "New game") { _loadedGame = null; _loadedName = ""; }
         else return;
 
-        string? id = await DisplayPromptAsync("Create game", "Game id:", "Next", "Cancel", initialValue: NewGameId());
+        string? id = await ThemedDialogs.Prompt(this, "Create game", "Game id:", "Next", "Cancel", initialValue: NewGameId());
         if (id == null) return;
         id = id.Trim();
         if (id.Length == 0) id = NewGameId();
@@ -1149,7 +1149,7 @@ public partial class MainPage : ContentPage
         string role = RoleAuto;
         if (_loadedGame == null)
         {
-            string r = await DisplayActionSheet("Your colour", "Cancel", null, RoleAuto, RoleWhite, RoleBlack);
+            string r = await ThemedDialogs.ActionSheet(this, "Your colour", "Cancel", null, RoleAuto, RoleWhite, RoleBlack);
             if (r == null || r == "Cancel") return;
             role = r;
         }
@@ -1223,7 +1223,7 @@ public partial class MainPage : ContentPage
         _selected = null; _legalForSelected.Clear(); _lastMove = null;
         BuildBoard(); Render(); ApplyConnectionState();
         Status("Game creation not acknowledged — try creating again.");
-        await DisplayAlert("No acknowledgement", $"No one acknowledged your new game '{gid}'.\n\n{reason}", "OK");
+        await ThemedDialogs.Alert(this, "No acknowledgement", $"No one acknowledged your new game '{gid}'.\n\n{reason}", "OK");
     }
 
     static string NewGameId() => Guid.NewGuid().ToString("N").Substring(0, 4);
@@ -1233,9 +1233,9 @@ public partial class MainPage : ContentPage
         if (_mesh == null) return;
         if (!await EnsureChessChannelSelectedAsync()) return;   // chess channel needed to receive announcements & join
         var games = _pendingGames.Values.ToList();
-        if (games.Count == 0) { await DisplayAlert("Join a game", "No open games yet. Wait for someone to create one.", "OK"); return; }
+        if (games.Count == 0) { await ThemedDialogs.Alert(this, "Join a game", "No open games yet. Wait for someone to create one.", "OK"); return; }
         var labels = games.Select(g => $"'{g.GameId}' by {_mesh.DescribeNode(g.CreatorNode)} (you'd be {g.CreatorColor.Opposite()})").ToArray();
-        string pick = await DisplayActionSheet("Open games", "Cancel", null, labels);
+        string pick = await ThemedDialogs.ActionSheet(this, "Open games", "Cancel", null, labels);
         if (pick == null || pick == "Cancel") return;
         int i = Array.IndexOf(labels, pick);
         if (i < 0) return;
@@ -1282,7 +1282,7 @@ public partial class MainPage : ContentPage
         _joining = false; _joinGame = null;
         ApplyConnectionState();
         Status("Join failed — no acknowledgement. Try joining again.");
-        await DisplayAlert("No acknowledgement", $"No acknowledgement from the host for game '{gameId}'.\n\n{reason}", "OK");
+        await ThemedDialogs.Alert(this, "No acknowledgement", $"No acknowledgement from the host for game '{gameId}'.\n\n{reason}", "OK");
     }
 
     void BeginGame(GameColor color, string gameId, string? fen = null, bool awaitingOpponent = false)
@@ -1313,7 +1313,7 @@ public partial class MainPage : ContentPage
     async void OnCancelClicked(object? sender, EventArgs e)
     {
         if (!_playing || _gameOver || !(_awaitingOpponent || _resigning)) return;
-        if (!await DisplayAlert("Cancel game", "Cancel this game?", "Yes", "No")) return;
+        if (!await ThemedDialogs.Alert(this, "Cancel game", "Cancel this game?", "Yes", "No")) return;
         CancelGame($"Game '{_gameId}' cancelled.");
     }
 
@@ -1373,7 +1373,7 @@ public partial class MainPage : ContentPage
     {
         if (!_playing || _gameOver || _mesh == null) return;
         if (_pending.Values.Any(p => p.IsSave)) return;
-        string? name = await DisplayPromptAsync("Save game", "Filename (both players save under this name):", "Save", "Cancel", initialValue: _gameId);
+        string? name = await ThemedDialogs.Prompt(this, "Save game", "Filename (both players save under this name):", "Save", "Cancel", initialValue: _gameId);
         if (string.IsNullOrWhiteSpace(name)) return;
         name = SanitizeFileName(name);
 
@@ -1400,7 +1400,7 @@ public partial class MainPage : ContentPage
         if (pm.GameId != _gameId || !_playing || _gameOver) return;
         string who = _mesh?.DescribeNode(msg.FromNode) ?? "Opponent";
         string saveName = pm.SaveName;
-        bool yes = await DisplayAlert("Game ended",
+        bool yes = await ThemedDialogs.Alert(this, "Game ended",
             $"{who} ended the game and saved it as '{saveName}'.\n\nSave a copy on your side too?", "Save a copy", "End without saving");
         if (yes)
         {
@@ -1444,12 +1444,12 @@ public partial class MainPage : ContentPage
         var files = Directory.Exists(GameStorage.DefaultFolder)
             ? Directory.GetFiles(GameStorage.DefaultFolder, "*.json").Select(Path.GetFileNameWithoutExtension).Where(s => s != null).Cast<string>().ToArray()
             : Array.Empty<string>();
-        if (files.Length == 0) { await DisplayAlert("Load game", "No saved games found.", "OK"); return false; }
-        string pick = await DisplayActionSheet("Load a saved game", "Cancel", null, files);
+        if (files.Length == 0) { await ThemedDialogs.Alert(this, "Load game", "No saved games found.", "OK"); return false; }
+        string pick = await ThemedDialogs.ActionSheet(this, "Load a saved game", "Cancel", null, files);
         if (pick == null || pick == "Cancel") return false;
 
         var game = GameStorage.Load(GameStorage.PathFor(pick));
-        if (game == null) { await DisplayAlert("Load failed", "Couldn't read that save file.", "OK"); return false; }
+        if (game == null) { await ThemedDialogs.Alert(this, "Load failed", "Couldn't read that save file.", "OK"); return false; }
         _loadedGame = game;
         _loadedName = pick;
         bool black = game.MyColor.Equals("black", StringComparison.OrdinalIgnoreCase);
@@ -1495,7 +1495,7 @@ public partial class MainPage : ContentPage
     async void OnResignClicked(object? sender, EventArgs e)
     {
         if (!_playing || _gameOver || _resigning || _mesh == null) return;
-        if (!await DisplayAlert("Resign", "Resign this game?", "Yes", "No")) return;
+        if (!await ThemedDialogs.Alert(this, "Resign", "Resign this game?", "Yes", "No")) return;
         _resigning = true;
         ApplyConnectionState();
         string payload = ProtocolMessage.EncodeResign(_gameId, _myColor);
@@ -1523,7 +1523,7 @@ public partial class MainPage : ContentPage
         if (rp != null) _pending.Remove(rp.Id);
         _resigning = false;
         ApplyConnectionState();
-        bool cancel = await DisplayAlert("No acknowledgement",
+        bool cancel = await ThemedDialogs.Alert(this, "No acknowledgement",
             $"Your opponent didn't acknowledge your resignation.\n\n{reason}\n\nCancel the game anyway?", "Cancel game", "Keep waiting");
         if (cancel) CancelGame("Game cancelled (resignation not acknowledged).");
         else Status("Resignation not acknowledged — resign or cancel again when ready.");
@@ -1564,7 +1564,7 @@ public partial class MainPage : ContentPage
     {
         var promo = candidates.Where(m => m.Promotion != PieceType.None).ToList();
         if (promo.Count == 0) return candidates[0];
-        string pick = await DisplayActionSheet("Promote to", null, null, "Queen", "Rook", "Bishop", "Knight");
+        string pick = await ThemedDialogs.ActionSheet(this, "Promote to", null, null, "Queen", "Rook", "Bishop", "Knight");
         PieceType chosen = pick switch { "Rook" => PieceType.Rook, "Bishop" => PieceType.Bishop, "Knight" => PieceType.Knight, _ => PieceType.Queen };
         return promo.FirstOrDefault(m => m.Promotion == chosen, promo.First(m => m.Promotion == PieceType.Queen));
     }
@@ -1604,7 +1604,7 @@ public partial class MainPage : ContentPage
             if (_moveHistory.Count > 0) _moveHistory.RemoveAt(_moveHistory.Count - 1);
             _moves.Remove(entry);
             Render();
-            await DisplayAlert("Send failed", $"Move could not be sent:\n{ex.Message}\n\nReverted — please try again.", "OK");
+            await ThemedDialogs.Alert(this, "Send failed", $"Move could not be sent:\n{ex.Message}\n\nReverted — please try again.", "OK");
         }
         if (!CheckForEnd()) UpdateTurnStatus();
     }
@@ -3349,7 +3349,7 @@ public partial class MainPage : ContentPage
         Render();
         Status(message);
         AddSystem(Stamp() + $"— {message} —");
-        await DisplayAlert("Game over", message, "OK");
+        await ThemedDialogs.Alert(this, "Game over", message, "OK");
     }
 
     void UpdateTurnStatus()

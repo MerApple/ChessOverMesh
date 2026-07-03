@@ -174,7 +174,7 @@ public sealed class NodesPage : ContentPage
             opts.Add("Remote admin…");
             opts.Add("Remove from device");
         }
-        string choice = await DisplayActionSheet(n.Display, "Cancel", null, opts.ToArray());
+        string choice = await ThemedDialogs.ActionSheet(this, n.Display, "Cancel", null, opts.ToArray());
         switch (choice)
         {
             case "Mark as favorite":
@@ -191,7 +191,7 @@ public sealed class NodesPage : ContentPage
                 await ShowRemoteAdminMenuAsync(n);
                 break;
             case "Remove from device":
-                bool ok = await DisplayAlert("Remove node",
+                bool ok = await ThemedDialogs.Alert(this, "Remove node",
                     $"Remove {n.Display} from the device's node database?\n\nUse this when the node reinstalled its firmware and direct messages stopped working (its stored public key is stale). After removal the device re-learns the node — and its new key — the next time it hears from it.",
                     "Remove", "Cancel");
                 if (!ok) break;
@@ -202,7 +202,7 @@ public sealed class NodesPage : ContentPage
             case "Open in Google Maps":
                 var url = _main.NodeMapsUrl(n.Num);
                 if (url == null)
-                    await DisplayAlert("No location",
+                    await ThemedDialogs.Alert(this, "No location",
                         $"No position data found for {n.Display}.\n\nThis node hasn't shared its location yet. Use \"Request position\" to ask for it, then try again.", "OK");
                 else
                     await Launcher.Default.OpenAsync(url);
@@ -226,7 +226,7 @@ public sealed class NodesPage : ContentPage
     // Remote-admin submenu: send admin commands to ANOTHER node (needs a shared "admin" channel on both nodes).
     async Task ShowRemoteAdminMenuAsync(MeshNode n)
     {
-        string choice = await DisplayActionSheet($"Remote admin — {n.Display}", "Cancel", null,
+        string choice = await ThemedDialogs.ActionSheet(this, $"Remote admin — {n.Display}", "Cancel", null,
             "Reboot", "Shut down", "Reset node DB", "Factory reset");
         var (action, warn) = choice switch
         {
@@ -237,7 +237,7 @@ public sealed class NodesPage : ContentPage
             _ => (null, null),
         };
         if (action == null) return;
-        bool ok = await DisplayAlert($"Remote {action}?",
+        bool ok = await ThemedDialogs.Alert(this, $"Remote {action}?",
             $"{warn}\n\nTarget: {n.Display}\n\nRemote admin needs a shared channel named \"admin\" on BOTH this node and the target. Continue?",
             "Send", "Cancel");
         if (!ok) return;
