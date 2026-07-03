@@ -327,6 +327,17 @@ public partial class MainWindow : Window
         }
         private static readonly PropertyChangedEventArgs ReactionsChangedArgs = new(nameof(Reactions));
 
+        // Unread highlight: a received message that arrived while the window was in the background gets a subtle
+        // yellow row wash, cleared the next time the window is focused. RowBackground notifies so the row updates live.
+        private bool _isUnread;
+        public bool IsUnread
+        {
+            get => _isUnread;
+            set { if (_isUnread == value) return; _isUnread = value; PropertyChanged?.Invoke(this, RowBackgroundChangedArgs); }
+        }
+        public Brush RowBackground => _isUnread ? UnreadHighlight : Brushes.Transparent;
+        private static readonly PropertyChangedEventArgs RowBackgroundChangedArgs = new(nameof(RowBackground));
+
         private static readonly PropertyChangedEventArgs TextChangedArgs = new(nameof(Text));
         private static readonly PropertyChangedEventArgs ForegroundChangedArgs = new(nameof(Foreground));
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -347,6 +358,9 @@ public partial class MainWindow : Window
     internal static readonly SolidColorBrush AckedText = new(DefAckedColor);
     internal static readonly SolidColorBrush RelayedText = new(DefRelayedColor);
     internal static readonly SolidColorBrush CachedText = new(DefCachedColor);
+
+    // Subtle semi-transparent yellow wash behind an unread received row (~15% alpha over the dark chat background).
+    internal static readonly SolidColorBrush UnreadHighlight = new(MediaColor.FromArgb(0x26, 0xFF, 0xEB, 0x3B));
 
     // Per-system-message-category colours (System messages only — chat is never coloured by these). Mutable so
     // the Color/Fonts window recolours existing system rows live via the shared brush, mirroring the type colours.
@@ -418,6 +432,9 @@ public partial class MainWindow : Window
         // Show the app version in the title bar (assembly version from the .csproj), e.g. "… v1.0.1".
         Title = $"Chess over Meshtastic  v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!.ToString(3)}";
         BrushFreeze();
+
+        // Focusing the window means the user is looking at the chat, so clear every unread (yellow) highlight.
+        Activated += (_, _) => ClearChatUnread();
 
         // Populate the Host dropdown with recently connected hosts, then pre-fill the last one we used.
         HostBox.ItemsSource = _recentHosts;
@@ -3284,7 +3301,11 @@ public partial class MainWindow : Window
             // of notifying (so a hidden conversation just shows a badge in the RX list).
             bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
             // No alert for an outgoing DM mirrored from a peer app, or during the proxy backfill burst after connect.
-            if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil) { FlashNotify(); PlayChatSound(); }
+            if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil)
+            {
+                FlashNotify(); PlayChatSound();
+                if (!IsActive) entry.IsUnread = true;   // arrived while the window was in the background → highlight until it's next focused
+            }
             // A DM from a node we haven't DM-enabled flips its DM flag on (and lists it in TX) so we can reply.
             if (wasDm) EnsureDmEnabled(msg.FromNode);
             else if (sentDmFromUs) EnsureDmEnabled(msg.ToNode);   // list the peer so the shared DM thread is navigable
@@ -5541,6 +5562,12 @@ public partial class MainWindow : Window
     private const uint FLASHW_TIMERNOFG = 0xC;   // keep flashing until the window is brought to the foreground
 
     /// <summary>Flashes the taskbar button to notify of an incoming move/message (no-op if focused).</summary>
+    /// <summary>Clears the unread (yellow) highlight on every chat row — called when the window regains focus.</summary>
+    private void ClearChatUnread()
+    {
+        foreach (var e in ChatList.Items.OfType<LogEntry>()) e.IsUnread = false;
+    }
+
     private void FlashNotify()
     {
         IntPtr hwnd = new WindowInteropHelper(this).Handle;

@@ -64,6 +64,7 @@ public sealed class ChatTabPage : ContentPage
                 reactions.SetBinding(Label.IsVisibleProperty, new Binding(nameof(LogEntry.Reactions), converter: NotEmpty));
                 var cell = new VerticalStackLayout { Padding = new Thickness(6, 4), Spacing = 1, Children = { msg, detail, expiry, reactions } };
                 cell.SetBinding(IsVisibleProperty, nameof(LogEntry.Visible));   // the RX filter hides a channel/DM's rows
+                cell.SetBinding(BackgroundColorProperty, nameof(LogEntry.RowBackground));   // unread received rows get a subtle yellow wash
 
                 // Long-press a message → the same options as the desktop right-click menu. MAUI has no built-in
                 // long-press gesture and PointerGestureRecognizer doesn't fire for finger touches on Android, so
@@ -201,6 +202,7 @@ public sealed class ChatTabPage : ContentPage
     {
         base.OnAppearing();
         (Shell.Current as AppShell)?.OnChatTabShown();   // stop the tab flashing / clear the unread marker
+        foreach (var e in _main.ChatLog) e.IsUnread = false;   // opening the chat marks every message read (clears the yellow wash)
         BackgroundConnection.ClearMessageNotifications();   // reading the chat dismisses any pending message alerts
         RebuildTx();   // channels may have changed while another tab was showing
         _main.ChatLog.CollectionChanged += OnChatChanged;

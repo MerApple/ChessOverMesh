@@ -1803,7 +1803,9 @@ public partial class MainPage : ContentPage
                     {
                         NotifyBackground(wasDm ? $"DM from {who}" : who, msg.DecryptFailed ? "⚠ message (decryption failed)" : body);
                         PlayChatSound();
-                        (Shell.Current as AppShell)?.FlashChatTab();   // draw attention to the Chat tab if it's not open
+                        var shell = Shell.Current as AppShell;
+                        shell?.FlashChatTab();   // draw attention to the Chat tab if it's not open
+                        if (shell?.ChatTabVisible != true) entry.IsUnread = true;   // arrived while the Chat tab wasn't open → yellow wash until it's opened
                     }
                 }
                 // A reply on the channel we just sent to confirms our in-flight chat (turns it green, frees Send).

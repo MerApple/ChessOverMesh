@@ -106,6 +106,17 @@ public sealed class LogEntry : INotifyPropertyChanged
     }
     private static readonly PropertyChangedEventArgs ReactionsArgs = new(nameof(Reactions));
 
+    // Unread highlight: a received message that arrived while the Chat tab wasn't open gets a subtle yellow row
+    // wash, cleared when the Chat tab is next shown. RowBackground notifies so the row updates live.
+    private bool _isUnread;
+    public bool IsUnread
+    {
+        get => _isUnread;
+        set { if (_isUnread == value) return; _isUnread = value; PropertyChanged?.Invoke(this, RowBackgroundArgs); }
+    }
+    public Color RowBackground => _isUnread ? Palette.Unread : Colors.Transparent;
+    private static readonly PropertyChangedEventArgs RowBackgroundArgs = new(nameof(RowBackground));
+
     private static readonly PropertyChangedEventArgs TextArgs = new(nameof(Text));
     private static readonly PropertyChangedEventArgs DetailArgs = new(nameof(Detail));
     private static readonly PropertyChangedEventArgs FontFamilyArgs = new(nameof(FontFamily));
@@ -125,6 +136,7 @@ public static class Palette
     public static Color Relayed { get; set; } = Color.FromRgb(0x80, 0xCB, 0xC4);   // teal — rebroadcast heard
     public static Color Cached  { get; set; } = Color.FromRgb(0x9E, 0x9E, 0x9E);   // grey — old cached history
     public static Color Warning { get; set; } = Color.FromRgb(0xFF, 0x6B, 0x6B);   // red — failed/warning
+    public static Color Unread  { get; set; } = Color.FromArgb("#26FFEB3B");        // subtle ~15%-alpha yellow wash — unread row
 
     // Per-system-message-category colours (System messages only — chat is never coloured by these).
     public static Color SysGame       { get; set; } = Color.FromRgb(0xE0, 0xE0, 0xE0);   // white/grey

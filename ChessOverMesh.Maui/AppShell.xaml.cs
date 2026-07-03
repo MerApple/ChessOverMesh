@@ -13,6 +13,9 @@ public partial class AppShell : Shell
 	int _flashTicks;
 	bool _onChatTab;
 
+	/// <summary>Whether the Chat tab is the one currently showing (used to decide if an incoming message is "unread").</summary>
+	public bool ChatTabVisible => _onChatTab;
+
 	public AppShell()
 	{
 		InitializeComponent();

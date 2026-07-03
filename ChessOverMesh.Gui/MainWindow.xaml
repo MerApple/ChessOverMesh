@@ -247,6 +247,8 @@
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <!-- Unread received messages get a subtle yellow wash (cleared when the window is focused). -->
+                            <Setter Property="Background" Value="{Binding RowBackground}"/>
                             <Style.Triggers>
                                 <!-- The RX filter hides a channel/DM's rows by setting Visible=false on them. -->
                                 <DataTrigger Binding="{Binding Visible}" Value="False">
