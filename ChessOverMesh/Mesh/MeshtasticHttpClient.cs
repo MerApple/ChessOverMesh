@@ -912,6 +912,21 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (hist.Count > MaxPositionHistory) hist.RemoveRange(0, hist.Count - MaxPositionHistory);
     }
 
+    /// <summary>Folds every node's current node-DB position into its track. Most nodes' locations reach us inside the
+    /// node DB (the config dump on connect and NodeInfo) rather than as standalone POSITION_APP packets, and only the
+    /// latter were being recorded — so a node's "Show last positions" track stayed a single point no matter how far it
+    /// had moved. Called each receive cycle; <see cref="AppendPositionHistory"/>'s distance filter keeps a stationary
+    /// node at one point and only extends the track once it has actually moved.</summary>
+    private void CaptureNodeDbPositionsToHistory()
+    {
+        foreach (var n in _state.Nodes)
+        {
+            var p = n.Position;
+            if (p == null || (p.LatitudeI == 0 && p.LongitudeI == 0)) continue;   // no fix
+            AppendPositionHistory(n.Num, p.LatitudeI / 1e7, p.LongitudeI / 1e7, n.LastHeard, p.Time);
+        }
+    }
+
     /// <summary>Great-circle (haversine) distance in metres between two lat/lon points.</summary>
     private static double DistanceMeters(double lat1, double lon1, double lat2, double lon2)
     {
@@ -1744,6 +1759,9 @@ public sealed class MeshtasticHttpClient : IDisposable
             catch { /* skip a single packet we couldn't process; keep draining the rest of the batch */ }
         }
 
+        // Record node-DB positions (config dump + NodeInfo) into each node's track, so "Show last positions" builds a
+        // real trail as a node moves — not only from the rarer standalone POSITION_APP packets. Dedup keeps it cheap.
+        CaptureNodeDbPositionsToHistory();
         return new MeshReceiveResult(messages, ackMap.Values.ToList(), count, traceroutes, nodeInfos, telemetryNodes, newNodes, positions, noiseFloors);
     }
 
