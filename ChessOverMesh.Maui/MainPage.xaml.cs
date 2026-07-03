@@ -1953,7 +1953,7 @@ public partial class MainPage : ContentPage
                         PlayChatSound();
                         var shell = Shell.Current as AppShell;
                         shell?.FlashChatTab();   // draw attention to the Chat tab if it's not open
-                        if (shell?.ChatTabVisible != true) entry.IsUnread = true;   // arrived while the Chat tab wasn't open → yellow wash until it's opened
+                        entry.IsUnread = true;   // yellow wash stays until the user presses in the chat list or replies on this channel
                     }
                 }
                 // A reply on the channel we just sent to confirms our in-flight chat (turns it green, frees Send).
@@ -2126,6 +2126,9 @@ public partial class MainPage : ContentPage
         return await SendChatCoreAsync(text, ttlSeconds);
     }
 
+    /// <summary>Replying on a channel marks its messages read — drops the yellow unread wash on that channel's rows.</summary>
+    void ClearChannelUnread(uint channel) { foreach (var e in _chat) if (e.Channel == channel) e.IsUnread = false; }
+
     /// <summary>Sends one ordinary chat message (the normal single-packet path): builds the row, transmits, and
     /// registers it in the ack/resend machinery so the in-flight gate serialises the next send. Used by the composer
     /// and by the headers-off split pump (which feeds each chunk through here as an independent message). Returns ""
@@ -2154,6 +2157,7 @@ public partial class MainPage : ContentPage
             uint id = await _mesh.SendTextAsync(wireText, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
             entry.PacketId = id;
             entry.Channel = _chatTxChannel;
+            ClearChannelUnread(_chatTxChannel);   // replying on this channel marks its messages read (drops the yellow wash)
             TrimChatChannel(_chatTxChannel);
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);
             entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt);

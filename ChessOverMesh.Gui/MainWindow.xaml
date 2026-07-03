@@ -224,7 +224,8 @@
                 <ListBox x:Name="ChatList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
                          BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
-                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
+                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown"
+                         PreviewMouseDown="ChatList_PreviewMouseDown">
                     <ListBox.ContextMenu>
                         <!-- FontSize follows the app UI text size via the ContextMenu class handler in App.xaml.cs -->
                         <ContextMenu>

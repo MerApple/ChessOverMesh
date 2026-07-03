@@ -99,6 +99,7 @@ public sealed class ChatTabPage : ContentPage
         {
             if (_list.SelectedItem == null) return;
             _list.SelectedItem = null;
+            foreach (var e in _main.ChatLog) e.IsUnread = false;   // pressing in the chat list marks every message read (clears the yellow wash)
             CollapseComposer();
         };
         // Fallback: scrolling the message list = "I'm reading" → collapse the composer. We ignore scrolls we caused
@@ -205,7 +206,8 @@ public sealed class ChatTabPage : ContentPage
     {
         base.OnAppearing();
         (Shell.Current as AppShell)?.OnChatTabShown();   // stop the tab flashing / clear the unread marker
-        foreach (var e in _main.ChatLog) e.IsUnread = false;   // opening the chat marks every message read (clears the yellow wash)
+        // Note: the per-message yellow wash is NOT cleared just by opening the tab — it persists until the user
+        // presses in the chat list (SelectionChanged above) or replies on the channel, so unread stays visible.
         BackgroundConnection.ClearMessageNotifications();   // reading the chat dismisses any pending message alerts
         RebuildTx();   // channels may have changed while another tab was showing
         _main.ChatLog.CollectionChanged += OnChatChanged;

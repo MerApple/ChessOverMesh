@@ -437,8 +437,9 @@ public partial class MainWindow : Window
         Title = $"Chess over Meshtastic  v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!.ToString(3)}";
         BrushFreeze();
 
-        // Focusing the window means the user is looking at the chat, so clear every unread (yellow) highlight.
-        Activated += (_, _) => ClearChatUnread();
+        // Unread (yellow) highlights persist until the user actually engages with the chat — pressing in the
+        // message list (ChatList_PreviewMouseDown) or replying on a channel (SendChatCore) clears them, not mere
+        // window focus. So we deliberately do NOT clear on Activated any more.
 
         // Populate the Host dropdown with recently connected hosts, then pre-fill the last one we used.
         HostBox.ItemsSource = _recentHosts;
@@ -3317,7 +3318,7 @@ public partial class MainWindow : Window
             if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil)
             {
                 FlashNotify(); PlayChatSound();
-                if (!IsActive) entry.IsUnread = true;   // arrived while the window was in the background → highlight until it's next focused
+                entry.IsUnread = true;   // yellow wash stays until the user presses in the chat list or replies on this channel
             }
             // A DM from a node we haven't DM-enabled flips its DM flag on (and lists it in TX) so we can reply.
             if (wasDm) EnsureDmEnabled(msg.FromNode);
@@ -3944,6 +3945,7 @@ public partial class MainWindow : Window
             uint id = await _mesh.SendTextAsync(wireText, _chatTxChannel, destination: _chatTxDest, replyId: replyId);
             entry.PacketId = id;          // so this message can itself be replied to / reacted to
             entry.Channel = _chatTxChannel;
+            ClearChatUnread(_chatTxChannel);   // replying on this channel marks its messages read (drops the yellow wash)
             TrimChatChannel(_chatTxChannel);   // cap on-screen rows per channel
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);   // hide if its target is filtered out
             _chatEntryById[id] = entry;   // so reactions can attach to this row
@@ -5963,11 +5965,16 @@ public partial class MainWindow : Window
     private const uint FLASHW_TIMERNOFG = 0xC;   // keep flashing until the window is brought to the foreground
 
     /// <summary>Flashes the taskbar button to notify of an incoming move/message (no-op if focused).</summary>
-    /// <summary>Clears the unread (yellow) highlight on every chat row — called when the window regains focus.</summary>
-    private void ClearChatUnread()
+    /// <summary>Clears the unread (yellow) highlight on chat rows: all of them when <paramref name="channel"/> is
+    /// null (the user pressed in the chat list), or just one channel's rows when they replied on that channel.</summary>
+    private void ClearChatUnread(uint? channel = null)
     {
-        foreach (var e in ChatList.Items.OfType<LogEntry>()) e.IsUnread = false;
+        foreach (var e in ChatList.Items.OfType<LogEntry>())
+            if (channel is null || e.Channel == channel) e.IsUnread = false;
     }
+
+    /// <summary>Pressing anywhere in the chat message list counts as reading it — clear every unread highlight.</summary>
+    private void ChatList_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e) => ClearChatUnread();
 
     private void FlashNotify()
     {
