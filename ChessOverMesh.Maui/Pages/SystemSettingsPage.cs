@@ -28,7 +28,7 @@ public sealed class SystemSettingsPage : ContentPage
                 AppSettings.CacheMessages = true;
                 return;
             }
-            bool ok = await DisplayAlert("Delete cached messages?",
+            bool ok = await ThemedDialogs.Alert(this, "Delete cached messages?",
                 "Turning off cached messages deletes all chat history currently cached on this device for every connection. " +
                 "This cannot be undone. Continue?",
                 "Delete", "Cancel");
@@ -122,20 +122,20 @@ public sealed class SystemSettingsPage : ContentPage
             // session key so the change re-encrypts the existing cache instead of losing it.
             if (DeviceCache.IsEncrypted(host))
             {
-                string? cur = await DisplayPromptAsync("Change cache password", "Current password:", "OK", "Cancel");
+                string? cur = await ThemedDialogs.Prompt(this, "Change cache password", "Current password:", "OK", "Cancel");
                 if (string.IsNullOrEmpty(cur)) return;
-                if (!DeviceCache.Unlock(host, cur)) { await DisplayAlert("Incorrect password", "The current password is incorrect.", "OK"); return; }
+                if (!DeviceCache.Unlock(host, cur)) { await ThemedDialogs.Alert(this, "Incorrect password", "The current password is incorrect.", "OK"); return; }
             }
-            string? p1 = await DisplayPromptAsync("Set cache password", "New password:", "OK", "Cancel");
+            string? p1 = await ThemedDialogs.Prompt(this, "Set cache password", "New password:", "OK", "Cancel");
             if (string.IsNullOrEmpty(p1)) return;
-            string? p2 = await DisplayPromptAsync("Set cache password", "Confirm password:", "OK", "Cancel");
-            if (p1 != p2) { await DisplayAlert("Passwords don't match", "Please try again.", "OK"); return; }
+            string? p2 = await ThemedDialogs.Prompt(this, "Set cache password", "Confirm password:", "OK", "Cancel");
+            if (p1 != p2) { await ThemedDialogs.Alert(this, "Passwords don't match", "Please try again.", "OK"); return; }
             DeviceCache.SetPassword(host, p1);
             RefreshCacheState();
         };
         removePwBtn.Clicked += async (_, _) =>
         {
-            bool ok = await DisplayAlert("Remove cache password",
+            bool ok = await ThemedDialogs.Alert(this, "Remove cache password",
                 "Remove the cache password for this device? Its cache will be stored unencrypted.", "Remove", "Cancel");
             if (!ok) return;
             DeviceCache.SetPassword(host, "");

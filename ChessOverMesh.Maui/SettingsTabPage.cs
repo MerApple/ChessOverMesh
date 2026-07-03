@@ -36,7 +36,7 @@ public sealed class SettingsTabPage : ContentPage
         {
             if (needsConnection && !_main.IsConnected)
             {
-                await DisplayAlert("Not connected", "Connect to a device first, then open " + text + ".", "OK");
+                await ThemedDialogs.Alert(this, "Not connected", "Connect to a device first, then open " + text + ".", "OK");
                 return;
             }
             open();

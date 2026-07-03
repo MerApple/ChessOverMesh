@@ -223,7 +223,7 @@ public partial class ChannelsPage : ContentPage
     {
         if (_busy || ChannelList.SelectedItem is not ChannelRow row) return;
         if (row.Index == 0) { SetStatus("The primary channel (0) cannot be deleted.", true); return; }
-        if (!await DisplayAlert("Delete channel", $"Disable channel [{row.Index}] on the device?", "Yes", "No")) return;
+        if (!await ThemedDialogs.Alert(this, "Delete channel", $"Disable channel [{row.Index}] on the device?", "Yes", "No")) return;
         _busy = true; SetBusy(true); SetStatus($"Disabling channel [{row.Index}]…", false);
         try
         {

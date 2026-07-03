@@ -209,7 +209,7 @@ public sealed class DeviceTabPage : ContentPage
             if (ip == null)
             {
                 _status.Text = "No device found — enter the IP manually.";
-                await DisplayAlert("No device found",
+                await ThemedDialogs.Alert(this, "No device found",
                     "No Meshtastic device answered at meshtastic.local.\n\nCheck the device has WiFi enabled and is " +
                     "on the same network, then try Find again — or type its IP in the Host box.", "OK");
             }
@@ -241,7 +241,7 @@ public sealed class DeviceTabPage : ContentPage
     {
         if (_busy || _main.IsConnected || _main.IsConnecting) return;
         var host = (_host.Text ?? "").Trim();
-        if (host.Length == 0) { await DisplayAlert("Host required", "Enter the device's address, e.g. http://192.168.1.50", "OK"); return; }
+        if (host.Length == 0) { await ThemedDialogs.Alert(this, "Host required", "Enter the device's address, e.g. http://192.168.1.50", "OK"); return; }
         _busy = true; _status.Text = "Connecting over WiFi…"; Refresh();
         try
         {
@@ -249,12 +249,12 @@ public sealed class DeviceTabPage : ContentPage
             // show the reason instead.
             var msg = await _main.ConnectToAsync(host);
             _status.Text = msg;
-            if (!_main.IsConnected) await DisplayAlert("Not connected", msg, "OK");
+            if (!_main.IsConnected) await ThemedDialogs.Alert(this, "Not connected", msg, "OK");
         }
         catch (Exception ex)
         {
             _status.Text = "Connect error.";
-            await DisplayAlert("Connect error", ex.ToString(), "OK");
+            await ThemedDialogs.Alert(this, "Connect error", ex.ToString(), "OK");
         }
         finally { _busy = false; Refresh(); }
     }
@@ -262,9 +262,9 @@ public sealed class DeviceTabPage : ContentPage
     async void OnScan(object? sender, EventArgs e)
     {
         if (_busy) return;
-        if (!BleScanner.IsAvailable) { await DisplayAlert("Bluetooth", "This device has no Bluetooth LE adapter.", "OK"); return; }
-        if (!await BleScanner.EnsurePermissionsAsync()) { await DisplayAlert("Permission needed", "Bluetooth permission was denied.", "OK"); return; }
-        if (!BleScanner.IsOn) { await DisplayAlert("Bluetooth off", "Turn Bluetooth on, then scan again.", "OK"); return; }
+        if (!BleScanner.IsAvailable) { await ThemedDialogs.Alert(this, "Bluetooth", "This device has no Bluetooth LE adapter.", "OK"); return; }
+        if (!await BleScanner.EnsurePermissionsAsync()) { await ThemedDialogs.Alert(this, "Permission needed", "Bluetooth permission was denied.", "OK"); return; }
+        if (!BleScanner.IsOn) { await ThemedDialogs.Alert(this, "Bluetooth off", "Turn Bluetooth on, then scan again.", "OK"); return; }
 
         _busy = true; _status.Text = "Scanning for Meshtastic radios…"; Refresh();
         try
@@ -274,14 +274,14 @@ public sealed class DeviceTabPage : ContentPage
             if (_bleDevices.Count > 0) { _blePicker.SelectedIndex = 0; _status.Text = $"Found {_bleDevices.Count} radio(s)."; }
             else _status.Text = "No Meshtastic radios found. Make sure the radio is on and advertising.";
         }
-        catch (Exception ex) { _status.Text = "Scan failed."; await DisplayAlert("Scan failed", ex.Message, "OK"); }
+        catch (Exception ex) { _status.Text = "Scan failed."; await ThemedDialogs.Alert(this, "Scan failed", ex.Message, "OK"); }
         finally { _busy = false; Refresh(); }
     }
 
     async void OnBleConnect(object? sender, EventArgs e)
     {
         if (_busy || _main.IsConnected || _main.IsConnecting) return;
-        if (_blePicker.SelectedItem is not BleDeviceInfo pick) { await DisplayAlert("Pick a radio", "Scan, then choose a radio to connect to.", "OK"); return; }
+        if (_blePicker.SelectedItem is not BleDeviceInfo pick) { await ThemedDialogs.Alert(this, "Pick a radio", "Scan, then choose a radio to connect to.", "OK"); return; }
 
         _busy = true; _status.Text = $"Connecting to {pick.Name} over Bluetooth…"; Refresh();
         IMeshTransport? transport = null;
@@ -292,13 +292,13 @@ public sealed class DeviceTabPage : ContentPage
             var msg = await _main.ConnectViaTransportAsync(transport, pick.Name, "ble:" + pick.Device.Id,
                 rebuild: async () => (IMeshTransport)await BleMeshTransport.ConnectAsync(pick.Device));
             _status.Text = msg;
-            if (!_main.IsConnected) await DisplayAlert("Not connected", msg, "OK");
+            if (!_main.IsConnected) await ThemedDialogs.Alert(this, "Not connected", msg, "OK");
         }
         catch (Exception ex)
         {
             transport?.Dispose();
             _status.Text = "Bluetooth connect failed.";
-            await DisplayAlert("Bluetooth connect failed", ex.Message, "OK");
+            await ThemedDialogs.Alert(this, "Bluetooth connect failed", ex.Message, "OK");
         }
         finally { _busy = false; Refresh(); }
     }

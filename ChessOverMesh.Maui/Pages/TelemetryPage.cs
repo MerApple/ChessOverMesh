@@ -117,7 +117,7 @@ public sealed class TelemetryPage : ContentPage
 
     async void OnDelete(object? sender, EventArgs e)
     {
-        if (!await DisplayAlert("Delete telemetry", $"Delete all cached telemetry for {_target.Display}?", "Yes", "No")) return;
+        if (!await ThemedDialogs.Alert(this, "Delete telemetry", $"Delete all cached telemetry for {_target.Display}?", "Yes", "No")) return;
         _main.ClearNodeEnvironment(_target.Num);
         Load();
         _status.Text = "Telemetry deleted.";
