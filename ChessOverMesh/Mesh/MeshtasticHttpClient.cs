@@ -171,6 +171,7 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly Dictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)> _positionCache = new();   // node num -> position + times, seeded from disk
     private readonly Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> _positionHistory = new();   // node num -> recent positions (oldest first)
     private const int MaxPositionHistory = 20;   // keep only the latest N positions per node (oldest dropped past this)
+    private const double MinPositionMoveMeters = 15.0;   // only record a new track point once the node has moved this far from the last one
     private readonly Dictionary<uint, List<MeshEnvironment>> _environmentHistory = new();   // node num -> readings (oldest first)
     private const int MaxEnvironmentHistory = 100;   // keep only the latest N per node (oldest dropped past this)
     private readonly HashSet<uint> _sentTraceroutes = new();   // ids of traceroute requests awaiting a reply (matched by request_id)
@@ -894,18 +895,30 @@ public sealed class MeshtasticHttpClient : IDisposable
         return match.Num == num ? match : null;   // FirstOrDefault yields Num==0 when there's no fix; real nodes are non-zero
     }
 
-    /// <summary>Appends a fix to a node's position track, dropping an exact repeat of the last point (same coords
-    /// and position time — a rebroadcast of the same fix) and keeping only the latest <see cref="MaxPositionHistory"/>.</summary>
+    /// <summary>Appends a fix to a node's position track, dropping any point within <see cref="MinPositionMoveMeters"/>
+    /// of the last stored one (a rebroadcast or a near-stationary node — no meaningful movement) and keeping only the
+    /// latest <see cref="MaxPositionHistory"/>.</summary>
     private void AppendPositionHistory(uint num, double lat, double lon, long lastHeard, long posTime)
     {
         if (!_positionHistory.TryGetValue(num, out var hist)) _positionHistory[num] = hist = new();
         if (hist.Count > 0)
         {
             var last = hist[^1];
-            if (last.Lat == lat && last.Lon == lon && last.PosTime == posTime) return;   // same fix repeated
+            if (DistanceMeters(last.Lat, last.Lon, lat, lon) < MinPositionMoveMeters) return;   // hasn't moved far enough
         }
         hist.Add((lat, lon, lastHeard, posTime));
         if (hist.Count > MaxPositionHistory) hist.RemoveRange(0, hist.Count - MaxPositionHistory);
+    }
+
+    /// <summary>Great-circle (haversine) distance in metres between two lat/lon points.</summary>
+    private static double DistanceMeters(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double r = 6371000.0;                 // Earth radius in metres
+        const double d2r = Math.PI / 180.0;
+        double dLat = (lat2 - lat1) * d2r, dLon = (lon2 - lon1) * d2r;
+        double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+            + Math.Cos(lat1 * d2r) * Math.Cos(lat2 * d2r) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return r * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
     }
 
     /// <summary>The recent positions tracked for a node this session (oldest first), up to the latest
