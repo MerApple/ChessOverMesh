@@ -108,6 +108,9 @@ public partial class MainWindow : Window
 
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(20);
 
+    // Recently connected hosts shown in the editable Host dropdown (newest first). Backed by AppSettings.RecentHosts.
+    private readonly System.Collections.ObjectModel.ObservableCollection<string> _recentHosts = new();
+
     private int? _selected;
     private List<Move> _legalForSelected = new();
     private (int from, int to)? _lastMove;
@@ -416,7 +419,9 @@ public partial class MainWindow : Window
         Title = $"Chess over Meshtastic  v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version!.ToString(3)}";
         BrushFreeze();
 
-        // Pre-fill the last host we connected to.
+        // Populate the Host dropdown with recently connected hosts, then pre-fill the last one we used.
+        HostBox.ItemsSource = _recentHosts;
+        foreach (var h in AppSettings.RecentHosts) _recentHosts.Add(h);
         var lastHost = AppSettings.LastHost;
         if (!string.IsNullOrWhiteSpace(lastHost)) HostBox.Text = lastHost;
 
@@ -517,10 +522,20 @@ public partial class MainWindow : Window
 
     private void OpenConnectionSettings()
     {
-        var dlg = new ConnectionSettingsWindow(this, AppSettings.AutoReconnect);
+        var dlg = new ConnectionSettingsWindow(this, AppSettings.AutoReconnect, ClearRecentHosts);
         if (dlg.ShowDialog() != true) return;
         AppSettings.AutoReconnect = dlg.AutoReconnect;
         if (!AppSettings.AutoReconnect) StopAutoReconnect(reconnected: false);   // turning it off cancels any retry loop
+    }
+
+    // Forgets the remembered Host dropdown entries (after confirmation) and refreshes the live list.
+    private void ClearRecentHosts()
+    {
+        if (AppSettings.RecentHosts.Count == 0) { ThemedDialog.Info(this, "There are no recent hosts to clear.", "Recent hosts"); return; }
+        if (!ThemedDialog.Confirm(this, "Forget all recently connected hosts?", "Clear recent hosts")) return;
+        AppSettings.ClearRecentHosts();
+        ReloadRecentHostsUi();
+        Status("Recent hosts cleared.");
     }
 
     private void OpenChessSettings()
@@ -676,6 +691,23 @@ public partial class MainWindow : Window
     }
 
     // ---- Connection ------------------------------------------------------------------
+
+    // Records a just-connected host in the persistent recent list and mirrors it into the live dropdown (newest
+    // first), without disturbing the text currently shown in the editable box.
+    private void RememberRecentHost(string host)
+    {
+        AppSettings.AddRecentHost(host);
+        ReloadRecentHostsUi();
+    }
+
+    // Rebuilds the dropdown items from AppSettings, preserving whatever the user has typed in the editable box.
+    private void ReloadRecentHostsUi()
+    {
+        var text = HostBox.Text;
+        _recentHosts.Clear();
+        foreach (var h in AppSettings.RecentHosts) _recentHosts.Add(h);
+        HostBox.Text = text;   // clearing the items can null the selection; keep the shown address
+    }
 
     private async void ConnectBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -930,6 +962,7 @@ public partial class MainWindow : Window
         _connected = true;
         _synced = false;
         AppSettings.LastHost = host;
+        RememberRecentHost(host);   // add to the Host dropdown's recent list (deduped, newest first)
 
         // If this device's cache is encrypted, unlock (or delete) it before we read or write any cache for it.
         if (!EnsureCacheUnlocked(host)) { Disconnect("Cache locked — connection cancelled."); return; }

@@ -9,6 +9,7 @@ internal static class AppSettings
     private sealed class Data
     {
         public string? LastHost { get; set; }
+        public List<string> RecentHosts { get; set; } = new();   // recently connected hosts, newest first
         public bool ShowSignal { get; set; } = true;
         public bool HeartbeatEnabled { get; set; } = false;   // opt-in TCP keep-alive (off by default)
         public bool AutoReconnect { get; set; } = true;       // retry once a minute when the device drops (on by default)
@@ -91,6 +92,24 @@ internal static class AppSettings
     }
 
     public static string? LastHost { get => Load().LastHost; set => Mutate(d => d.LastHost = value); }
+
+    private const int RecentHostsMax = 10;
+    /// <summary>Recently connected hosts, newest first (capped at 10) — for the Host dropdown on the Device tab.</summary>
+    public static IReadOnlyList<string> RecentHosts => Load().RecentHosts;
+    /// <summary>Records a successful connection's host at the top of the recent list (deduped, case-insensitive, capped).</summary>
+    public static void AddRecentHost(string host)
+    {
+        host = (host ?? "").Trim();
+        if (host.Length == 0) return;
+        Mutate(d =>
+        {
+            d.RecentHosts.RemoveAll(h => string.Equals(h, host, StringComparison.OrdinalIgnoreCase));
+            d.RecentHosts.Insert(0, host);
+            if (d.RecentHosts.Count > RecentHostsMax) d.RecentHosts.RemoveRange(RecentHostsMax, d.RecentHosts.Count - RecentHostsMax);
+        });
+    }
+    /// <summary>Forgets all remembered recent hosts.</summary>
+    public static void ClearRecentHosts() => Mutate(d => d.RecentHosts.Clear());
     public static bool ShowSignal { get => Load().ShowSignal; set => Mutate(d => d.ShowSignal = value); }
     public static bool HeartbeatEnabled { get => Load().HeartbeatEnabled; set => Mutate(d => d.HeartbeatEnabled = value); }
     public static bool AutoReconnect { get => Load().AutoReconnect; set => Mutate(d => d.AutoReconnect = value); }

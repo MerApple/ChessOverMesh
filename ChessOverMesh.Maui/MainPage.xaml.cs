@@ -588,7 +588,7 @@ public partial class MainPage : ContentPage
             _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
             _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
-            if (isIp) AppSettings.LastHost = cacheKey;
+            if (isIp) { AppSettings.LastHost = cacheKey; AppSettings.AddRecentHost(cacheKey); }   // remember for the Host dropdown
             // If this device's cache is encrypted, unlock (or delete) it before reading or writing any cache.
             if (!await EnsureCacheUnlockedAsync(cacheKey)) { Disconnect("Cache locked — connection cancelled."); return "Cache locked — connection cancelled."; }
             DeviceCache.Save(cacheKey, _mesh.GetAvailableChannels(), _mesh.MyNodeNum);

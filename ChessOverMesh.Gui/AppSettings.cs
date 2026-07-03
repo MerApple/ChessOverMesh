@@ -9,6 +9,7 @@ internal static class AppSettings
     private sealed class Data
     {
         public string? LastHost { get; set; }
+        public List<string> RecentHosts { get; set; } = new();   // recently connected hosts, newest first
         public bool ShowSignal { get; set; } = true;
         public bool RainbowEffect { get; set; }   // rainbow wave on each move (default off)
         public bool HeartbeatEnabled { get; set; } = false;   // opt-in TCP keep-alive (off by default)
@@ -101,6 +102,27 @@ internal static class AppSettings
         get => Load().LastHost;
         set => Mutate(d => d.LastHost = value);
     }
+
+    private const int RecentHostsMax = 10;
+
+    /// <summary>The most recently connected hosts, newest first (capped at 10) — for the Host dropdown.</summary>
+    public static IReadOnlyList<string> RecentHosts => Load().RecentHosts;
+
+    /// <summary>Records a successful connection's host at the top of the recent list (deduped, case-insensitive, capped).</summary>
+    public static void AddRecentHost(string host)
+    {
+        host = (host ?? "").Trim();
+        if (host.Length == 0) return;
+        Mutate(d =>
+        {
+            d.RecentHosts.RemoveAll(h => string.Equals(h, host, StringComparison.OrdinalIgnoreCase));
+            d.RecentHosts.Insert(0, host);
+            if (d.RecentHosts.Count > RecentHostsMax) d.RecentHosts.RemoveRange(RecentHostsMax, d.RecentHosts.Count - RecentHostsMax);
+        });
+    }
+
+    /// <summary>Forgets all remembered recent hosts.</summary>
+    public static void ClearRecentHosts() => Mutate(d => d.RecentHosts.Clear());
 
     /// <summary>Show RSSI/SNR/hop info on received chat messages.</summary>
     public static bool ShowSignal

@@ -15,6 +15,9 @@ public sealed class DeviceTabPage : ContentPage
     readonly Entry _host;
     readonly Button _wifiBtn, _findBtn, _disconnectBtn, _scanBtn, _bleBtn, _deviceSettingsBtn;
     readonly Picker _blePicker;
+    readonly Picker _recentPicker;                 // pick a recently connected host to fill the Host box
+    List<string> _recentPickerItems = new();       // current picker items (recent hosts + trailing Clear command)
+    const string ClearRecentsLabel = "— Clear recent hosts —";
     readonly Label _status, _sync, _name, _hardware, _firmware, _battery, _noise;
     IReadOnlyList<BleDeviceInfo> _bleDevices = Array.Empty<BleDeviceInfo>();
     bool _busy;
@@ -81,6 +84,9 @@ public sealed class DeviceTabPage : ContentPage
         hostRow.Add(new Label { Text = "Host", TextColor = Dim, VerticalOptions = LayoutOptions.Center }, 0, 0);
         hostRow.Add(_host, 1, 0);
         hostRow.Add(_findBtn, 2, 0);
+        // Recently connected hosts: pick one to fill the Host box (or the trailing item to clear the list).
+        _recentPicker = new Picker { Title = "Recent hosts", TextColor = Fg, BackgroundColor = Color.FromArgb("#1E1E1E") };
+        _recentPicker.SelectedIndexChanged += OnRecentHostPicked;
         _wifiBtn = new Button { Text = "Connect over WiFi", MinimumHeightRequest = 44, Padding = new Thickness(14, 0) };
         _wifiBtn.Clicked += OnWifiConnect;
 
@@ -106,6 +112,7 @@ public sealed class DeviceTabPage : ContentPage
         stack.Add(new BoxView { HeightRequest = 1, Color = Rule, Margin = new Thickness(0, 6) });
         stack.Add(new Label { Text = "WiFi (HTTP)", TextColor = Fg, FontAttributes = FontAttributes.Bold });
         stack.Add(hostRow);
+        stack.Add(_recentPicker);
         stack.Add(_wifiBtn);
         stack.Add(new BoxView { HeightRequest = 1, Color = Rule, Margin = new Thickness(0, 6) });
         stack.Add(new Label { Text = "Bluetooth", TextColor = Fg, FontAttributes = FontAttributes.Bold });
@@ -148,6 +155,41 @@ public sealed class DeviceTabPage : ContentPage
         // MainPage raises StateChanged from ApplyConnectionState (connect, disconnect, and after each sync),
         // so the readout below stays current as telemetry arrives.
         _main.StateChanged += OnStateChanged;
+
+        ReloadRecentHosts();
+    }
+
+    // Fills the recent-hosts picker from AppSettings (newest first), hiding it when empty and appending a trailing
+    // "Clear recent hosts" command. Kept selection-less so it always shows its Title, not a stale pick.
+    void ReloadRecentHosts()
+    {
+        var items = new List<string>(AppSettings.RecentHosts);
+        _recentPicker.IsVisible = items.Count > 0;
+        if (items.Count > 0) items.Add(ClearRecentsLabel);
+        _recentPickerItems = items;
+        _recentPicker.SelectedIndexChanged -= OnRecentHostPicked;   // avoid firing while we reset the source
+        _recentPicker.ItemsSource = items;
+        _recentPicker.SelectedIndex = -1;
+        _recentPicker.SelectedIndexChanged += OnRecentHostPicked;
+    }
+
+    // A recent host was picked: fill the Host box with it, or (the trailing command) clear the list after confirming.
+    async void OnRecentHostPicked(object? sender, EventArgs e)
+    {
+        var idx = _recentPicker.SelectedIndex;
+        if (idx < 0 || idx >= _recentPickerItems.Count) return;
+        var choice = _recentPickerItems[idx];
+        _recentPicker.SelectedIndex = -1;   // reset so the Title shows and the same item can be picked again
+        if (choice == ClearRecentsLabel)
+        {
+            if (await DisplayAlert("Clear recent hosts", "Forget all recently connected hosts?", "Clear", "Cancel"))
+            {
+                AppSettings.ClearRecentHosts();
+                ReloadRecentHosts();
+            }
+            return;
+        }
+        _host.Text = choice;
     }
 
     static Label InfoValue() => new() { Text = "—", TextColor = Fg, VerticalOptions = LayoutOptions.Center };
@@ -162,6 +204,7 @@ public sealed class DeviceTabPage : ContentPage
     {
         base.OnAppearing();
         Refresh();
+        ReloadRecentHosts();   // reflect any host remembered since this tab was last shown
         MaybeRequestNoiseFloor();
     }
 
@@ -256,7 +299,7 @@ public sealed class DeviceTabPage : ContentPage
             _status.Text = "Connect error.";
             await DisplayAlert("Connect error", ex.ToString(), "OK");
         }
-        finally { _busy = false; Refresh(); }
+        finally { _busy = false; Refresh(); ReloadRecentHosts(); }   // a successful connect adds to the recent list
     }
 
     async void OnScan(object? sender, EventArgs e)

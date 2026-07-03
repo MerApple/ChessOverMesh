@@ -15,7 +15,7 @@ internal sealed class ConnectionSettingsWindow : Window
 
     public bool AutoReconnect => _autoReconnect.IsChecked == true;
 
-    public ConnectionSettingsWindow(Window owner, bool autoReconnect)
+    public ConnectionSettingsWindow(Window owner, bool autoReconnect, Action onClearRecentHosts)
     {
         Title = "Connection settings";
         Owner = owner;
@@ -33,6 +33,17 @@ internal sealed class ConnectionSettingsWindow : Window
         {
             Text = "If the device goes offline, automatically retry the connection once a minute until it " +
                    "reconnects — or until you click Cancel.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
+        });
+
+        // Recent hosts: a button to forget the addresses remembered in the Host dropdown. Clears immediately
+        // (the owner confirms), independent of this dialog's OK/Cancel.
+        var clearHosts = new Button { Content = "Clear recent hosts", MinHeight = 26, HorizontalAlignment = HorizontalAlignment.Left };
+        clearHosts.Click += (_, _) => onClearRecentHosts();
+        root.Children.Add(clearHosts);
+        root.Children.Add(new TextBlock
+        {
+            Text = "Forget the recently connected addresses listed in the Host dropdown.",
             Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
         });
 

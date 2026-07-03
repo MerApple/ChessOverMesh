@@ -36,7 +36,9 @@
                 <Button x:Name="FindBtn" Content="Find" MinWidth="56" MinHeight="24" Margin="0,0,8,0" Click="FindBtn_Click"
                         ToolTip="Find Meshtastic devices on the local network (mDNS)"/>
                 <TextBlock Text="Host:" Margin="0,0,4,0"/>
-                <TextBox x:Name="HostBox" MinWidth="190" MinHeight="24" Text="http://192.168.2.183"/>
+                <ComboBox x:Name="HostBox" MinWidth="190" MinHeight="24" IsEditable="True" StaysOpenOnEdit="True"
+                          Text="http://192.168.2.183"
+                          ToolTip="Type an address or pick a recently connected one (proxy://… for a proxy). Clear the list in Settings → Connection."/>
                 <Button x:Name="ConnectBtn" Content="Connect" MinWidth="92" MinHeight="24" Margin="6,0,0,0" Click="ConnectBtn_Click"/>
                 <Button x:Name="ChannelsBtn" Content="Channels…" MinWidth="92" MinHeight="24" Margin="8,0,0,0"
                         IsEnabled="False" Click="ChannelsBtn_Click"
