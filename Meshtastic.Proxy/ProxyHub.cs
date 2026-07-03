@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using ChessOverMesh.Mesh;
@@ -36,11 +35,12 @@ internal sealed class ProxyHub
     private readonly Action<string> _log;
     private readonly bool _verbose;
 
-    // Optional client authentication. When a username is configured, a client must present matching credentials
-    // (over the already-encrypted TLS link) before it's served; otherwise the proxy greets clients as open.
-    private readonly string? _authUser;
-    private readonly string? _authPass;
-    private bool AuthRequired => !string.IsNullOrEmpty(_authUser);
+    // Optional multi-user authentication. When a user store is configured, a client must present credentials that
+    // match one of its users (over the already-encrypted TLS link) before it's served; otherwise the proxy greets
+    // clients as open. Each matched user carries a CanUseDevice flag: a restricted user may connect and chat with the
+    // other clients but nothing it sends is written to the radio (see HandleClientFrameAsync).
+    private readonly UserStore? _users;
+    private bool AuthRequired => _users is { Count: > 0 };
 
     private readonly object _sync = new();
     private readonly List<Client> _clients = new();
@@ -67,10 +67,10 @@ internal sealed class ProxyHub
     private readonly Dictionary<uint, byte[]> _nodes = new();         // node num -> frame
 
     public ProxyHub(Func<CancellationToken, Task<IMeshTransport>> connectDevice, X509Certificate2 cert, int port, Action<string> log,
-                    bool verbose = false, string? authUser = null, string? authPass = null)
+                    bool verbose = false, UserStore? users = null)
     {
         _connectDevice = connectDevice; _cert = cert; _port = port; _log = log; _verbose = verbose;
-        _authUser = authUser; _authPass = authPass;
+        _users = users;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -248,7 +248,8 @@ internal sealed class ProxyHub
             }
 
             lock (_sync) _clients.Add(client);
-            _log($"Client connected: {remote}  (total {_clients.Count}){(AuthRequired ? " [authenticated]" : "")}");
+            string who = client.User is { } u ? $" [{u.Username}, {(u.CanUseDevice ? "device" : "restricted")}]" : "";
+            _log($"Client connected: {remote}  (total {_clients.Count}){who}");
 
             while (!ct.IsCancellationRequested)
             {
@@ -291,6 +292,31 @@ internal sealed class ProxyHub
             await ReplayConfigAsync(client, tr.WantConfigId, ct);   // answer locally; don't disturb the device
             return;
         }
+
+        // Restricted user: never touch the radio. Deliver a text/packet to every OTHER connected client, plus back to
+        // the sender itself (there's no radio loopback to confirm its own send), and remember text for backfill. Any
+        // non-packet frame (heartbeat, etc.) from a restricted client is simply dropped.
+        if (!client.CanUseDevice)
+        {
+            if (tr.PayloadVariantCase == ToRadio.PayloadVariantOneofCase.Packet && tr.Packet.Decoded != null
+                && _myNodeNum != 0 && tr.Packet.Id != 0)
+            {
+                _log($"Restricted client -> proxy clients only: {tr.Packet.Decoded.Portnum} id 0x{tr.Packet.Id:x8}");
+                var synth = tr.Packet.Clone();
+                synth.From = _myNodeNum;                       // present it as coming from the shared device node
+                var synthBytes = new FromRadio { Packet = synth }.ToByteArray();
+                await MirrorToOthersAsync(client, synthBytes);
+                try { await SendFrameAsync(client, synthBytes, ct); } catch { Remove(client); }
+                if (tr.Packet.Decoded.Portnum == PortNum.TextMessageApp)
+                    lock (_sync)
+                    {
+                        _recent.Add((tr.Packet.RxTime, synthBytes));
+                        if (_recent.Count > RecentCap) _recent.RemoveAt(0);
+                    }
+            }
+            return;
+        }
+
         // A packet / heartbeat / anything else: send it to the device (if we have one).
         var dev = _device;
         if (dev == null) { _log("Dropping client packet: device offline."); return; }
@@ -421,14 +447,16 @@ internal sealed class ProxyHub
     private byte[] HelloPayload() => new byte[] { Mpxy[0], Mpxy[1], Mpxy[2], Mpxy[3], 0x04, (byte)(AuthRequired ? 1 : 0) };
 
     // Reads the client's first frame ("MPXY" + 0x02 + [userLen][user][pass]) and replies "MPXY" + 0x03 + result.
+    // On success the matched user (with its CanUseDevice flag) is stored on the client.
     private async Task<bool> AuthenticateClientAsync(Client client, string remote, CancellationToken ct)
     {
         byte[]? frame;
         try { frame = await client.ReadFrameAsync(ct); }
         catch { return false; }
-        bool ok = TryParseAuth(frame, out var user, out var pass) && CredsMatch(user, pass);
-        try { await SendFrameAsync(client, new byte[] { Mpxy[0], Mpxy[1], Mpxy[2], Mpxy[3], 0x03, (byte)(ok ? 1 : 0) }, ct); } catch { }
-        return ok;
+        ProxyUser? matched = TryParseAuth(frame, out var user, out var pass) ? _users?.Authenticate(user, pass) : null;
+        if (matched != null) client.User = matched;
+        try { await SendFrameAsync(client, new byte[] { Mpxy[0], Mpxy[1], Mpxy[2], Mpxy[3], 0x03, (byte)(matched != null ? 1 : 0) }, ct); } catch { }
+        return matched != null;
     }
 
     private static bool TryParseAuth(byte[]? f, out string user, out string pass)
@@ -441,13 +469,6 @@ internal sealed class ProxyHub
         pass = Encoding.UTF8.GetString(f, 6 + ul, f.Length - (6 + ul));
         return true;
     }
-
-    private bool CredsMatch(string user, string pass) =>
-        FixedEquals(user, _authUser ?? "") && FixedEquals(pass, _authPass ?? "");
-
-    // Length-tolerant constant-time compare (FixedTimeEquals returns false on a length mismatch without early-exiting).
-    private static bool FixedEquals(string a, string b) =>
-        CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
 
     private static byte[] Frame(byte[] p)
     {
@@ -464,6 +485,8 @@ internal sealed class ProxyHub
     {
         public readonly SslStream Stream;
         public readonly SemaphoreSlim WriteLock = new(1, 1);
+        public ProxyUser? User;              // the authenticated user (null when the proxy runs open / no auth)
+        public bool CanUseDevice => User?.CanUseDevice ?? true;   // open/legacy clients default to full device access
         public volatile bool ServedEmpty;   // completed want_config while the device was down (needs a re-sync)
         private readonly List<byte> _acc = new(8192);
         private readonly byte[] _buf = new byte[4096];
