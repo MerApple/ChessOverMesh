@@ -30,8 +30,9 @@ public sealed class CachedRegion
 /// An on-disk cache of OpenStreetMap map tiles for offline use, stored as plain PNG files at
 /// <c>{root}/{z}/{x}/{y}.png</c> (the standard slippy-map layout). Downloads the tiles covering a user-chosen
 /// area/zoom range up front (<see cref="CacheAreaAsync"/>) and serves them back to the map — via
-/// <see cref="MapTileServer"/> — with no network needed. Browsing the map online also fills the cache
-/// transparently (<see cref="GetTileAsync"/> saves what it fetches), so revisited areas work offline afterward.
+/// <see cref="MapTileServer"/> — with no network needed. (<see cref="GetTileAsync"/> can optionally also fetch a
+/// missing tile online and save it, but the apps run the tile server cache-only, so the cache only grows via an
+/// explicit area download.)
 /// </summary>
 /// <remarks>
 /// Tiles come from OpenStreetMap's public server. Its tile usage policy forbids heavy bulk downloading, so this
@@ -202,11 +203,42 @@ public sealed class MapTileCache
 
     // ---- Cache stats + management ------------------------------------------------------------------------
 
+    /// <summary>True when any offline tiles have been cached (a fast, lazy check — stops at the first tile). Used
+    /// to decide whether to offer the offline/online map choice at all: with no cache the map behaves exactly as
+    /// before (online only).</summary>
+    public bool HasAnyTiles()
+    {
+        try
+        {
+            if (GetRegions().Count > 0) return true;   // fast path: a recorded download
+            return System.IO.Directory.Exists(_root) &&
+                   System.IO.Directory.EnumerateFiles(_root, "*.png", System.IO.SearchOption.AllDirectories).Any();
+        }
+        catch { return false; }
+    }
+
     /// <summary>The number of tile files currently stored (walks the tree; may be slow for a huge cache).</summary>
     public long CachedTileCount()
     {
         try { return System.IO.Directory.Exists(_root) ? System.IO.Directory.EnumerateFiles(_root, "*.png", System.IO.SearchOption.AllDirectories).LongCount() : 0; }
         catch { return 0; }
+    }
+
+    /// <summary>The stored tile count and total bytes, in a single walk of the cache tree (for the settings view).</summary>
+    public (long Tiles, long Bytes) CacheStats()
+    {
+        long tiles = 0, bytes = 0;
+        try
+        {
+            if (System.IO.Directory.Exists(_root))
+                foreach (var f in System.IO.Directory.EnumerateFiles(_root, "*.png", System.IO.SearchOption.AllDirectories))
+                {
+                    tiles++;
+                    try { bytes += new System.IO.FileInfo(f).Length; } catch { }
+                }
+        }
+        catch { }
+        return (tiles, bytes);
     }
 
     /// <summary>Total bytes used by stored tiles.</summary>

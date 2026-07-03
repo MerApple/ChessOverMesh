@@ -5,10 +5,11 @@ namespace ChessOverMesh.Mesh;
 /// <summary>
 /// Builds a self-contained OpenStreetMap/Leaflet HTML page plotting known mesh node positions, with a search
 /// box and markers that show last-heard / position times. Shared by the desktop GUI (opened in the system
-/// browser) and the MAUI app (shown in an in-app WebView), so both render the identical map. By default the
-/// Leaflet JS/CSS and the map tiles load from CDNs (an internet connection is needed); pass an
-/// <c>assetBase</c> pointing at a running <see cref="ChessOverMesh.Map.MapTileServer"/> to render fully
-/// offline from the local tile cache instead.
+/// browser) and the MAUI app (shown in an in-app WebView), so both render the identical map. With no offline
+/// cache the Leaflet JS/CSS and tiles load from CDNs (online only, an internet connection is needed). When a
+/// cache exists, pass an <c>assetBase</c> pointing at a running <see cref="ChessOverMesh.Map.MapTileServer"/>:
+/// Leaflet then loads locally (so the page works offline) and the map offers a base-layer switcher between the
+/// online OpenStreetMap layer and the offline cached layer.
 /// </summary>
 public static class NodeMap
 {
@@ -18,9 +19,12 @@ public static class NodeMap
     /// track (oldest first) is embedded so the user can left-click a pin and press "Show last positions" to see
     /// only that node's latest positions, drawn newest-blue → oldest-red with lines between them. Pass
     /// <paramref name="focusNum"/> to open the map straight into that node's track (the "Show on map" button).</summary>
-    /// <param name="assetBase">When set (e.g. <c>http://127.0.0.1:49152</c>, a running
-    /// <see cref="ChessOverMesh.Map.MapTileServer"/>), Leaflet and the tiles load from that local server so the
-    /// map works with no internet. When null, the unpkg CDN + OpenStreetMap tile URLs are used (online only).</param>
+    /// <param name="assetBase">Pass null when there is no offline cache: the map renders exactly as before —
+    /// Leaflet from the unpkg CDN and a single online OpenStreetMap tile layer. Pass a running
+    /// <see cref="ChessOverMesh.Map.MapTileServer"/>'s base URL (e.g. <c>http://127.0.0.1:49152</c>) when a cache
+    /// exists: Leaflet then loads from that local server (so the page works with no internet) and the map gets a
+    /// base-layer switcher letting the user choose between <b>Online</b> (direct OpenStreetMap, as before) and
+    /// <b>Offline (cached)</b> (the local tile cache). Online is the default selection.</param>
     public static string Html(IEnumerable<MeshNodePosition> positions,
         IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null,
         uint? focusNum = null, string? assetBase = null)
@@ -40,19 +44,26 @@ public static class NodeMap
         });
         var focus = focusNum is { } f ? "'" + f.ToString("x8") + "'" : "null";
 
-        // Offline: pull Leaflet + tiles from the local MapTileServer and point the default marker icon at its
-        // bundled images. Online (assetBase null): the unpkg CDN + OpenStreetMap tile server, as before. The
-        // local tile server has no {s} subdomain shard, so its URL uses a single host.
-        bool offline = !string.IsNullOrEmpty(assetBase);
-        string leafletCss = offline ? assetBase + "/leaflet/leaflet.css" : "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        string leafletJs = offline ? assetBase + "/leaflet/leaflet.js" : "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-        string tileUrl = offline ? assetBase + "/tiles/{z}/{x}/{y}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-        string iconFix = offline ? "L.Icon.Default.imagePath = '" + assetBase + "/leaflet/images/';" : "";
+        const string onlineTiles = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+        bool hasCache = !string.IsNullOrEmpty(assetBase);
+
+        // No cache → the original online-only page (CDN Leaflet, single OSM layer, no switcher). Cache present →
+        // Leaflet + marker icons load from the local server (so it works offline too), and the user picks between
+        // the online OSM layer (as before) and the offline cached layer via Leaflet's base-layer control.
+        string leafletCss = hasCache ? assetBase + "/leaflet/leaflet.css" : "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        string leafletJs = hasCache ? assetBase + "/leaflet/leaflet.js" : "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        string iconFix = hasCache ? "L.Icon.Default.imagePath = '" + assetBase + "/leaflet/images/';" : "";
+        string tileSetup = hasCache
+            ? "var onlineLayer = L.tileLayer('" + onlineTiles + "', {maxZoom: 19, attribution: '(c) OpenStreetMap'});" +
+              "var offlineLayer = L.tileLayer('" + assetBase + "/tiles/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '(c) OpenStreetMap (cached)'});" +
+              "onlineLayer.addTo(map);" +   // default: online, as before — the user can switch to the cached layer
+              "L.control.layers({'Online': onlineLayer, 'Offline (cached)': offlineLayer}, null, {collapsed: false, position: 'bottomright'}).addTo(map);"
+            : "L.tileLayer('" + onlineTiles + "', {maxZoom: 19, attribution: '(c) OpenStreetMap'}).addTo(map);";
 
         return Template
             .Replace("__LEAFLET_CSS__", leafletCss)
             .Replace("__LEAFLET_JS__", leafletJs)
-            .Replace("__TILE_URL__", tileUrl)
+            .Replace("__TILE_SETUP__", tileSetup)
             .Replace("__ICON_FIX__", iconFix)
             .Replace("__NODES__", JsonSerializer.Serialize(data))
             .Replace("__FOCUS__", focus);
@@ -78,7 +89,7 @@ var nodes = __NODES__;
 var focus = __FOCUS__;
 __ICON_FIX__
 var map = L.map('map').setView([59.3293, 18.0686], 6);   // default: Stockholm
-L.tileLayer('__TILE_URL__', {maxZoom: 19, attribution: '(c) OpenStreetMap'}).addTo(map);
+__TILE_SETUP__
 var markers = {};      // node num -> main marker
 var group = [];        // all main markers
 var track = null;      // the layer group for a single node's track (polyline + point markers), or null

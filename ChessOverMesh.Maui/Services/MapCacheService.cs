@@ -32,7 +32,9 @@ internal static class MapCacheService
         {
             if (_server == null)
             {
-                var server = new MapTileServer(Cache, allowOnlineFallback: true);
+                // Cache-only: the server never fetches from the network. The map's online layer goes straight to
+                // OpenStreetMap; the offline layer is served from the cache here.
+                var server = new MapTileServer(Cache, allowOnlineFallback: false);
                 if (!server.Start()) { server.Dispose(); return null; }
                 _server = server;
             }

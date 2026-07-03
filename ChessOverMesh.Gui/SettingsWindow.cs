@@ -17,7 +17,7 @@ internal sealed class SettingsWindow : Window
 
     public SettingsWindow(Window owner, bool deviceEnabled,
                           Action openDevice, Action openColor, Action openSound, Action openChess, Action openConnection,
-                          Action openSystemSettings, Action openChatSettings)
+                          Action openSystemSettings, Action openChatSettings, Action openMap)
     {
         Title = "Settings";
         Owner = owner;
@@ -70,6 +70,9 @@ internal sealed class SettingsWindow : Window
         root.Children.Add(Section("Connection settings",
             "Keep-alive heartbeat and auto-reconnect for the device connection",
             openConnection, true));
+        root.Children.Add(Section("Map settings",
+            "Download map areas for offline use, and delete the cached map tiles",
+            openMap, true));
         root.Children.Add(Section("Chat messages",
             "How many chat messages to keep per channel (on screen and in the saved history)",
             openChatSettings, true));

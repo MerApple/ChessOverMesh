@@ -531,7 +531,7 @@ public partial class MainWindow : Window
     private void SettingsBtn_Click(object sender, RoutedEventArgs e)
     {
         bool deviceEnabled = _connected && !_refreshing && !_joining && _mesh != null;
-        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemSettings, OpenChatSettings).ShowDialog();
+        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemSettings, OpenChatSettings, OpenMapSettings).ShowDialog();
     }
 
     // System settings (cached-messages toggle): the window applies its changes immediately.
@@ -5046,13 +5046,9 @@ public partial class MainWindow : Window
         var updateBtn = new Button { Content = "Update nodes", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         var mapBtn = new Button { Content = "Map", MinWidth = 70, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         mapBtn.Click += (_, _) => ShowMap();
-        var cacheMapBtn = new Button { Content = "Cache map area…", MinWidth = 120, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = "Download a chosen area's map tiles so the map works offline." };
-        cacheMapBtn.Click += (_, _) => CacheMapArea(dialog);
         var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28 };
         buttons.Children.Add(updateBtn);
         buttons.Children.Add(mapBtn);
-        buttons.Children.Add(cacheMapBtn);
         buttons.Children.Add(closeBtn);
 
         var greyBrush = new SolidColorBrush(MediaColor.FromRgb(0xB0, 0xB0, 0xB0));
@@ -5402,14 +5398,15 @@ public partial class MainWindow : Window
     /// <summary>The shared tile cache, created on first use.</summary>
     private MapTileCache MapCache => _mapCache ??= new MapTileCache(MapCacheDir);
 
-    /// <summary>Starts (once) the loopback tile server that serves Leaflet + cached tiles to the map page, and
-    /// returns its base URL (e.g. http://127.0.0.1:PORT) — or null if the socket couldn't be bound, in which case
-    /// the map falls back to loading Leaflet and tiles online.</summary>
+    /// <summary>Starts (once) the loopback tile server that serves bundled Leaflet + cached tiles to the map page,
+    /// and returns its base URL (e.g. http://127.0.0.1:PORT) — or null if the socket couldn't be bound, in which
+    /// case the map falls back to loading Leaflet and tiles online. The server is cache-only (it never fetches from
+    /// the network); the map's online layer goes straight to OpenStreetMap as before.</summary>
     private string? EnsureMapServer()
     {
         if (_mapServer == null)
         {
-            var server = new MapTileServer(MapCache, allowOnlineFallback: true);
+            var server = new MapTileServer(MapCache, allowOnlineFallback: false);
             if (!server.Start()) { server.Dispose(); return null; }
             _mapServer = server;
         }
@@ -5417,9 +5414,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Generates an OpenStreetMap/Leaflet page of all known node positions (with a search box,
-    /// centred on Stockholm by default) and opens it in the default browser. Tiles + Leaflet are served by a local
-    /// loopback server backed by the on-disk cache, so areas cached with "Cache map area…" work with no internet
-    /// (and browsing online fills the cache). Falls back to loading them online if the local server can't start.</summary>
+    /// centred on Stockholm by default) and opens it in the default browser. With no offline cache the map is
+    /// online-only exactly as before; once an area has been cached (via "Cache map area…") the page gains a
+    /// base-layer switcher so the user can pick the online OpenStreetMap layer or the offline cached one.</summary>
     private void ShowMap(uint? focusNum = null)
     {
         if (_mesh == null) return;
@@ -5431,7 +5428,9 @@ public partial class MainWindow : Window
         }
         try
         {
-            string? assetBase = EnsureMapServer();   // null → the map loads Leaflet + tiles online (CDN/OSM)
+            // Only stand up the local tile server (and offer the offline/online choice) once something is cached;
+            // otherwise the map is the original online-only page. Null asset base = load Leaflet + tiles online.
+            string? assetBase = MapCache.HasAnyTiles() ? EnsureMapServer() : null;
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chessmesh-nodes-map.html");
             // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
             System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum, assetBase));
@@ -5442,6 +5441,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { Status($"Could not open the map: {ex.Message}"); }
     }
+
+    /// <summary>Opens the Map settings section: download areas for offline use and delete the cached tiles.</summary>
+    private void OpenMapSettings() => new MapSettingsWindow(this, MapCache, CacheMapArea).ShowDialog();
 
     /// <summary>Opens the "Cache map area for offline use" dialog, centred on the mean of known node positions
     /// (or Stockholm when none), and downloads the chosen area's tiles into the cache.</summary>
