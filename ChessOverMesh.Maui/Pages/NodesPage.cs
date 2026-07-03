@@ -156,7 +156,7 @@ public sealed class NodesPage : ContentPage
 
     async void OnMap(object? sender, EventArgs e)
     {
-        try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions())); }
+        try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions(), _main.GetPositionHistoryMap())); }
         catch (Exception ex) { _status.Text = $"Could not open the map: {ex.Message}"; }
     }
 

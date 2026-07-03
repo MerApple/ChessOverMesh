@@ -88,6 +88,7 @@ internal static class DeviceCache
         public Dictionary<uint, int> ChannelSendTtlMinutes { get; set; } = new();
         public Dictionary<uint, List<TelemetryReading>> Telemetry { get; set; } = new();
         public Dictionary<uint, CachedPosition> Positions { get; set; } = new();   // node num -> last-known position
+        public Dictionary<uint, List<CachedPosition>> PositionHistory { get; set; } = new();   // node num -> recent positions (oldest first)
 
         public uint? ChessChannel { get; set; }
         public List<uint> ChatListen { get; set; } = new();
@@ -299,6 +300,7 @@ internal static class DeviceCache
                 ChannelSendTtlMinutes = existing?.ChannelSendTtlMinutes ?? new Dictionary<uint, int>(),  // preserve send TTLs
                 Telemetry = existing?.Telemetry ?? new Dictionary<uint, List<TelemetryReading>>(),   // preserve telemetry
                 Positions = existing?.Positions ?? new Dictionary<uint, CachedPosition>(),     // preserve node positions
+                PositionHistory = existing?.PositionHistory ?? new Dictionary<uint, List<CachedPosition>>(),   // preserve position tracks
                 ChessChannel = existing?.ChessChannel,
                 ChatListen = existing?.ChatListen ?? new List<uint>(),
                 ChatTxChannel = existing?.ChatTxChannel,
@@ -550,6 +552,25 @@ internal static class DeviceCache
         catch { /* best effort */ }
     }
 
+    /// <summary>The persisted per-node position tracks for a device (node num → recent positions, oldest first), empty if none.</summary>
+    public static IReadOnlyDictionary<uint, List<CachedPosition>> GetPositionHistory(string host) =>
+        Load().GetValueOrDefault(host)?.PositionHistory ?? new Dictionary<uint, List<CachedPosition>>();
+
+    /// <summary>Replaces the stored per-node position tracks for a device from the live history map.</summary>
+    public static void SavePositionHistory(string host, IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> history)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            entry.PositionHistory = history.ToDictionary(kv => kv.Key,
+                kv => kv.Value.Select(p => new CachedPosition { Lat = p.Lat, Lon = p.Lon, LastHeard = p.LastHeard, PosTime = p.PosTime }).ToList());
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
     public static ChannelPrefs? GetChannelPrefs(string host)
     {
         var entry = Load().GetValueOrDefault(host);
@@ -609,6 +630,7 @@ internal static class DeviceCache
             entry.NodeHw.Remove(nodeNum);
             entry.NodePrefs.Remove(nodeNum);
             entry.Telemetry.Remove(nodeNum);
+            entry.PositionHistory.Remove(nodeNum);
             all[host] = entry;
             Persist(all);
         }

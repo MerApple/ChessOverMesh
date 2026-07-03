@@ -85,6 +85,7 @@ internal static class DeviceCache
         public Dictionary<uint, string> NodeRoles { get; set; } = new();     // node num -> device role (Client/Router/…)
         public Dictionary<uint, string> NodeHw { get; set; } = new();        // node num -> hardware model (Heltec V3/…)
         public Dictionary<uint, CachedPosition> Positions { get; set; } = new();   // node num -> last-known position
+        public Dictionary<uint, List<CachedPosition>> PositionHistory { get; set; } = new();   // node num -> recent positions (oldest first)
         public Dictionary<uint, string> ChannelKeys { get; set; } = new();   // legacy app-level AES keys (unused)
 
         // Per-node DM/Block flags (node num → prefs). Only nodes with a flag set are stored.
@@ -330,6 +331,7 @@ internal static class DeviceCache
                     ? new Dictionary<uint, string>(nodeHw)
                     : existing?.NodeHw ?? new Dictionary<uint, string>(),
                 Positions = existing?.Positions ?? new Dictionary<uint, CachedPosition>(),   // preserve node positions
+                PositionHistory = existing?.PositionHistory ?? new Dictionary<uint, List<CachedPosition>>(),   // preserve position tracks
                 ChannelOptions = existing?.ChannelOptions ?? new Dictionary<uint, ChannelOptions>(),   // preserve channel options
                 ChannelKeys = existing?.ChannelKeys ?? new Dictionary<uint, string>(),   // preserve per-channel keys
                 NodePrefs = existing?.NodePrefs ?? new Dictionary<uint, NodePrefs>(),     // preserve DM/Block flags
@@ -438,6 +440,7 @@ internal static class DeviceCache
             entry.NodeRoles.Remove(nodeNum);
             entry.NodeHw.Remove(nodeNum);
             entry.Positions.Remove(nodeNum);
+            entry.PositionHistory.Remove(nodeNum);
             entry.NodePrefs.Remove(nodeNum);
             entry.Telemetry.Remove(nodeNum);
             all[host] = entry;
@@ -476,6 +479,25 @@ internal static class DeviceCache
             var all = Load();
             var entry = all.GetValueOrDefault(host) ?? new Entry();
             entry.Positions = positions.ToDictionary(kv => kv.Key, kv => new CachedPosition { Lat = kv.Value.Lat, Lon = kv.Value.Lon, LastHeard = kv.Value.LastHeard, PosTime = kv.Value.PosTime });
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>The persisted per-node position tracks for a device (node num → recent positions, oldest first), empty if none.</summary>
+    public static IReadOnlyDictionary<uint, List<CachedPosition>> GetPositionHistory(string host) =>
+        Load().GetValueOrDefault(host)?.PositionHistory ?? new Dictionary<uint, List<CachedPosition>>();
+
+    /// <summary>Replaces the stored per-node position tracks for a device.</summary>
+    public static void SavePositionHistory(string host, IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> history)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            entry.PositionHistory = history.ToDictionary(kv => kv.Key,
+                kv => kv.Value.Select(p => new CachedPosition { Lat = p.Lat, Lon = p.Lon, LastHeard = p.LastHeard, PosTime = p.PosTime }).ToList());
             all[host] = entry;
             Persist(all);
         }

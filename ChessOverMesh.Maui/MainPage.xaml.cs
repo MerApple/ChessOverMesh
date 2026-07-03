@@ -719,6 +719,12 @@ public partial class MainPage : ContentPage
             if (pos.Count > 0)
                 _mesh.SeedNodes(nodePositions: pos.ToDictionary(kv => kv.Key,
                     kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)));
+
+            // Seed cached position tracks so the map's right-click "recent positions" view works immediately on reconnect.
+            var ph = DeviceCache.GetPositionHistory(host);
+            if (ph.Count > 0)
+                _mesh.SeedPositionHistory(ph.ToDictionary(kv => kv.Key,
+                    kv => kv.Value.Select(p => (p.Lat, p.Lon, p.LastHeard, p.PosTime)).ToList()));
         }
 
         var available = channels.Select(c => c.Index).ToHashSet();
@@ -2209,6 +2215,9 @@ public partial class MainPage : ContentPage
     // ---- Nodes list (the dedicated Nodes page shares this page's live node state) ----
     public IReadOnlyList<MeshNode> GetNodes() => _mesh?.GetNodes() ?? (IReadOnlyList<MeshNode>)Array.Empty<MeshNode>();
     public IReadOnlyList<MeshNodePosition> GetNodePositions() => _mesh?.GetNodePositions() ?? (IReadOnlyList<MeshNodePosition>)Array.Empty<MeshNodePosition>();
+    /// <summary>node num → recent position track (oldest first) for the map's right-click "recent positions" view.</summary>
+    public IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> GetPositionHistoryMap() =>
+        _mesh?.GetPositionHistoryMap() ?? new Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>();
     /// <summary>A Google Maps URL for a node's last known location, or null if we have no fix for it yet.</summary>
     public string? NodeMapsUrl(uint num) =>
         _mesh?.GetNodePosition(num) is { } p ? MeshtasticHttpClient.GoogleMapsUrl(p.Latitude, p.Longitude) : null;
@@ -2569,7 +2578,11 @@ public partial class MainPage : ContentPage
         if (result.Positions.Count > 0)
         {
             // Persist the refreshed positions so they survive a reconnect/restart (mirrors the desktop app).
-            if (_currentHost.Length > 0 && _mesh != null) DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());
+            if (_currentHost.Length > 0 && _mesh != null)
+            {
+                DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());
+                DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());
+            }
             NodesChanged?.Invoke();
         }
         if (result.Telemetry.Count > 0)

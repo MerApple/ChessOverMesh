@@ -1256,6 +1256,12 @@ public partial class MainWindow : Window
                 _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw,
                     cached.Positions.ToDictionary(kv => kv.Key, kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)),
                     cached.NodeShortNames, cached.NodeFavorites, cached.NodeIgnored, cached.NodeHopsAway, cached.NodeLastHeard);
+
+            // Seed cached position tracks so the map's right-click "recent positions" view works immediately on reconnect.
+            var ph = DeviceCache.GetPositionHistory(host);
+            if (ph.Count > 0)
+                _mesh.SeedPositionHistory(ph.ToDictionary(kv => kv.Key,
+                    kv => kv.Value.Select(p => (p.Lat, p.Lon, p.LastHeard, p.PosTime)).ToList()));
         }
 
         // Per-channel chat-ack setting (default off; we store the on exceptions).
@@ -3035,7 +3041,11 @@ public partial class MainWindow : Window
         if (r.Positions.Count > 0)
         {
             _nodesRefresh?.Invoke();
-            if (_currentHost.Length > 0) DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());
+            if (_currentHost.Length > 0)
+            {
+                DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());
+                DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());
+            }
         }
 
         // Fresh telemetry: refresh the open Nodes dialog rows + any telemetry window, persist, and note nodes.
@@ -5005,11 +5015,15 @@ public partial class MainWindow : Window
     {
         if (_mesh == null) return;
         var positions = _mesh.GetNodePositions();
-        if (_currentHost.Length > 0) DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache for next time
+        if (_currentHost.Length > 0)
+        {
+            DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache for next time
+            DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());
+        }
         try
         {
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chessmesh-nodes-map.html");
-            System.IO.File.WriteAllText(path, NodeMap.Html(positions));
+            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap()));
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             Status(positions.Count == 0
                 ? "Opened the map (no nodes have a known position yet — right-click a node → Request position)."
@@ -5390,6 +5404,7 @@ public partial class MainWindow : Window
             RebuildChatTxCombo();   // channel names may have refreshed
             DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
             DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache positions for the map
+            DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());   // + their recent-position tracks
             RefreshChatAckerNames();   // resolve any acker numbers to names now that nodes are loaded
             report($"Done — {_mesh.GetNodes().Count} nodes known.");
         }

@@ -169,6 +169,8 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly Dictionary<uint, string> _roleCache = new();   // node num -> device role, seeded from disk cache
     private readonly Dictionary<uint, string> _hwCache = new();     // node num -> hardware model name, seeded from disk cache
     private readonly Dictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)> _positionCache = new();   // node num -> position + times, seeded from disk
+    private readonly Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> _positionHistory = new();   // node num -> recent positions (oldest first)
+    private const int MaxPositionHistory = 20;   // keep only the latest N positions per node (oldest dropped past this)
     private readonly Dictionary<uint, List<MeshEnvironment>> _environmentHistory = new();   // node num -> readings (oldest first)
     private const int MaxEnvironmentHistory = 100;   // keep only the latest N per node (oldest dropped past this)
     private readonly HashSet<uint> _sentTraceroutes = new();   // ids of traceroute requests awaiting a reply (matched by request_id)
@@ -890,6 +892,41 @@ public sealed class MeshtasticHttpClient : IDisposable
     {
         var match = GetNodePositions().FirstOrDefault(p => p.Num == num);
         return match.Num == num ? match : null;   // FirstOrDefault yields Num==0 when there's no fix; real nodes are non-zero
+    }
+
+    /// <summary>Appends a fix to a node's position track, dropping an exact repeat of the last point (same coords
+    /// and position time — a rebroadcast of the same fix) and keeping only the latest <see cref="MaxPositionHistory"/>.</summary>
+    private void AppendPositionHistory(uint num, double lat, double lon, long lastHeard, long posTime)
+    {
+        if (!_positionHistory.TryGetValue(num, out var hist)) _positionHistory[num] = hist = new();
+        if (hist.Count > 0)
+        {
+            var last = hist[^1];
+            if (last.Lat == lat && last.Lon == lon && last.PosTime == posTime) return;   // same fix repeated
+        }
+        hist.Add((lat, lon, lastHeard, posTime));
+        if (hist.Count > MaxPositionHistory) hist.RemoveRange(0, hist.Count - MaxPositionHistory);
+    }
+
+    /// <summary>The recent positions tracked for a node this session (oldest first), up to the latest
+    /// <see cref="MaxPositionHistory"/>. Empty if we've heard no standalone position from it.</summary>
+    public IReadOnlyList<(double Lat, double Lon, long LastHeard, long PosTime)> GetPositionHistory(uint num) =>
+        _positionHistory.TryGetValue(num, out var list) ? list : Array.Empty<(double, double, long, long)>();
+
+    /// <summary>node num → recent position track (oldest first) for every node we've tracked, for the map and
+    /// for persisting the tracks back to the cache.</summary>
+    public IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> GetPositionHistoryMap() => _positionHistory;
+
+    /// <summary>Seeds the position tracks from persisted storage (called on connect), keeping only the most recent
+    /// <see cref="MaxPositionHistory"/> points per node.</summary>
+    public void SeedPositionHistory(IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> history)
+    {
+        foreach (var kv in history)
+        {
+            var list = kv.Value.ToList();
+            if (list.Count > MaxPositionHistory) list.RemoveRange(0, list.Count - MaxPositionHistory);
+            _positionHistory[kv.Key] = list;
+        }
     }
 
     /// <summary>A Google Maps URL that drops a pin at the given coordinates (works in the browser and the Maps app).</summary>
@@ -1625,6 +1662,7 @@ public sealed class MeshtasticHttpClient : IDisposable
                     long lastHeard = pkt.RxTime > 0 ? (long)pkt.RxTime
                         : (_positionCache.TryGetValue(pkt.From, out var prev) ? prev.LastHeard : 0);
                     _positionCache[pkt.From] = (p.LatitudeI / 1e7, p.LongitudeI / 1e7, lastHeard, p.Time);   // works with no NodeInfo
+                    AppendPositionHistory(pkt.From, p.LatitudeI / 1e7, p.LongitudeI / 1e7, lastHeard, p.Time);   // keep a track of the latest N
                     var node = _state.Nodes.FirstOrDefault(n => n.Num == pkt.From);
                     if (node != null) node.Position = p;   // keep the live node DB in sync when we do know the node
                 }
