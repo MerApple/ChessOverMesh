@@ -62,7 +62,8 @@
 
             <BoxView HeightRequest="1" Color="#3F3F46" Margin="0,10,0,6"/>
 
-            <Label Text="Create a channel" TextColor="#E0E0E0" FontAttributes="Bold"/>
+            <Label Text="Create / Update channel" TextColor="#E0E0E0" FontAttributes="Bold"/>
+            <Label Text="Create makes a new channel from the fields below. To Update the selected channel, tap &quot;Fetch from device&quot; first so its PSK is read correctly before it's rewritten." TextColor="#B0B0B0" FontSize="11"/>
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="6" RowSpacing="4">
                 <Label Grid.Row="0" Grid.Column="0" Text="Name" TextColor="#E0E0E0" VerticalOptions="Center"/>
                 <Entry x:Name="NameBox" Grid.Row="0" Grid.Column="1" TextColor="#E0E0E0" Placeholder="channel name"/>
@@ -72,8 +73,10 @@
             <HorizontalStackLayout Spacing="6">
                 <Button x:Name="RandomBtn" Text="Random PSK" Clicked="OnRandomPsk" MinimumHeightRequest="36" Padding="10,0"/>
                 <Button x:Name="CreateBtn" Text="Create" Clicked="OnCreate" MinimumHeightRequest="36" Padding="14,0"/>
+                <Button x:Name="UpdateBtn" Text="Update" Clicked="OnUpdate" IsEnabled="False" MinimumHeightRequest="36" Padding="14,0"/>
                 <Button x:Name="DeleteBtn" Text="Delete" Clicked="OnDelete" IsEnabled="False" MinimumHeightRequest="36" Padding="14,0"/>
             </HorizontalStackLayout>
+            <Label x:Name="UpdateHint" Text="Fetch from device to enable Update for the selected channel." TextColor="#E69A4C" FontSize="11"/>
 
             <BoxView HeightRequest="1" Color="#3F3F46" Margin="0,10,0,6"/>
 

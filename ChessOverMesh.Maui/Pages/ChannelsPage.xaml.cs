@@ -21,6 +21,7 @@ public partial class ChannelsPage : ContentPage
     IReadOnlyList<MeshChannel> _channels;
     uint _chessChannel;
     bool _busy;
+    bool _fetched;          // true once channels were read live this session — required before Update (so the PSK is correct)
     bool _settingUtility;   // guards the utility-channel picker while it's repopulated
     readonly TaskCompletionSource<Result> _tcs = new();
 
@@ -82,6 +83,7 @@ public partial class ChannelsPage : ContentPage
         try
         {
             _channels = await _mesh.GetDeviceChannelsAsync();
+            _fetched = true;   // PSKs are now read from the device — Update is safe
             RebuildLists();
             DeviceCache.Save(_host, _channels.Where(c => !c.IsDisabled), _mesh.MyNodeNum);
             SetStatus($"Fetched {_channels.Count(c => !c.IsDisabled)} channel(s) from the device (cached).", false);
@@ -104,6 +106,11 @@ public partial class ChannelsPage : ContentPage
         UplinkSwitch.IsEnabled = DownlinkSwitch.IsEnabled = PositionSwitch.IsEnabled = has && !_busy;
         SaveOptionsBtn.IsEnabled = has && !_busy;
 
+        // Update rewrites the selected channel's name/PSK/options — it needs a live Fetch first so the PSK is
+        // read correctly before it's rewritten. The hint explains why it's disabled until then.
+        UpdateBtn.IsEnabled = has && _fetched && !_busy;
+        UpdateHint.IsVisible = !_fetched;
+
         if (ChannelList.SelectedItem is ChannelRow row)
         {
             AppKeyBox.Text = DeviceCache.GetChannelKey(_host, row.Index);
@@ -115,6 +122,10 @@ public partial class ChannelsPage : ContentPage
             PskShow.Text = ch.Psk.Length > 0 ? ch.Psk
                          : ch.HasKey ? "🔒 set — tap Fetch to read it from the device"
                          : "(open channel — no PSK)";
+            // Populate the editable Name/PSK from the selected channel so Update can rewrite it. PSK is base64 when
+            // known (fetched), blank for an open channel or a key not yet read back.
+            NameBox.Text = ch.Name;
+            PskBox.Text = ch.Psk;
             // Uplink/downlink are read straight from the device (Fetch to refresh); position too when the device
             // reports it (PositionPrecision >= 0), else off.
             UplinkSwitch.IsToggled = ch.UplinkEnabled;
@@ -124,6 +135,7 @@ public partial class ChannelsPage : ContentPage
         else
         {
             AppKeyBox.Text = ""; TriggerBox.Text = ""; PskShow.Text = ""; AckSignalSwitch.IsToggled = false; AckSignalSwitch.IsEnabled = false;
+            NameBox.Text = ""; PskBox.Text = "";
             UplinkSwitch.IsToggled = DownlinkSwitch.IsToggled = PositionSwitch.IsToggled = false;
         }
     }
@@ -191,6 +203,53 @@ public partial class ChannelsPage : ContentPage
             SetStatus($"Created channel '{name}' (index {result.Index}).", false);
         }
         catch (Exception ex) { SetStatus($"Create failed: {ex.Message}", true); }
+        finally { _busy = false; SetBusy(false); }
+    }
+
+    // Rewrite the SELECTED channel's name + PSK + uplink/downlink/position in one request. Guarded so it only runs
+    // after a Fetch (so the PSK is read correctly before the channel is rewritten) — the button is also disabled
+    // until then. Mirrors the desktop ChannelsWindow's "Update channel".
+    async void OnUpdate(object? sender, EventArgs e)
+    {
+        if (_busy) return;
+        if (ChannelList.SelectedItem is not ChannelRow row) { SetStatus("Select a channel to update.", true); return; }
+        if (!_fetched) { SetStatus("Tap \"Fetch from device\" first so the channel's PSK is read correctly before updating.", true); return; }
+        string name = (NameBox.Text ?? "").Trim();
+        if (name.Length == 0) { SetStatus("Enter a channel name first.", true); return; }
+
+        var current = _channels.FirstOrDefault(c => c.Index == row.Index);
+        bool up = UplinkSwitch.IsToggled, down = DownlinkSwitch.IsToggled, pos = PositionSwitch.IsToggled;
+        // An empty PSK box on a channel whose key couldn't be read back keeps the existing key (null); type "none"
+        // to actually clear it. Otherwise the box text is applied (base64 → raw key, anything else → passphrase).
+        string pskText = (PskBox.Text ?? "").Trim();
+        string? psk = pskText.Length == 0 && current.HasKey && current.Psk.Length == 0 ? null : PskBox.Text;
+
+        _busy = true; SetBusy(true); SetStatus($"Updating channel [{row.Index}]…", false);
+        try
+        {
+            var result = await _mesh.SetChannelAsync(row.Index, name, psk, up, down, pos);
+            if (!result.Ok) { SetStatus(result.Error ?? "Update failed.", true); return; }
+            // Reflect locally rather than re-reading: a config re-read right after the commit can come back
+            // incomplete until the radio settles (the desktop app hit this), so apply the values we just set.
+            static bool LooksLikeRawKey(string s)
+            {
+                try { return Convert.FromBase64String(s.Trim()).Length is 16 or 32; } catch { return false; }
+            }
+            bool keyCleared = pskText.Length == 0 || pskText == "none";
+            bool keepingKey = psk == null;   // updating a channel whose key we left untouched
+            bool hasKey = keepingKey ? current.HasKey : !keyCleared;
+            string pskShown = keepingKey ? current.Psk : (!keyCleared && LooksLikeRawKey(pskText) ? pskText : "");
+            _channels = _channels
+                .Select(c => c.Index == row.Index
+                    ? c with { Name = name, HasKey = hasKey, Psk = pskShown, UplinkEnabled = up, DownlinkEnabled = down, PositionPrecision = pos ? 32 : 0 }
+                    : c)
+                .ToList();
+            RebuildLists();
+            ChannelList.SelectedItem = (ChannelList.ItemsSource as IEnumerable<ChannelRow>)?.FirstOrDefault(r => r.Index == row.Index);
+            DeviceCache.Save(_host, _channels.Where(c => !c.IsDisabled), _mesh.MyNodeNum);
+            SetStatus($"Updated channel [{row.Index}].", false);
+        }
+        catch (Exception ex) { SetStatus($"Update failed: {ex.Message}", true); }
         finally { _busy = false; SetBusy(false); }
     }
 
