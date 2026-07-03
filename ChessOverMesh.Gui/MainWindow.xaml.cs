@@ -1222,7 +1222,9 @@ public partial class MainWindow : Window
             if (cached != null)
                 _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw,
                     cached.Positions.ToDictionary(kv => kv.Key, kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)),
-                    cached.NodeShortNames, cached.NodeFavorites, cached.NodeIgnored, cached.NodeHopsAway, cached.NodeLastHeard);
+                    cached.NodeShortNames, cached.NodeFavorites, cached.NodeIgnored,
+                    cached.NodeSignals.ToDictionary(kv => kv.Key, kv => (kv.Value.Rssi, (float)kv.Value.Snr, kv.Value.Hops, kv.Value.When)),
+                    cached.NodeLastHeard);
         }
 
         // Per-channel chat-ack setting (default off; we store the on exceptions).
@@ -2322,7 +2324,7 @@ public partial class MainWindow : Window
         if (_mesh == null || _currentHost.Length == 0) return;
         DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum,
             _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(),
-            _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
     }
 
     /// <summary>Confirms then runs a remote-admin action against another node, reporting via <paramref name="setStatus"/>.</summary>
@@ -2979,7 +2981,7 @@ public partial class MainWindow : Window
 
         // A node-info reply updates the device's node DB; persist the refreshed names so they survive reconnect.
         if (r.NodeInfos.Count > 0 && _currentHost.Length > 0)
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
 
         // Position heard from another node (broadcast or a reply to our request): note it in the system log, and
         // refresh the Nodes dialog/map since the node DB position just changed.
@@ -3026,7 +3028,7 @@ public partial class MainWindow : Window
         {
             _lastNodeViewCount = nodeCount;
             if (_currentHost.Length > 0)
-                DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+                DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
             _nodesRepopulate?.Invoke();
         }
         else
@@ -3105,7 +3107,7 @@ public partial class MainWindow : Window
         // The full drain populated the node list — persist names and show them on any acks so far.
         if (_mesh != null)
         {
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
             SyncDeviceClockIfAhead();   // correct a radio whose clock is set in the future (bad "last heard" stamps)
             // On a proxy link, ask it to replay any received messages we missed while away (newer than our newest
@@ -5355,7 +5357,7 @@ public partial class MainWindow : Window
             }
 
             RebuildChatTxCombo();   // channel names may have refreshed
-            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeHopsAwayMap(), _mesh.GetNodeLastHeardMap());
+            DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
             DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache positions for the map
             RefreshChatAckerNames();   // resolve any acker numbers to names now that nodes are loaded
             report($"Done — {_mesh.GetNodes().Count} nodes known.");
