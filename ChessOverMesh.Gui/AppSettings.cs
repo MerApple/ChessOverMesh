@@ -61,6 +61,11 @@ internal static class AppSettings
         // the reported noise floor for nodes of that hardware. Only non-zero entries are stored (missing = 0).
         public Dictionary<string, int> NoiseCalibrations { get; set; } = new();
 
+        // Offline-map tile provider id (see MapTileProvider; null = OpenStreetMap online-only) and its API key.
+        // OSM forbids bulk downloading, so caching an area requires a keyed provider + key.
+        public string? MapProvider { get; set; }
+        public string? MapApiKey { get; set; }
+
         // Remembered proxy sign-in credentials, keyed by proxy host. The password is DPAPI-protected.
         public Dictionary<string, ProxyCred> ProxyCreds { get; set; } = new();
 
@@ -254,6 +259,11 @@ internal static class AppSettings
         Mutate(d => d.NoiseCalibrations = calibrations
             .Where(kv => kv.Value != 0)
             .ToDictionary(kv => kv.Key, kv => kv.Value));
+
+    /// <summary>The offline-map tile provider id (see <see cref="ChessOverMesh.Map.MapTileProvider"/>); null = OSM online-only.</summary>
+    public static string? MapProvider { get => Load().MapProvider; set => Mutate(d => d.MapProvider = value); }
+    /// <summary>The API key for the chosen keyed tile provider (empty for OSM).</summary>
+    public static string? MapApiKey { get => Load().MapApiKey; set => Mutate(d => d.MapApiKey = value); }
 
     /// <summary>The remembered proxy login for <paramref name="host"/> (password decrypted), or null if none saved.</summary>
     public static (string User, string Pass)? GetProxyCred(string host)

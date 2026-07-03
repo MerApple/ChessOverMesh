@@ -13,13 +13,27 @@ internal static class MapCacheService
     private static MapTileServer? _server;
     private static readonly object Gate = new();
 
-    /// <summary>The on-disk tile cache, stored under the app's private data directory.</summary>
+    /// <summary>The on-disk tile cache, stored under the app's private data directory. Its download URL is the
+    /// configured tile provider (a keyed provider that permits offline caching, or online OSM as a fallback).</summary>
     public static MapTileCache Cache
     {
         get
         {
             lock (Gate)
-                return _cache ??= new MapTileCache(Path.Combine(FileSystem.AppDataDirectory, "mapcache"));
+                return _cache ??= new MapTileCache(Path.Combine(FileSystem.AppDataDirectory, "mapcache"),
+                    MapTileProvider.TileUrl(AppSettings.MapProvider, AppSettings.MapApiKey));
+        }
+    }
+
+    /// <summary>Drops the cache + server so they're rebuilt against the current tile-provider settings (call after
+    /// the provider or API key changes). The on-disk tiles are untouched.</summary>
+    public static void InvalidateTileSource()
+    {
+        lock (Gate)
+        {
+            _server?.Dispose();
+            _server = null;
+            _cache = null;
         }
     }
 

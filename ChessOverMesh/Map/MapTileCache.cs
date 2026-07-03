@@ -42,8 +42,9 @@ public sealed class CachedRegion
 /// </remarks>
 public sealed class MapTileCache
 {
-    /// <summary>The tile source. <c>{z}/{x}/{y}</c> are substituted per tile. Kept as one place to swap providers.</summary>
-    public const string TileUrlTemplate = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+    /// <summary>The default tile source when a caller doesn't pass one. <c>{z}/{x}/{y}</c> are substituted per
+    /// tile. Note OSM's public server forbids bulk downloading — see <see cref="MapTileProvider"/>.</summary>
+    public const string TileUrlTemplate = MapTileProvider.OsmOnlineUrl;
 
     /// <summary>Refuse to bulk-download more than this many tiles in one area request (be a good tile-server
     /// citizen and stop the user accidentally queuing millions of tiles). The UI shows the estimate first.</summary>
@@ -55,10 +56,15 @@ public sealed class MapTileCache
 
     private readonly string _root;
     private readonly string _manifestPath;
+    private readonly string _tileUrl;
 
-    public MapTileCache(string rootDir)
+    /// <param name="tileUrl">The <c>{z}/{x}/{y}</c> tile URL template to fetch from (key already substituted).
+    /// Null/blank uses <see cref="TileUrlTemplate"/> (online OSM). Build it via
+    /// <see cref="MapTileProvider.TileUrl"/> so downloads use a provider that permits offline caching.</param>
+    public MapTileCache(string rootDir, string? tileUrl = null)
     {
         _root = rootDir;
+        _tileUrl = string.IsNullOrWhiteSpace(tileUrl) ? TileUrlTemplate : tileUrl;
         _manifestPath = System.IO.Path.Combine(_root, "regions.json");
         try { System.IO.Directory.CreateDirectory(_root); } catch { /* created lazily on write too */ }
     }
@@ -106,11 +112,16 @@ public sealed class MapTileCache
         catch { return null; }
     }
 
-    private static async Task<byte[]?> DownloadTileAsync(int z, int x, int y, CancellationToken ct)
+    private async Task<byte[]?> DownloadTileAsync(int z, int x, int y, CancellationToken ct)
     {
-        string url = TileUrlTemplate.Replace("{z}", z.ToString()).Replace("{x}", x.ToString()).Replace("{y}", y.ToString());
+        string url = _tileUrl.Replace("{z}", z.ToString()).Replace("{x}", x.ToString()).Replace("{y}", y.ToString());
         using var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode) return null;
+        // Only ever cache real image tiles. When a provider refuses the request (rate limit, policy block, bad or
+        // missing key) it may still answer 200 — but with an HTML/text notice, not a PNG. Saving that would poison
+        // the cache with the provider's error page, so drop any non-image response.
+        var mediaType = resp.Content.Headers.ContentType?.MediaType;
+        if (mediaType != null && !mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return null;
         var bytes = await resp.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
         return bytes.Length > 0 ? bytes : null;
     }

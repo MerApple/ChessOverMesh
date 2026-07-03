@@ -5396,8 +5396,19 @@ public partial class MainWindow : Window
     private static string MapCacheDir => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChessOverMesh", "mapcache");
 
-    /// <summary>The shared tile cache, created on first use.</summary>
-    private MapTileCache MapCache => _mapCache ??= new MapTileCache(MapCacheDir);
+    /// <summary>The shared tile cache, created on first use. Its download URL is the configured tile provider (a
+    /// keyed provider that permits offline caching, or online OSM as a fallback that can't be bulk-downloaded).</summary>
+    private MapTileCache MapCache =>
+        _mapCache ??= new MapTileCache(MapCacheDir, MapTileProvider.TileUrl(AppSettings.MapProvider, AppSettings.MapApiKey));
+
+    /// <summary>Drops the cached tile cache + server so they're rebuilt against the current tile-provider settings
+    /// (call after the provider or API key changes in Map settings). The on-disk tiles are untouched.</summary>
+    private void InvalidateMapTileSource()
+    {
+        _mapServer?.Dispose();
+        _mapServer = null;
+        _mapCache = null;
+    }
 
     /// <summary>Starts (once) the loopback tile server that serves bundled Leaflet + cached tiles to the map page,
     /// and returns its base URL (e.g. http://127.0.0.1:PORT) — or null if the socket couldn't be bound, in which
@@ -5432,9 +5443,10 @@ public partial class MainWindow : Window
             // Only stand up the local tile server (and offer the offline/online choice) once something is cached;
             // otherwise the map is the original online-only page. Null asset base = load Leaflet + tiles online.
             string? assetBase = MapCache.HasAnyTiles() ? EnsureMapServer() : null;
+            string onlineTileUrl = MapTileProvider.TileUrl(AppSettings.MapProvider, AppSettings.MapApiKey);
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chessmesh-nodes-map.html");
             // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
-            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum, assetBase));
+            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum, assetBase, onlineTileUrl));
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             Status(positions.Count == 0
                 ? "Opened the map (no nodes have a known position yet — right-click a node → Request position)."
@@ -5444,7 +5456,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Opens the Map settings section: download areas for offline use and delete the cached tiles.</summary>
-    private void OpenMapSettings() => new MapSettingsWindow(this, MapCache, CacheMapArea).ShowDialog();
+    private void OpenMapSettings() => new MapSettingsWindow(this, MapCache, CacheMapArea, InvalidateMapTileSource).ShowDialog();
 
     /// <summary>Opens the Noise settings section: a per-hardware calibration offset (dBm) added to each node's
     /// reported noise floor. Lists every known hardware model plus any type currently seen or already configured.
