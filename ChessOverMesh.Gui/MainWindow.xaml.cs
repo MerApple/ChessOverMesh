@@ -1337,8 +1337,11 @@ public partial class MainWindow : Window
     {
         var names = _mesh?.GetAvailableChannels().ToDictionary(c => c.Index, c => c.DisplayName)
                     ?? new Dictionary<uint, string>();
+        // Flag channels with an app encryption key with a 🔒 (same condition as the chat send: a non-empty app key).
         var items = _chatListen.OrderBy(i => i)
-            .Select(i => new TxTarget(false, i, $"[{i}] {(names.TryGetValue(i, out var n) ? n : "")}".TrimEnd()))
+            .Select(i => new TxTarget(false, i,
+                $"[{i}] {(names.TryGetValue(i, out var n) ? n : "")}".TrimEnd()
+                + ((_mesh?.GetChannelKey(i).Length ?? 0) > 0 ? " 🔒" : "")))
             .ToList();
 
         // Append DM targets: nodes the user has flagged for DMs (and not blocked).
