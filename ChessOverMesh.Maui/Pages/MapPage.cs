@@ -13,12 +13,14 @@ public sealed class MapPage : ContentPage
     static readonly Color Fg = Color.FromArgb("#E0E0E0");
 
     public MapPage(IReadOnlyList<MeshNodePosition> positions,
-        IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null)
+        IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null,
+        uint? focusNum = null)
     {
         Title = "Node map";
         BackgroundColor = Bg;
 
-        var web = new WebView { Source = new HtmlWebViewSource { Html = NodeMap.Html(positions, history) } };
+        // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
+        var web = new WebView { Source = new HtmlWebViewSource { Html = NodeMap.Html(positions, history, focusNum) } };
 
         var close = new Button { Text = "Close", Padding = new Thickness(14, 0), MinimumHeightRequest = 40 };
         close.Clicked += async (_, _) => await Navigation.PopModalAsync();

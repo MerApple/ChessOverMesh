@@ -2215,9 +2215,12 @@ public partial class MainPage : ContentPage
     // ---- Nodes list (the dedicated Nodes page shares this page's live node state) ----
     public IReadOnlyList<MeshNode> GetNodes() => _mesh?.GetNodes() ?? (IReadOnlyList<MeshNode>)Array.Empty<MeshNode>();
     public IReadOnlyList<MeshNodePosition> GetNodePositions() => _mesh?.GetNodePositions() ?? (IReadOnlyList<MeshNodePosition>)Array.Empty<MeshNodePosition>();
-    /// <summary>node num → recent position track (oldest first) for the map's right-click "recent positions" view.</summary>
+    /// <summary>node num → recent position track (oldest first) for the map's "Show last positions" track view.</summary>
     public IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> GetPositionHistoryMap() =>
         _mesh?.GetPositionHistoryMap() ?? new Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>();
+    /// <summary>One node's recent position track (oldest first, up to the latest 20), empty if none heard.</summary>
+    public IReadOnlyList<(double Lat, double Lon, long LastHeard, long PosTime)> NodePositionHistory(uint num) =>
+        _mesh?.GetPositionHistory(num) ?? Array.Empty<(double, double, long, long)>();
     /// <summary>A Google Maps URL for a node's last known location, or null if we have no fix for it yet.</summary>
     public string? NodeMapsUrl(uint num) =>
         _mesh?.GetNodePosition(num) is { } p ? MeshtasticHttpClient.GoogleMapsUrl(p.Latitude, p.Longitude) : null;

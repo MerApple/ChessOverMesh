@@ -15,8 +15,9 @@ public sealed class TelemetryPage : ContentPage
 
     readonly MainPage _main;
     readonly MeshNode _target;
-    readonly Label _header, _info, _sub, _status;
+    readonly Label _header, _info, _sub, _status, _posHeader;
     readonly VerticalStackLayout _list = new() { Spacing = 2 };
+    readonly VerticalStackLayout _posList = new() { Spacing = 2 };
 
     public TelemetryPage(MainPage main, MeshNode target)
     {
@@ -30,6 +31,7 @@ public sealed class TelemetryPage : ContentPage
         _info = new Label { TextColor = Fg, FontFamily = "monospace", FontSize = 12 };
         _sub = new Label { TextColor = Dim, FontSize = 12 };
         _status = new Label { TextColor = Dim, FontSize = 12 };
+        _posHeader = new Label { Text = "Position history (latest 20):", TextColor = Fg, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 4, 0, 0) };
 
         var requestBtn = new Button { Text = "Request telemetry", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         requestBtn.Clicked += OnRequest;
@@ -68,13 +70,22 @@ public sealed class TelemetryPage : ContentPage
             try { await _main.RequestNoiseFloorAsync(_target.Num); }
             catch (Exception ex) { _status.Text = $"Request failed: {ex.Message}"; }
         };
+        // Opens the node map straight into this node's recent-position track (newest blue → oldest red).
+        var mapBtn = new Button { Text = "Show on map", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
+        mapBtn.Clicked += async (_, _) =>
+        {
+            try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions(), _main.GetPositionHistoryMap(), _target.Num)); }
+            catch (Exception ex) { _status.Text = $"Could not open the map: {ex.Message}"; }
+        };
         var actions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Direction = Microsoft.Maui.Layouts.FlexDirection.Row };
-        actions.Add(infoBtn); actions.Add(posBtn); actions.Add(requestBtn); actions.Add(metricsBtn); actions.Add(traceBtn); actions.Add(noiseBtn);
+        actions.Add(infoBtn); actions.Add(posBtn); actions.Add(requestBtn); actions.Add(metricsBtn); actions.Add(traceBtn); actions.Add(noiseBtn); actions.Add(mapBtn);
 
         var root = new VerticalStackLayout { Padding = 16, Spacing = 8 };
         root.Add(_header);
         root.Add(_info);
         root.Add(actions);
+        root.Add(_posHeader);   // position history (latest 20) above telemetry
+        root.Add(_posList);
         root.Add(new Label { Text = "Telemetry history:", TextColor = Fg, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 4, 0, 0) });
         root.Add(_sub);
         root.Add(_status);
@@ -99,6 +110,21 @@ public sealed class TelemetryPage : ContentPage
     void Load()
     {
         _info.Text = _main.NodeInfoText(_target.Num);
+
+        // Recent positions, newest first. Cached with the device entry, so encrypted on disk when a cache key is set.
+        var track = _main.NodePositionHistory(_target.Num);
+        _posList.Children.Clear();
+        for (int i = track.Count - 1; i >= 0; i--)
+        {
+            var p = track[i];
+            string when = p.PosTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(p.PosTime).LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") : "unknown time";
+            string tag = i == track.Count - 1 ? "  (newest)" : (i == 0 ? "  (oldest)" : "");
+            _posList.Children.Add(new Label { Text = $"{when}   {p.Lat:0.#####}, {p.Lon:0.#####}{tag}", TextColor = Fg, FontFamily = "monospace", FontSize = 12 });
+        }
+        _posHeader.Text = track.Count == 0
+            ? "Position history: none yet"
+            : $"Position history (latest {track.Count}, newest first):";
+
         var history = _main.NodeEnvironmentHistory(_target.Num);
         _list.Children.Clear();
         foreach (var e in history.Reverse())   // newest first
@@ -128,6 +154,14 @@ public sealed class TelemetryPage : ContentPage
         var sb = new System.Text.StringBuilder();
         sb.AppendLine(_header.Text);
         sb.AppendLine(_info.Text);
+        sb.AppendLine(_posHeader.Text);
+        var track = _main.NodePositionHistory(_target.Num);
+        for (int i = track.Count - 1; i >= 0; i--)
+        {
+            var p = track[i];
+            string when = p.PosTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(p.PosTime).LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") : "unknown time";
+            sb.AppendLine($"{when}   {p.Lat:0.#####}, {p.Lon:0.#####}");
+        }
         sb.AppendLine("Telemetry history:");
         foreach (var e2 in _main.NodeEnvironmentHistory(_target.Num).Reverse())
             sb.AppendLine($"{e2.Timestamp:yyyy-MM-dd HH:mm:ss}   {EnvSummary(e2)}");

@@ -5010,19 +5010,20 @@ public partial class MainWindow : Window
     /// <summary>Generates an OpenStreetMap/Leaflet page of all known node positions (with a search box,
     /// centred on Stockholm by default) and opens it in the default browser. No in-app map control is used,
     /// so there's no extra dependency; the tiles need an internet connection.</summary>
-    private void ShowMap()
+    private void ShowMap(uint? focusNum = null)
     {
         if (_mesh == null) return;
         var positions = _mesh.GetNodePositions();
         if (_currentHost.Length > 0)
         {
             DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache for next time
-            DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());
+            DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());   // + recent tracks (encrypted when a cache key is set)
         }
         try
         {
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chessmesh-nodes-map.html");
-            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap()));
+            // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
+            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum));
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             Status(positions.Count == 0
                 ? "Opened the map (no nodes have a known position yet — right-click a node → Request position)."
@@ -5101,6 +5102,20 @@ public partial class MainWindow : Window
         var status = new TextBlock { Foreground = grey, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(status, Dock.Top);
 
+        // Position history (latest 20 fixes, newest first). Cached with the rest of the device entry, so it's
+        // encrypted on disk whenever a cache key is set. Capped MaxHeight so telemetry still gets room below.
+        var posHeader = new TextBlock { Text = "Position history (latest 20):", Foreground = white, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 4, 0, 2) };
+        DockPanel.SetDock(posHeader, Dock.Top);
+        var posList = new ListBox
+        {
+            Background = new SolidColorBrush(MediaColor.FromRgb(0x1E, 0x1E, 0x1E)),
+            Foreground = white, BorderThickness = new Thickness(0),
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            SelectionMode = SelectionMode.Extended,
+            MaxHeight = 140, Margin = new Thickness(0, 0, 0, 6),
+        };
+        DockPanel.SetDock(posList, Dock.Top);
+
         var list = new ListBox
         {
             Background = new SolidColorBrush(MediaColor.FromRgb(0x1E, 0x1E, 0x1E)),
@@ -5115,6 +5130,20 @@ public partial class MainWindow : Window
             var pref = _nodePrefs.GetValueOrDefault(target.Num);
             details.Text = _mesh!.GetNodeInfoText(target.Num) + Environment.NewLine +
                            $"DM: {(pref?.Dm == true ? "on" : "off")}    Block: {(pref?.Block == true ? "on" : "off")}";
+
+            // Recent positions, newest first (each: local time of the fix, then lat, lon).
+            var track = _mesh!.GetPositionHistory(target.Num);
+            posList.Items.Clear();
+            for (int i = track.Count - 1; i >= 0; i--)
+            {
+                var p = track[i];
+                string when = p.PosTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(p.PosTime).LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss") : "unknown time         ";
+                string tag = i == track.Count - 1 ? "  (newest)" : (i == 0 ? "  (oldest)" : "");
+                posList.Items.Add($"{when}   {p.Lat:0.#####}, {p.Lon:0.#####}{tag}");
+            }
+            posHeader.Text = track.Count == 0
+                ? "Position history: none yet"
+                : $"Position history (latest {track.Count}, newest first):";
 
             var history = _mesh!.GetEnvironmentHistory(target.Num);
             list.Items.Clear();
@@ -5159,6 +5188,8 @@ public partial class MainWindow : Window
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(header.Text);
             sb.AppendLine(details.Text);
+            sb.AppendLine(posHeader.Text);
+            foreach (var item in posList.Items) sb.AppendLine(item?.ToString());
             sb.AppendLine("Telemetry history:");
             foreach (var item in list.Items) sb.AppendLine(item?.ToString());
             try { Clipboard.SetText(sb.ToString()); } catch { /* clipboard may be momentarily locked by another app */ }
@@ -5189,13 +5220,16 @@ public partial class MainWindow : Window
         };
         var traceBtn = new Button { Content = "Traceroute", MinWidth = 96, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         traceBtn.Click += (_, _) => ShowTraceroute(target, win);
-        var noiseBtn = new Button { Content = "Request noise floor", MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
+        var noiseBtn = new Button { Content = "Request noise floor", MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
         noiseBtn.Click += async (_, _) =>
         {
             status.Text = $"Requesting noise floor from {target.Display}…";
             try { await _mesh!.RequestNoiseFloorAsync(target.Num); }
             catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
         };
+        // Opens the node map straight into this node's recent-position track (newest blue → oldest red).
+        var mapBtn = new Button { Content = "Show on map", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
+        mapBtn.Click += (_, _) => ShowMap(target.Num);
         // WrapPanel so the action buttons flow onto a second line rather than overflowing the window.
         var actionPanel = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
         actionPanel.Children.Add(infoBtn);
@@ -5204,12 +5238,15 @@ public partial class MainWindow : Window
         actionPanel.Children.Add(metricsBtn);   // Request device metrics (battery/voltage/util/uptime)
         actionPanel.Children.Add(traceBtn);
         actionPanel.Children.Add(noiseBtn);
+        actionPanel.Children.Add(mapBtn);       // Show this node's track on the map
         DockPanel.SetDock(actionPanel, Dock.Bottom);
 
         win.Closed += (_, _) => _telemetryRefresh = null;
 
         root.Children.Add(header);
         root.Children.Add(details);
+        root.Children.Add(posHeader);     // position history (latest 20) above telemetry
+        root.Children.Add(posList);
         root.Children.Add(telemHeader);
         root.Children.Add(sub);
         root.Children.Add(status);
