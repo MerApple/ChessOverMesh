@@ -43,14 +43,26 @@ internal sealed class MapSettingsWindow : Window
         Title = "Map settings";
         Owner = owner;
         Width = 420;
-        SizeToContent = SizeToContent.Height;
+        Height = 460;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
+        MinWidth = 360;
+        MinHeight = 240;
         Background = Bg;
 
-        var root = new StackPanel { Margin = new Thickness(14) };
+        // Grid so the cached-region list (star row) soaks up any extra height when the user resizes the window;
+        // the top block (intro + provider settings + summary) and the buttons stay Auto-height.
+        var root = new Grid { Margin = new Thickness(14) };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // top: intro + provider + summary
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // regions
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
 
-        root.Children.Add(new TextBlock
+        // Fixed-height top block; the region list below it grows when the window is resized.
+        var top = new StackPanel();
+        Grid.SetRow(top, 0);
+        root.Children.Add(top);
+
+        top.Children.Add(new TextBlock
         {
             Text = "Offline map: download the tiles for an area so the node map works with no internet. " +
                    "When something is cached, the map lets you switch between the online and cached layers.",
@@ -60,7 +72,7 @@ internal sealed class MapSettingsWindow : Window
         // --- Tile provider ---------------------------------------------------------------------------------
         // OpenStreetMap's servers forbid bulk downloading (they return an "Access blocked" tile), so caching an
         // area needs a provider whose terms allow it, with a free API key.
-        root.Children.Add(new TextBlock { Text = "Tile provider", Foreground = Fg, Margin = new Thickness(0, 0, 0, 4) });
+        top.Children.Add(new TextBlock { Text = "Tile provider", Foreground = Fg, Margin = new Thickness(0, 0, 0, 4) });
         _providerBox = new ComboBox { Background = Field, Foreground = Fg, BorderBrush = Border, Margin = new Thickness(0, 0, 0, 6) };
         var itemStyle = new Style(typeof(ComboBoxItem));   // dark dropdown items (else light-on-white = invisible)
         itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Field));
@@ -69,31 +81,32 @@ internal sealed class MapSettingsWindow : Window
         foreach (var id in MapTileProvider.All)
             _providerBox.Items.Add(new ComboBoxItem { Content = MapTileProvider.DisplayName(id), Tag = id, Foreground = Fg, Background = Field });
         _providerBox.SelectionChanged += (_, _) => OnProviderOrKeyChanged();
-        root.Children.Add(_providerBox);
+        top.Children.Add(_providerBox);
 
-        root.Children.Add(new TextBlock { Text = "API key", Foreground = Fg, Margin = new Thickness(0, 0, 0, 4) });
+        top.Children.Add(new TextBlock { Text = "API key", Foreground = Fg, Margin = new Thickness(0, 0, 0, 4) });
         _keyBox = new TextBox { Background = Field, Foreground = Fg, CaretBrush = Fg, BorderBrush = Border,
             MinHeight = 24, Padding = new Thickness(4, 2, 4, 2), Margin = new Thickness(0, 0, 0, 4) };
         _keyBox.LostFocus += (_, _) => OnProviderOrKeyChanged();
-        root.Children.Add(_keyBox);
+        top.Children.Add(_keyBox);
 
         _providerHelp = new TextBlock { Foreground = Dim, TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 0, 0, 12) };
-        root.Children.Add(_providerHelp);
+        top.Children.Add(_providerHelp);
 
         _summary = new TextBlock { Foreground = Fg, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
-        root.Children.Add(_summary);
+        top.Children.Add(_summary);
 
         _regions = new ItemsControl { Margin = new Thickness(0, 0, 0, 8) };
         var scroll = new ScrollViewer
         {
             Content = _regions,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            MaxHeight = 160,
             Margin = new Thickness(0, 0, 0, 8),
         };
+        Grid.SetRow(scroll, 1);
         root.Children.Add(scroll);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        Grid.SetRow(buttons, 2);
 
         _cacheBtn = new Button { Content = "Cache map area…", MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0),
             ToolTip = "Download a chosen area's map tiles for offline use." };
