@@ -1067,12 +1067,51 @@ public sealed class MeshtasticHttpClient : IDisposable
         return packet.Id;
     }
 
-    // node num → last reported noise floor (LocalStats.noise_floor, dBm).
+    // node num → last reported noise floor (LocalStats.noise_floor, dBm), stored as the radio reported it (raw,
+    // before any calibration offset — the offset is applied on read so changing it re-applies retroactively).
     private readonly Dictionary<uint, int> _noiseFloor = new();
 
-    /// <summary>The node's most recently reported noise floor in dBm (from a LocalStats telemetry reply), or null
-    /// if we've never received one for it.</summary>
-    public int? GetNoiseFloor(uint num) => _noiseFloor.TryGetValue(num, out var v) ? v : null;
+    // hardware model display name → noise-floor calibration offset (dBm), added to the reported noise floor for
+    // nodes of that hardware. Missing/unknown hardware = 0 (no adjustment). Set via SetNoiseCalibration.
+    private Dictionary<string, int> _noiseCalibration = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Every hardware model display name this build knows about (pretty-printed, sorted case-insensitively)
+    /// — for offering a per-hardware setting such as noise-floor calibration. Excludes the "unset" case; unknown
+    /// models a running device might still report show as "Model N" and aren't listed here.</summary>
+    public static IReadOnlyList<string> KnownHardwareNames =>
+        HardwareNames.Values.Select(PrettyHardware).OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>Sets the per-hardware noise-floor calibration offsets (dBm), keyed by hardware model display name
+    /// (as from <see cref="KnownHardwareNames"/> or a node's <see cref="MeshNode.HwModel"/>). Replaces any previous
+    /// map. Each offset is added to a node's reported noise floor when read via <see cref="GetNoiseFloor"/> or
+    /// surfaced in a <see cref="MeshNoiseFloor"/>. An empty map (the default) means no adjustment.</summary>
+    public void SetNoiseCalibration(IReadOnlyDictionary<string, int> calibrations)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in calibrations) map[kv.Key] = kv.Value;
+        _noiseCalibration = map;
+    }
+
+    // The node's hardware model display name (live NodeInfo → disk cache → our own device metadata), or "" when
+    // unknown. Mirrors how HwModel is resolved elsewhere; used to pick a node's noise calibration offset.
+    private string HardwareNameOf(uint num)
+    {
+        var live = _state.Nodes.FirstOrDefault(x => x.Num == num);
+        if (live?.User != null && HwName(live.User.HwModel) is { Length: > 0 } h) return h;
+        if (_hwCache.TryGetValue(num, out var c) && !string.IsNullOrEmpty(c)) return c;
+        if (num == MyNodeNum && HardwareModel is { Length: > 0 } m) return m;
+        return string.Empty;
+    }
+
+    // The configured noise-floor calibration offset (dBm) for a node, by its hardware type (0 when unknown/unset).
+    private int NoiseCalibrationFor(uint num) =>
+        HardwareNameOf(num) is { Length: > 0 } hw && _noiseCalibration.TryGetValue(hw, out var off) ? off : 0;
+
+    /// <summary>The node's most recently reported noise floor in dBm — with the per-hardware calibration offset for
+    /// its hardware type added (default 0) — from a LocalStats telemetry reply, or null if we've never received
+    /// one for it.</summary>
+    public int? GetNoiseFloor(uint num) =>
+        _noiseFloor.TryGetValue(num, out var v) ? v + NoiseCalibrationFor(num) : null;
 
     /// <summary>Requests a node's LocalStats — to read its noise_floor (dBm) — by sending a Telemetry request with
     /// the local_stats variant (Telemetry field 6, empty), want_response set. The bundled protobuf doesn't model
@@ -1668,8 +1707,8 @@ public sealed class MeshtasticHttpClient : IDisposable
                 // protobuf, so read it from the raw payload. Surfaced so the UI can show the requested noise floor.
                 else if (ReadInt32SubField(decoded.Payload.ToByteArray(), 6, 15) is int noise)
                 {
-                    _noiseFloor[pkt.From] = noise;
-                    noiseFloors.Add(new MeshNoiseFloor(pkt.From, DescribeNode(pkt.From), noise));
+                    _noiseFloor[pkt.From] = noise;   // store raw; surface with the hardware calibration offset applied
+                    noiseFloors.Add(new MeshNoiseFloor(pkt.From, DescribeNode(pkt.From), noise + NoiseCalibrationFor(pkt.From)));
                 }
                 continue;
             }

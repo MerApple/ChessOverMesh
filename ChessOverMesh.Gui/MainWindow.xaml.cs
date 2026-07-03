@@ -531,7 +531,7 @@ public partial class MainWindow : Window
     private void SettingsBtn_Click(object sender, RoutedEventArgs e)
     {
         bool deviceEnabled = _connected && !_refreshing && !_joining && _mesh != null;
-        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemSettings, OpenChatSettings, OpenMapSettings).ShowDialog();
+        new SettingsWindow(this, deviceEnabled, OpenDeviceSettings, OpenColorSettings, OpenSoundSettings, OpenChessSettings, OpenConnectionSettings, OpenSystemSettings, OpenChatSettings, OpenMapSettings, OpenNoiseSettings).ShowDialog();
     }
 
     // System settings (cached-messages toggle): the window applies its changes immediately.
@@ -976,6 +976,7 @@ public partial class MainWindow : Window
         _mesh = client;
         _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
         _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
+        _mesh.SetNoiseCalibration(AppSettings.NoiseCalibrations);   // apply the per-hardware noise-floor calibration
         _currentHost = host;
         _probeHost = probeHost;
         _probePort = probePort;
@@ -5444,6 +5445,23 @@ public partial class MainWindow : Window
 
     /// <summary>Opens the Map settings section: download areas for offline use and delete the cached tiles.</summary>
     private void OpenMapSettings() => new MapSettingsWindow(this, MapCache, CacheMapArea).ShowDialog();
+
+    /// <summary>Opens the Noise settings section: a per-hardware calibration offset (dBm) added to each node's
+    /// reported noise floor. Lists every known hardware model plus any type currently seen or already configured.
+    /// Saves to <see cref="AppSettings"/> and pushes the new offsets into the live client so open views recalc.</summary>
+    private void OpenNoiseSettings()
+    {
+        var current = AppSettings.NoiseCalibrations;
+        var hardware = MeshtasticHttpClient.KnownHardwareNames
+            .Concat(_mesh?.GetNodeHwMap().Values ?? Enumerable.Empty<string>())
+            .Concat(current.Keys);
+        var dlg = new NoiseSettingsWindow(this, hardware, current);
+        if (dlg.ShowDialog() != true) return;
+        AppSettings.SetNoiseCalibrations(dlg.Calibrations);
+        _mesh?.SetNoiseCalibration(dlg.Calibrations);   // apply live so any open node/telemetry view recalculates
+        _nodesRefresh?.Invoke();
+        _telemetryRefresh?.Invoke();
+    }
 
     /// <summary>Opens the "Cache map area for offline use" dialog, centred on the mean of known node positions
     /// (or Stockholm when none), and downloads the chosen area's tiles into the cache.</summary>
