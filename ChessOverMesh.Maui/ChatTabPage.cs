@@ -80,6 +80,15 @@ public sealed class ChatTabPage : ContentPage
                     if (cell.BindingContext is LogEntry le)
                         MainThread.BeginInvokeOnMainThread(() => _ = ShowMessageMenuAsync(le));
                 }
+                // A short tap on the message counts as "reading the chat": clear the yellow unread wash (every row)
+                // and collapse the composer. We handle the native Click because the LongClickable view above
+                // intercepts touches, so a tap never reaches the CollectionView's selection (SelectionChanged) here.
+                void OnClick(object? s, System.EventArgs e)
+                    => MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        foreach (var le in _main.ChatLog) le.IsUnread = false;
+                        CollapseComposer();
+                    });
                 cell.HandlerChanged += (_, _) =>
                 {
                     if (cell.Handler?.PlatformView is Android.Views.View av)
@@ -87,6 +96,9 @@ public sealed class ChatTabPage : ContentPage
                         av.LongClickable = true;
                         av.LongClick -= OnLongClick;   // avoid double-subscribing if the handler is re-created
                         av.LongClick += OnLongClick;
+                        av.Clickable = true;
+                        av.Click -= OnClick;           // ditto — tap clears the unread wash even when selection won't fire
+                        av.Click += OnClick;
                     }
                 };
 #endif
