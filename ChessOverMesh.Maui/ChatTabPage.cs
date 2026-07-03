@@ -14,9 +14,11 @@ public sealed class ChatTabPage : ContentPage
     readonly Button _sendBtn;
     readonly Picker _txPicker;
     readonly Button _rxBtn;
+    readonly Button _settingsBtn;
     readonly Grid _replyBanner;
     readonly Label _replyLabel;
     readonly Label _charCounter;
+    readonly Label _selfDestruct;
     bool _settingTx;
 
     const double ComposerCollapsedHeight = 44;    // one line — while reading (not focused)
@@ -132,7 +134,10 @@ public sealed class ChatTabPage : ContentPage
         ApplyComposerFont(AppSettings.ChatFont ?? "", AppSettings.ChatSize);   // match the chat text setting
 
         // Live "<used> / <max> · <left> left" counter under the composer (matches the desktop GUI). Turns red over the limit.
-        _charCounter = new Label { TextColor = Color.FromArgb("#B0B0B0"), FontSize = 11, HorizontalOptions = LayoutOptions.End, Margin = new Thickness(0, 0, 4, 0) };
+        _charCounter = new Label { TextColor = Color.FromArgb("#B0B0B0"), FontSize = 11, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Center, Margin = new Thickness(0, 0, 4, 0) };
+        // Self-destruct indicator: whether the current TX channel stamps outgoing messages with a self-destruct
+        // lifetime, and how long. Sits left of the counter; hidden when the channel has no send-TTL.
+        _selfDestruct = new Label { TextColor = Color.FromArgb("#E0A030"), FontSize = 11, HorizontalOptions = LayoutOptions.Start, VerticalOptions = LayoutOptions.Center, Margin = new Thickness(4, 0, 0, 0), IsVisible = false };
         _sendBtn = new Button { Text = "Send", MinimumHeightRequest = 44, Padding = new Thickness(14, 0), VerticalOptions = LayoutOptions.End };
         _sendBtn.Clicked += async (_, _) => await SendAsync();
 
@@ -140,10 +145,16 @@ public sealed class ChatTabPage : ContentPage
         _rxBtn = new Button { Text = "RX ▾", Padding = new Thickness(10, 0), MinimumHeightRequest = 36 };
         _rxBtn.Clicked += async (_, _) => { await Navigation.PushModalAsync(new RxFilterPage(_main)); };
 
-        var txRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
+        // Quick jump to Chat settings — where the per-channel self-destruct (and message retention) is set — so you
+        // can check or change it without leaving the chat. Reuses MainPage's existing modal navigation.
+        _settingsBtn = new Button { Text = "⚙", Padding = new Thickness(10, 0), MinimumHeightRequest = 36 };
+        _settingsBtn.Clicked += (_, _) => _main.OpenChatSettings();
+
+        var txRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
         txRow.Add(new Label { Text = "TX", TextColor = Color.FromArgb("#B0B0B0"), VerticalOptions = LayoutOptions.Center }, 0, 0);
         txRow.Add(_txPicker, 1, 0);
         txRow.Add(_rxBtn, 2, 0);
+        txRow.Add(_settingsBtn, 3, 0);
 
         var composer = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
         composer.Add(_input, 0, 0);
@@ -172,11 +183,16 @@ public sealed class ChatTabPage : ContentPage
                 new RowDefinition(GridLength.Auto),
             },
         };
+        // Counter row: self-destruct indicator on the left, character counter on the right.
+        var counterRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
+        counterRow.Add(_selfDestruct, 0, 0);
+        counterRow.Add(_charCounter, 1, 0);
+
         root.Add(border, 0, 0);
         root.Add(txRow, 0, 1);
         root.Add(_replyBanner, 0, 2);
         root.Add(composer, 0, 3);
-        root.Add(_charCounter, 0, 4);
+        root.Add(counterRow, 0, 4);
         Content = root;
         UpdateCharCounter();
     }
@@ -233,6 +249,27 @@ public sealed class ChatTabPage : ContentPage
         int left = max - used;
         _charCounter.Text = $"{used} / {max}  ·  {left} left";
         _charCounter.TextColor = used > max ? Color.FromArgb("#FF6B6B") : Color.FromArgb("#B0B0B0");
+        UpdateSelfDestruct();
+    }
+
+    // Shows whether messages you send on the current TX channel self-destruct, and after how long, so it's clear
+    // before hitting Send. Hidden when the channel has no send-TTL. The lifetime is per channel, so it tracks the TX
+    // picker; changes made in Chat settings show on return (OnAppearing → RebuildTx → here).
+    void UpdateSelfDestruct()
+    {
+        int ttl = _main.ChatSendTtlMinutes();
+        _selfDestruct.IsVisible = ttl > 0;
+        if (ttl > 0) _selfDestruct.Text = $"🔥 Self-destruct: {FormatTtl(ttl)}";
+    }
+
+    // A friendly duration for a self-destruct lifetime given in minutes: "5 min", "2 hours", "1 day", "1 h 30 min".
+    static string FormatTtl(int minutes)
+    {
+        if (minutes <= 0) return "off";
+        if (minutes % 1440 == 0) { int d = minutes / 1440; return $"{d} day{(d == 1 ? "" : "s")}"; }
+        if (minutes % 60 == 0) { int h = minutes / 60; return $"{h} hour{(h == 1 ? "" : "s")}"; }
+        if (minutes < 60) return $"{minutes} min";
+        return $"{minutes / 60} h {minutes % 60} min";
     }
 
     // Sending is allowed only once the post-connect mesh sync has completed (so we don't send mid-sync), and not
