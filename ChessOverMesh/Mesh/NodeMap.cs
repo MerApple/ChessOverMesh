@@ -25,9 +25,12 @@ public static class NodeMap
     /// exists: Leaflet then loads from that local server (so the page works with no internet) and the map gets a
     /// base-layer switcher letting the user choose between <b>Online</b> (direct OpenStreetMap, as before) and
     /// <b>Offline (cached)</b> (the local tile cache). Online is the default selection.</param>
+    /// <param name="onlineTileUrl">The <c>{z}/{x}/{y}</c> tile URL for the online base layer (build it via
+    /// <see cref="ChessOverMesh.Map.MapTileProvider.TileUrl"/>). Null/blank uses the plain online OpenStreetMap
+    /// layer, as before.</param>
     public static string Html(IEnumerable<MeshNodePosition> positions,
         IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null,
-        uint? focusNum = null, string? assetBase = null)
+        uint? focusNum = null, string? assetBase = null, string? onlineTileUrl = null)
     {
         var data = positions.Select(p => new
         {
@@ -44,7 +47,10 @@ public static class NodeMap
         });
         var focus = focusNum is { } f ? "'" + f.ToString("x8") + "'" : "null";
 
-        const string onlineTiles = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+        // The online base layer: the configured provider's URL (may carry an API key), else plain online OSM.
+        string onlineTiles = string.IsNullOrEmpty(onlineTileUrl)
+            ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            : onlineTileUrl;
         bool hasCache = !string.IsNullOrEmpty(assetBase);
 
         // No cache → the original online-only page (CDN Leaflet, single OSM layer, no switcher). Cache present →
@@ -78,11 +84,13 @@ public static class NodeMap
 #back{position:absolute;z-index:1000;top:10px;right:10px;padding:6px 10px;display:none;border:1px solid #888;border-radius:4px;background:#fff;cursor:pointer;font:14px sans-serif}
 .trackbtn{margin-top:6px;padding:4px 8px;border:1px solid #888;border-radius:4px;background:#f4f4f4;cursor:pointer;font:13px sans-serif}
 #legend{position:absolute;z-index:1000;bottom:12px;left:12px;display:none;padding:6px 8px;border:1px solid #888;border-radius:4px;background:#fff;font:12px sans-serif}
-#legend .bar{display:inline-block;width:90px;height:10px;vertical-align:middle;margin:0 4px;background:linear-gradient(to right,rgb(0,0,255),rgb(255,0,0))}</style>
+#legend .bar{display:inline-block;width:90px;height:10px;vertical-align:middle;margin:0 4px;background:linear-gradient(to right,rgb(0,0,255),rgb(255,0,0))}
+#coords{position:absolute;z-index:1000;bottom:12px;right:12px;padding:4px 8px;border:1px solid #888;border-radius:4px;background:rgba(255,255,255,0.85);font:12px monospace;pointer-events:none}</style>
 </head><body>
 <input id='search' placeholder='Search node…' oninput='doSearch()' autocomplete='off'/>
 <button id='back' onclick='showAll()'>&#8592; Show all nodes</button>
 <div id='legend'>newest<span class='bar'></span>oldest</div>
+<div id='coords'>—</div>
 <div id='map'></div>
 <script>
 var nodes = __NODES__;
@@ -90,6 +98,10 @@ var focus = __FOCUS__;
 __ICON_FIX__
 var map = L.map('map').setView([59.3293, 18.0686], 6);   // default: Stockholm
 __TILE_SETUP__
+// Live lat/lon readout for the point under the cursor (bottom-right overlay).
+var coordsBox = document.getElementById('coords');
+map.on('mousemove', function(e){ coordsBox.textContent = e.latlng.lat.toFixed(5) + ', ' + e.latlng.lng.toFixed(5); });
+map.on('mouseout', function(){ coordsBox.textContent = '—'; });
 var markers = {};      // node num -> main marker
 var group = [];        // all main markers
 var track = null;      // the layer group for a single node's track (polyline + point markers), or null

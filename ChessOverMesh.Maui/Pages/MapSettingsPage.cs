@@ -17,6 +17,11 @@ public sealed class MapSettingsPage : ContentPage
     readonly Label _summary;
     readonly VerticalStackLayout _regions;
     readonly Button _delete;
+    readonly Button _cache;
+    readonly Picker _provider;
+    readonly Entry _key;
+    readonly Label _providerHelp;
+    bool _loading;   // suppress change handlers while populating the controls
 
     public MapSettingsPage(MainPage main)
     {
@@ -33,15 +38,31 @@ public sealed class MapSettingsPage : ContentPage
             TextColor = Dim, FontSize = 13,
         });
 
+        // Tile provider: OSM forbids bulk downloading (it returns an "Access blocked" tile), so caching an area
+        // needs a keyed provider whose terms permit it.
+        stack.Add(new Label { Text = "Tile provider", TextColor = Fg, FontSize = 14 });
+        _provider = new Picker { TextColor = Fg, TitleColor = Dim, BackgroundColor = Bg };
+        foreach (var id in MapTileProvider.All) _provider.Items.Add(MapTileProvider.DisplayName(id));
+        _provider.SelectedIndexChanged += (_, _) => OnProviderOrKeyChanged();
+        stack.Add(_provider);
+
+        stack.Add(new Label { Text = "API key", TextColor = Fg, FontSize = 14 });
+        _key = new Entry { TextColor = Fg, PlaceholderColor = Dim, BackgroundColor = Bg, Placeholder = "provider API key" };
+        _key.Unfocused += (_, _) => OnProviderOrKeyChanged();
+        stack.Add(_key);
+
+        _providerHelp = new Label { TextColor = Dim, FontSize = 11 };
+        stack.Add(_providerHelp);
+
         _summary = new Label { TextColor = Fg, FontSize = 14 };
         stack.Add(_summary);
 
         _regions = new VerticalStackLayout { Spacing = 2 };
         stack.Add(_regions);
 
-        var cache = new Button { Text = "Cache map area…", MinimumHeightRequest = 48, HorizontalOptions = LayoutOptions.Fill };
-        cache.Clicked += OnCacheArea;
-        stack.Add(cache);
+        _cache = new Button { Text = "Cache map area…", MinimumHeightRequest = 48, HorizontalOptions = LayoutOptions.Fill };
+        _cache.Clicked += OnCacheArea;
+        stack.Add(_cache);
 
         _delete = new Button { Text = "Delete map cache", MinimumHeightRequest = 48, HorizontalOptions = LayoutOptions.Fill };
         _delete.Clicked += OnDelete;
@@ -52,12 +73,57 @@ public sealed class MapSettingsPage : ContentPage
         stack.Add(close);
 
         Content = new ScrollView { Content = stack };
+        LoadProvider();
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
         Refresh();   // pick up any tiles just downloaded via the cache page
+    }
+
+    // Sets the provider picker + key field from saved settings (without firing the change handlers).
+    void LoadProvider()
+    {
+        _loading = true;
+        string current = string.IsNullOrWhiteSpace(AppSettings.MapProvider) ? MapTileProvider.Default : AppSettings.MapProvider!;
+        int idx = Array.IndexOf(MapTileProvider.All, current);
+        _provider.SelectedIndex = idx >= 0 ? idx : 0;
+        _key.Text = AppSettings.MapApiKey ?? "";
+        _loading = false;
+        UpdateProviderHelp();
+    }
+
+    // Persists the chosen provider + key, rebuilds the cache/server against the new source, and updates the UI.
+    void OnProviderOrKeyChanged()
+    {
+        if (_loading) return;
+        int i = _provider.SelectedIndex;
+        string provider = i >= 0 && i < MapTileProvider.All.Length ? MapTileProvider.All[i] : MapTileProvider.Default;
+        string key = (_key.Text ?? "").Trim();
+        bool changed = !string.Equals(provider, AppSettings.MapProvider ?? MapTileProvider.Default, StringComparison.Ordinal)
+                       || !string.Equals(key, AppSettings.MapApiKey ?? "", StringComparison.Ordinal);
+        AppSettings.MapProvider = provider;
+        AppSettings.MapApiKey = key;
+        if (changed) MapCacheService.InvalidateTileSource();
+        UpdateProviderHelp();
+        Refresh();   // enable/disable the Cache button for the new provider/key
+    }
+
+    // Shows provider-specific guidance: where to get a key, or that OSM can't cache offline.
+    void UpdateProviderHelp()
+    {
+        int i = _provider.SelectedIndex;
+        string provider = i >= 0 && i < MapTileProvider.All.Length ? MapTileProvider.All[i] : MapTileProvider.Default;
+        _key.IsEnabled = MapTileProvider.NeedsKey(provider);
+        if (!MapTileProvider.AllowsOfflineCaching(provider))
+            _providerHelp.Text = "OpenStreetMap is online-only: its tile policy forbids downloading areas for " +
+                                 "offline use. Pick a keyed provider to enable \"Cache map area\".";
+        else if (string.IsNullOrWhiteSpace(_key.Text))
+            _providerHelp.Text = $"Enter your free {MapTileProvider.DisplayName(provider)} API key to enable offline " +
+                                 $"caching. Get one at {MapTileProvider.SignupUrl(provider)}";
+        else
+            _providerHelp.Text = $"Using {MapTileProvider.DisplayName(provider)} for the map and offline caching.";
     }
 
     async void OnCacheArea(object? sender, EventArgs e)
@@ -92,6 +158,9 @@ public sealed class MapSettingsPage : ContentPage
             : $"Cached: {tiles:N0} tiles, {FormatBytes(bytes)}" +
               (regions.Count > 0 ? $" across {regions.Count} area(s):" : ".");
         _delete.IsEnabled = tiles > 0;
+
+        // Caching an area is only possible with a keyed provider that has a key (OSM forbids bulk downloading).
+        _cache.IsEnabled = MapTileProvider.CanCacheOffline(AppSettings.MapProvider, AppSettings.MapApiKey);
 
         _regions.Clear();
         foreach (var r in regions)

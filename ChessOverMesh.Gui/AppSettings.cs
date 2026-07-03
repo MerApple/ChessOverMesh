@@ -57,6 +57,11 @@ internal static class AppSettings
         // keep their own sizes. Default 12 = the WPF default, so it's a no-op until changed.
         public double UiTextSize { get; set; } = 12;
 
+        // Offline-map tile provider id (see MapTileProvider; null = OpenStreetMap online-only) and its API key.
+        // OSM forbids bulk downloading, so caching an area requires a keyed provider + key.
+        public string? MapProvider { get; set; }
+        public string? MapApiKey { get; set; }
+
         // Remembered proxy sign-in credentials, keyed by proxy host. The password is DPAPI-protected.
         public Dictionary<string, ProxyCred> ProxyCreds { get; set; } = new();
 
@@ -235,6 +240,11 @@ internal static class AppSettings
 
     // App-wide text size for buttons and settings/labels (window chrome). Content lists keep their own sizes.
     public static double UiTextSize { get => Load().UiTextSize; set => Mutate(d => d.UiTextSize = value); }
+
+    /// <summary>The offline-map tile provider id (see <see cref="ChessOverMesh.Map.MapTileProvider"/>); null = OSM online-only.</summary>
+    public static string? MapProvider { get => Load().MapProvider; set => Mutate(d => d.MapProvider = value); }
+    /// <summary>The API key for the chosen keyed tile provider (empty for OSM).</summary>
+    public static string? MapApiKey { get => Load().MapApiKey; set => Mutate(d => d.MapApiKey = value); }
 
     /// <summary>The remembered proxy login for <paramref name="host"/> (password decrypted), or null if none saved.</summary>
     public static (string User, string Pass)? GetProxyCred(string host)

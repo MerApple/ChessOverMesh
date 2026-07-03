@@ -130,7 +130,12 @@ internal sealed class MapCacheDialog : Window
 
     private ComboBox MakeZoomCombo(int min, int max, int selected)
     {
-        var combo = new ComboBox { MinWidth = 60, MinHeight = 24, Background = Field, Foreground = Fg, BorderBrush = Border };
+        // The dropdown items inherit the ComboBox's light Foreground; without a dark item background they'd
+        // render light-on-white (invisible) against the popup's default system background. Force a dark item.
+        var itemStyle = new Style(typeof(ComboBoxItem));
+        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Field));
+        itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, Fg));
+        var combo = new ComboBox { MinWidth = 60, MinHeight = 24, Background = Field, Foreground = Fg, BorderBrush = Border, ItemContainerStyle = itemStyle };
         for (int z = min; z <= max; z++) combo.Items.Add(z);
         combo.SelectedItem = selected;
         return combo;

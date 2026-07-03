@@ -1,3 +1,4 @@
+using ChessOverMesh.Map;
 using ChessOverMesh.Mesh;
 
 namespace ChessOverMesh.Maui;
@@ -23,8 +24,9 @@ public sealed class MapPage : ContentPage
         // With no offline cache the map is online-only, exactly as before. Once an area is cached, stand up the
         // local server so the page offers the online/offline base-layer choice. Null → load Leaflet + tiles online.
         string? assetBase = MapCacheService.Cache.HasAnyTiles() ? MapCacheService.EnsureServerBaseUrl() : null;
+        string onlineTileUrl = MapTileProvider.TileUrl(AppSettings.MapProvider, AppSettings.MapApiKey);
         // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
-        var web = new WebView { Source = new HtmlWebViewSource { Html = NodeMap.Html(positions, history, focusNum, assetBase) } };
+        var web = new WebView { Source = new HtmlWebViewSource { Html = NodeMap.Html(positions, history, focusNum, assetBase, onlineTileUrl) } };
 
         var close = new Button { Text = "Close", Padding = new Thickness(14, 0), MinimumHeightRequest = 40 };
         close.Clicked += async (_, _) => await Navigation.PopModalAsync();
