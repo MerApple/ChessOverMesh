@@ -1,3 +1,4 @@
+using ChessOverMesh.Game;
 using ChessOverMesh.Mesh;
 
 namespace ChessOverMesh.Maui;
@@ -151,6 +152,76 @@ public sealed class ChatSettingsPage : ContentPage
                 row.Add(new Label { Text = channel.DisplayName, TextColor = Fg, VerticalOptions = LayoutOptions.Center }, 0, 0);
                 row.Add(valEntry, 1, 0);
                 row.Add(unit, 2, 0);
+                root.Add(row);
+            }
+        }
+
+        // ---- Per-channel split long messages ----
+        root.Add(new BoxView { HeightRequest = 1, Color = Color.FromArgb("#3F3F46"), Margin = new Thickness(0, 8, 0, 4) });
+        root.Add(new Label { Text = "Split long messages", TextColor = Fg, FontAttributes = FontAttributes.Bold });
+        root.Add(new Label
+        {
+            Text = $"When on, a message too long for one packet is split into a sequence (up to {ProtocolMessage.MaxChatChunks} parts) " +
+                   "and reassembled by the receiver. The sequence markers travel unencrypted; the message text stays encrypted " +
+                   "if the channel has a key. Cooperative: a recipient not running this app sees the separate parts. Off = long " +
+                   "messages are refused instead.",
+            TextColor = Dim, FontSize = 11,
+        });
+
+        if (channels.Count == 0 || host.Length == 0)
+        {
+            root.Add(new Label { Text = "Connect to a device to set per-channel message splitting.", TextColor = Dim, FontSize = 12 });
+        }
+        else
+        {
+            var splitOn = DeviceCache.GetChannelSplitOn(host);
+            foreach (var ch in channels)
+            {
+                var channel = ch;   // capture for the closure
+                var sw = new Switch { IsToggled = splitOn.Contains(channel.Index), VerticalOptions = LayoutOptions.Center };
+                sw.Toggled += (_, e) => DeviceCache.SetChannelSplit(host, channel.Index, e.Value);
+                var row = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2),
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
+                row.Add(new Label { Text = channel.DisplayName, TextColor = Fg, VerticalOptions = LayoutOptions.Center }, 0, 0);
+                row.Add(sw, 1, 0);
+                root.Add(row);
+            }
+        }
+
+        // ---- Per-channel: add sequence headers when splitting ----
+        root.Add(new BoxView { HeightRequest = 1, Color = Color.FromArgb("#3F3F46"), Margin = new Thickness(0, 8, 0, 4) });
+        root.Add(new Label { Text = "Add sequence headers", TextColor = Fg, FontAttributes = FontAttributes.Bold });
+        root.Add(new Label
+        {
+            Text = "On (default): parts carry sequence markers so the receiver reassembles them into one message, sent " +
+                   "one-at-a-time waiting for each acknowledgement. Off: the message is split into separate independent " +
+                   "messages (no reassembly) — only possible on a channel with no app key (encrypted splits always need " +
+                   "headers, so those channels stay on and locked).",
+            TextColor = Dim, FontSize = 11,
+        });
+
+        if (channels.Count == 0 || host.Length == 0)
+        {
+            root.Add(new Label { Text = "Connect to a device to set per-channel headers.", TextColor = Dim, FontSize = 12 });
+        }
+        else
+        {
+            foreach (var ch in channels)
+            {
+                var channel = ch;   // capture for the closure
+                bool hasKey = DeviceCache.GetChannelKey(host, channel.Index).Length > 0;
+                var sw = new Switch
+                {
+                    IsToggled = hasKey || !DeviceCache.IsSplitHeadersOff(host, channel.Index),
+                    IsEnabled = !hasKey,   // a keyed channel forces (and locks) headers on
+                    VerticalOptions = LayoutOptions.Center,
+                };
+                sw.Toggled += (_, e) => DeviceCache.SetSplitHeaders(host, channel.Index, e.Value);
+                var row = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2),
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
+                row.Add(new Label { Text = hasKey ? $"{channel.DisplayName}  (required — encrypted)" : channel.DisplayName,
+                    TextColor = Fg, VerticalOptions = LayoutOptions.Center }, 0, 0);
+                row.Add(sw, 1, 0);
                 root.Add(row);
             }
         }

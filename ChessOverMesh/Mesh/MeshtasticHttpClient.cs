@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using Google.Protobuf;
+using ChessOverMesh.Game;
 using Meshtastic.Data;
 using Meshtastic.Data.MessageFactories;
 using Meshtastic.Extensions;
@@ -25,8 +26,14 @@ namespace ChessOverMesh.Mesh;
 public readonly record struct MeshTextMessage(
     uint FromNode, uint Channel, string Text, uint PacketId, uint RxTime, bool DecryptFailed = false,
     int RxRssi = 0, float RxSnr = 0, int HopLimit = 0, int HopStart = 0, byte RelayNode = 0, uint ToNode = 0,
-    uint ReplyId = 0, bool IsReaction = false, bool ViaMqtt = false)
+    uint ReplyId = 0, bool IsReaction = false, bool ViaMqtt = false,
+    string? ChunkGroupId = null, int ChunkIndex = 0, int ChunkTotal = 0)
 {
+    /// <summary>True when this text is ONE part of a split ("chunked", headers-on) message. The UI shows each part
+    /// as it arrives and, once all <see cref="ChunkTotal"/> parts of the same <see cref="ChunkGroupId"/> are in,
+    /// concatenates their <see cref="Text"/> slices (in <see cref="ChunkIndex"/> order) and decrypts the whole.
+    /// <see cref="Text"/> here is the RAW slice — still encrypted when the channel has an app key.</summary>
+    public bool IsChunkPart => ChunkGroupId != null;
     /// <summary>Hops the packet travelled (HopStart − HopLimit), or null when HopStart is unknown
     /// (older sender firmware) so we can't tell direct from relayed.</summary>
     public int? Hops => HopStart > 0 ? Math.Max(0, HopStart - HopLimit) : (int?)null;
@@ -1712,6 +1719,18 @@ public sealed class MeshtasticHttpClient : IDisposable
                 if (relay != 0 && relay != (byte)(MyNodeNum & 0xFF))
                     AddAck(new MeshAck(pkt.Id, 0, relay, pkt.RxRssi, pkt.RxSnr));
                 continue; // don't show our own echo as a received message
+            }
+
+            // One part of a split ("chunked", headers-on) message. The sequence header is plaintext, so we peel it
+            // here BEFORE decryption and surface the RAW slice tagged with its group/index/total — the UI shows each
+            // part as it arrives and, once all parts of a group are in, concatenates and decrypts the whole. We do
+            // NOT buffer/reassemble in the client: the UI owns that so it can render partial progress and collapse.
+            if (ProtocolMessage.TryDecodeChatChunk(text, out var cgId, out var cgPart, out var cgTotal, out var cgSlice))
+            {
+                messages.Add(new MeshTextMessage(pkt.From, pkt.Channel, cgSlice, pkt.Id, pkt.RxTime, false,
+                    pkt.RxRssi, pkt.RxSnr, (int)pkt.HopLimit, (int)ReadVarintField(pkt, 15), (byte)ReadVarintField(pkt, 19),
+                    pkt.To, 0, false, ReadVarintField(pkt, 14) != 0, cgId, cgPart, cgTotal));   // via_mqtt = field 14
+                continue;
             }
 
             // Decrypt with this channel's app-level key if one is set; if it doesn't decrypt

@@ -97,6 +97,10 @@ public sealed class LogEntry : INotifyPropertyChanged
     }
     private static readonly PropertyChangedEventArgs VisibleArgs = new(nameof(Visible));
 
+    // For a reassembled split ("chunked") message: the packet ids of the parts it was combined from (shown in
+    // "Message details"). Also set on a sent headers-on split. Null otherwise.
+    public List<uint>? PartPacketIds;
+
     // Emoji reactions on this chat message ("👍 ❤️ 2"), shown on its own line. Empty when none.
     private string _reactions = "";
     public string Reactions
