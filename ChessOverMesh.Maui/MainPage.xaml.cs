@@ -181,11 +181,17 @@ public partial class MainPage : ContentPage
     {
         string t = (text ?? "").Trim();
         if (t.Length == 0) return (0, 0, true);
-        if (_currentHost.Length == 0 || !DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel)) return (0, 0, true);
+        // A DM uses its own split/header preference (it reuses the TX channel but is controlled separately).
+        bool isDm = _chatTxDest.HasValue;
+        bool splitEnabled = isDm ? DeviceCache.IsDmSplitEnabled(_currentHost)
+                                 : DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel);
+        if (_currentHost.Length == 0 || !splitEnabled) return (0, 0, true);
         if (ChatWireLength(t) <= MaxChatChars) return (0, 0, true);
         int ttlSeconds = ChatSendTtlMinutes() * 60;
         string key = _mesh?.GetChannelKey(_chatTxChannel) ?? "";
-        bool headersOff = key.Length == 0 && DeviceCache.IsSplitHeadersOff(_currentHost, _chatTxChannel);
+        bool headersOff = key.Length == 0 &&
+            (isDm ? DeviceCache.IsDmSplitHeadersOff(_currentHost)
+                  : DeviceCache.IsSplitHeadersOff(_currentHost, _chatTxChannel));
         if (headersOff)
         {
             int ttlHdr = System.Text.Encoding.UTF8.GetByteCount(ProtocolMessage.EncodeChatTtl(ttlSeconds, ""));
@@ -2118,11 +2124,16 @@ public partial class MainPage : ContentPage
         if (wireLen > MaxChatChars)
         {
             // Over the single-packet limit. If "split long messages" is on, split it (a headers sequence, or
-            // independent plain messages when headers are off); otherwise refuse and keep the text.
-            bool splitOn = _currentHost.Length > 0 && DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel);
+            // independent plain messages when headers are off); otherwise refuse and keep the text. A DM consults its
+            // own DM split preference (it reuses this channel but is controlled separately in Chat settings).
+            bool isDmSend = _chatTxDest.HasValue;
+            bool splitOn = _currentHost.Length > 0 &&
+                (isDmSend ? DeviceCache.IsDmSplitEnabled(_currentHost)
+                          : DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel));
             if (!splitOn)
                 return $"Message is too long: {wireLen}/{MaxChatChars} chars{(encrypted ? " (once encrypted)" : "")}. " +
-                       "Shorten it, or turn on \"Split long messages\" for this channel in Chat settings.";
+                       (isDmSend ? "Shorten it, or turn on \"Split long messages\" for DMs in Chat settings."
+                                 : "Shorten it, or turn on \"Split long messages\" for this channel in Chat settings.");
             return StartSplitSend(text, ttlSeconds);
         }
 
@@ -2203,7 +2214,11 @@ public partial class MainPage : ContentPage
         if (_mesh == null) return "Not connected to a device.";
         uint ch = _chatTxChannel;
         bool hasKey = _mesh.GetChannelKey(ch).Length > 0;
-        bool headersOff = !hasKey && _currentHost.Length > 0 && DeviceCache.IsSplitHeadersOff(_currentHost, ch);
+        // A DM uses its own headers preference; a broadcast uses the per-channel one. A keyed channel forces headers on.
+        bool isDm = _chatTxDest.HasValue;
+        bool headersOff = !hasKey && _currentHost.Length > 0 &&
+            (isDm ? DeviceCache.IsDmSplitHeadersOff(_currentHost)
+                  : DeviceCache.IsSplitHeadersOff(_currentHost, ch));
         if (headersOff)
         {
             int ttlHdr = System.Text.Encoding.UTF8.GetByteCount(ProtocolMessage.EncodeChatTtl(ttlSeconds, ""));

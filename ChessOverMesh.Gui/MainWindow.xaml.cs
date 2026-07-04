@@ -3884,14 +3884,19 @@ public partial class MainWindow : Window
         int wireLen = encrypted ? AesText.Encrypt(wireText, key).Length : System.Text.Encoding.UTF8.GetByteCount(wireText);
         if (wireLen > MaxChatChars)
         {
-            // Over the single-packet limit. If "split long messages" is on for this channel, split it (into a headers
-            // sequence, or independent plain messages when headers are off); otherwise refuse and keep the text.
-            bool splitOn = _currentHost.Length > 0 && DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel);
+            // Over the single-packet limit. If "split long messages" is on, split it (into a headers sequence, or
+            // independent plain messages when headers are off); otherwise refuse and keep the text. A DM consults its
+            // own DM split preference (it reuses this channel but is controlled separately in Chat settings).
+            bool isDmSend = _chatTxDest.HasValue;
+            bool splitOn = _currentHost.Length > 0 &&
+                (isDmSend ? DeviceCache.IsDmSplitEnabled(_currentHost)
+                          : DeviceCache.IsSplitEnabled(_currentHost, _chatTxChannel));
             if (!splitOn)
             {
                 AddSystemWarning($"{Stamp()}Chat NOT sent — {wireLen} chars" +
                     (encrypted ? " once encrypted" : "") + $" exceeds the {MaxChatChars}-char limit. Shorten it, " +
-                    "or turn on \"Split long messages\" for this channel in Chat settings.");
+                    (isDmSend ? "or turn on \"Split long messages\" for DMs in Chat settings."
+                              : "or turn on \"Split long messages\" for this channel in Chat settings."));
                 return;   // keep the text in the box so it can be edited
             }
             ChatBox.Clear();
@@ -4012,7 +4017,12 @@ public partial class MainWindow : Window
         if (_mesh == null) return;
         uint ch = _chatTxChannel;
         bool hasKey = _mesh.GetChannelKey(ch).Length > 0;
-        bool headersOff = !hasKey && _currentHost.Length > 0 && DeviceCache.IsSplitHeadersOff(_currentHost, ch);
+        // A DM uses its own headers preference; a broadcast uses the per-channel one. Either way a keyed channel
+        // forces headers on (an encrypted split needs them to reassemble).
+        bool isDm = _chatTxDest.HasValue;
+        bool headersOff = !hasKey && _currentHost.Length > 0 &&
+            (isDm ? DeviceCache.IsDmSplitHeadersOff(_currentHost)
+                  : DeviceCache.IsSplitHeadersOff(_currentHost, ch));
         if (headersOff)
         {
             // Each chunk is sent as its own normal message and re-stamps its own TTL header, so reserve its bytes.

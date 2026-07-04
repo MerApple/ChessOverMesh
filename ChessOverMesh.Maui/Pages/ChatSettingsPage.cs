@@ -186,6 +186,14 @@ public sealed class ChatSettingsPage : ContentPage
                 row.Add(sw, 1, 0);
                 root.Add(row);
             }
+            // DMs reuse the current channel but have their own split preference.
+            var dmSw = new Switch { IsToggled = DeviceCache.IsDmSplitEnabled(host), VerticalOptions = LayoutOptions.Center };
+            dmSw.Toggled += (_, e) => DeviceCache.SetDmSplit(host, e.Value);
+            var dmRow = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2),
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
+            dmRow.Add(new Label { Text = "Direct messages (DM)", TextColor = Fg, VerticalOptions = LayoutOptions.Center }, 0, 0);
+            dmRow.Add(dmSw, 1, 0);
+            root.Add(dmRow);
         }
 
         // ---- Per-channel: add sequence headers when splitting ----
@@ -224,6 +232,15 @@ public sealed class ChatSettingsPage : ContentPage
                 row.Add(sw, 1, 0);
                 root.Add(row);
             }
+            // DM headers preference. We can't lock it here (the DM's channel — and thus whether it's keyed — isn't
+            // known until send); if the DM goes out on a keyed channel, send-time forces headers on anyway.
+            var dmHdrSw = new Switch { IsToggled = !DeviceCache.IsDmSplitHeadersOff(host), VerticalOptions = LayoutOptions.Center };
+            dmHdrSw.Toggled += (_, e) => DeviceCache.SetDmSplitHeaders(host, e.Value);
+            var dmHdrRow = new Grid { ColumnSpacing = 8, Margin = new Thickness(0, 2),
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
+            dmHdrRow.Add(new Label { Text = "Direct messages (DM)", TextColor = Fg, VerticalOptions = LayoutOptions.Center }, 0, 0);
+            dmHdrRow.Add(dmHdrSw, 1, 0);
+            root.Add(dmHdrRow);
         }
 
         var closeBtn = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 14, 0, 0) };

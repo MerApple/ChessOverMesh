@@ -207,6 +207,17 @@ internal sealed class ChatSettingsWindow : Window
                 cb.Unchecked += (_, _) => DeviceCache.SetChannelSplit(host, channel.Index, false);
                 root.Children.Add(cb);
             }
+            // DMs reuse the current channel but have their own split preference.
+            var dmSplit = new CheckBox
+            {
+                Content = "Direct messages (DM)",
+                Foreground = Fg,
+                IsChecked = DeviceCache.IsDmSplitEnabled(host),
+                Margin = new Thickness(0, 0, 0, 4),
+            };
+            dmSplit.Checked += (_, _) => DeviceCache.SetDmSplit(host, true);
+            dmSplit.Unchecked += (_, _) => DeviceCache.SetDmSplit(host, false);
+            root.Children.Add(dmSplit);
         }
 
         // ---- Per-channel: add sequence headers when splitting ----
@@ -250,6 +261,18 @@ internal sealed class ChatSettingsWindow : Window
                 cb.Unchecked += (_, _) => DeviceCache.SetSplitHeaders(host, channel.Index, false);
                 root.Children.Add(cb);
             }
+            // DM headers preference. Unlike a channel we can't lock it here (a DM's channel — and thus whether it's
+            // keyed — isn't known until send); if the DM goes out on a keyed channel, send-time forces headers on anyway.
+            var dmHdr = new CheckBox
+            {
+                Content = "Direct messages (DM)",
+                Foreground = Fg,
+                IsChecked = !DeviceCache.IsDmSplitHeadersOff(host),
+                Margin = new Thickness(0, 0, 0, 4),
+            };
+            dmHdr.Checked += (_, _) => DeviceCache.SetDmSplitHeaders(host, true);
+            dmHdr.Unchecked += (_, _) => DeviceCache.SetDmSplitHeaders(host, false);
+            root.Children.Add(dmHdr);
         }
 
         var closeBtn = new Button

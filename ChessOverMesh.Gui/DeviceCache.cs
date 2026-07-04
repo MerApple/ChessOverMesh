@@ -147,6 +147,12 @@ internal static class DeviceCache
         // Headers off = split into independent plain messages (no reassembly); only honoured when the channel has no
         // app key (an encrypted split always needs headers to reassemble, so a keyed channel forces headers on).
         public List<uint> ChannelSplitHeadersOff { get; set; } = new();
+
+        // DMs (direct messages) reuse the current TX channel but have their own split preferences, independent of
+        // that channel's per-channel settings. DmSplitOn: split long DMs into a sequence (default off, like channels).
+        // DmSplitHeadersOff: sequence headers OFF for DM splits (default on; still forced on if the DM's channel is keyed).
+        public bool DmSplitOn { get; set; }
+        public bool DmSplitHeadersOff { get; set; }
     }
 
     /// <summary>The persisted channel selections for a device (null if none saved yet).</summary>
@@ -370,6 +376,8 @@ internal static class DeviceCache
                 AckTriggers = existing?.AckTriggers ?? new Dictionary<uint, List<string>>(),
                 ChannelSplitOn = existing?.ChannelSplitOn ?? new List<uint>(),
                 ChannelSplitHeadersOff = existing?.ChannelSplitHeadersOff ?? new List<uint>(),
+                DmSplitOn = existing?.DmSplitOn ?? false,
+                DmSplitHeadersOff = existing?.DmSplitHeadersOff ?? false,
             };
             Persist(all);
         }
@@ -867,6 +875,45 @@ internal static class DeviceCache
     /// This is the raw stored preference; the effective mode also forces headers on when the channel has an app key.</summary>
     public static bool IsSplitHeadersOff(string host, uint channelIndex) =>
         Load().GetValueOrDefault(host)?.ChannelSplitHeadersOff.Contains(channelIndex) ?? false;
+
+    /// <summary>True when "split long messages" is enabled for DMs on a device (default off). DMs reuse the current
+    /// TX channel but carry their own split preference, independent of that channel's setting.</summary>
+    public static bool IsDmSplitEnabled(string host) =>
+        Load().GetValueOrDefault(host)?.DmSplitOn ?? false;
+
+    /// <summary>Sets whether long DMs are split into a sequence (default off).</summary>
+    public static void SetDmSplit(string host, bool enabled)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            entry.DmSplitOn = enabled;
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>True when the user turned sequence headers OFF for DM splits (default false = headers on). This is the
+    /// raw stored preference; send-time still forces headers on when the DM goes out on a channel with an app key.</summary>
+    public static bool IsDmSplitHeadersOff(string host) =>
+        Load().GetValueOrDefault(host)?.DmSplitHeadersOff ?? false;
+
+    /// <summary>Sets whether DM splits carry sequence headers (default on). Headers off splits into independent plain
+    /// messages (no reassembly); ignored when the DM's channel has an app key.</summary>
+    public static void SetDmSplitHeaders(string host, bool headersOn)
+    {
+        try
+        {
+            var all = Load();
+            var entry = all.GetValueOrDefault(host) ?? new Entry();
+            entry.DmSplitHeadersOff = !headersOn;
+            all[host] = entry;
+            Persist(all);
+        }
+        catch { /* best effort */ }
+    }
 
     /// <summary>The cached AES key for a given device + channel, or "" if none. (DPAPI-decrypted.)</summary>
     public static string GetChannelKey(string host, uint channelIndex)
