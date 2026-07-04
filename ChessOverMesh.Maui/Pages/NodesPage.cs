@@ -75,6 +75,11 @@ public sealed class NodesPage : ContentPage
         btnRow.Add(_updateBtn, 0, 0);
         btnRow.Add(_mapBtn, 1, 0);
 
+        // Solicit info from any node by its id — even one we've never heard from. Sends a NodeInfo
+        // request (want_response) to the entered node number; its reply adds it to the list.
+        var reqIdBtn = new Button { Text = "Request info by ID", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
+        reqIdBtn.Clicked += OnRequestById;
+
         var close = new Button { Text = "Close", MinimumHeightRequest = 44, Margin = new Thickness(0, 8, 0, 0) };
         close.Clicked += async (_, _) => await CloseAsync();
 
@@ -86,6 +91,7 @@ public sealed class NodesPage : ContentPage
         controls.Add(_search);
         controls.Add(sortRow);
         controls.Add(btnRow);
+        controls.Add(reqIdBtn);
         controls.Add(new BoxView { HeightRequest = 1, Color = Rule });
 
         _cv = new CollectionView
@@ -144,6 +150,19 @@ public sealed class NodesPage : ContentPage
     }
 
     void OnNodesChanged() => MainThread.BeginInvokeOnMainThread(() => _dirty = true);
+
+    async void OnRequestById(object? sender, EventArgs e)
+    {
+        var entered = await ThemedDialogs.Prompt(this, "Request node info", "Enter a node ID (!hex or number)",
+                                                 placeholder: "!a1b2c3d4", keyboard: Keyboard.Default);
+        if (entered == null) return;   // cancelled
+        if (!MeshtasticHttpClient.TryParseNodeId(entered, out var num))
+        {
+            _status.Text = $"Couldn't read a node id from \"{entered.Trim()}\". Use !hex (e.g. !a1b2c3d4) or a number.";
+            return;
+        }
+        _status.Text = await _main.RequestNodeInfoForAsync(num);
+    }
 
     async void OnUpdate(object? sender, EventArgs e)
     {

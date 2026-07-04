@@ -5096,9 +5096,30 @@ public partial class MainWindow : Window
         var updateBtn = new Button { Content = "Update nodes", MinWidth = 110, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         var mapBtn = new Button { Content = "Map", MinWidth = 70, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
         mapBtn.Click += (_, _) => ShowMap();
+        // Solicit info from any node by its id — even one we've never heard from. Sends a NodeInfo
+        // request (want_response) to the entered node number; its reply adds it to the list.
+        var reqIdBtn = new Button { Content = "Request info by ID…", MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 0, 8, 0) };
+        reqIdBtn.Click += async (_, _) =>
+        {
+            var entered = InputDialog.Ask(dialog, "Request node info", "Enter a node ID (!hex or number):");
+            if (entered == null) return;   // cancelled
+            if (!MeshtasticHttpClient.TryParseNodeId(entered, out var num))
+            {
+                status.Text = $"Couldn't read a node id from \"{entered.Trim()}\". Use !hex (e.g. !a1b2c3d4) or a number.";
+                return;
+            }
+            try
+            {
+                status.Text = $"Requesting info from !{num:x8}…";
+                await _mesh!.RequestNodeInfoAsync(num);
+                status.Text = $"Requested node info from !{num:x8}. It should appear in Nodes shortly.";
+            }
+            catch (Exception ex) { status.Text = $"Request failed: {ex.Message}"; }
+        };
         var closeBtn = new Button { Content = "Close", MinWidth = 80, MinHeight = 28 };
         buttons.Children.Add(updateBtn);
         buttons.Children.Add(mapBtn);
+        buttons.Children.Add(reqIdBtn);
         buttons.Children.Add(closeBtn);
 
         var greyBrush = new SolidColorBrush(MediaColor.FromRgb(0xB0, 0xB0, 0xB0));
