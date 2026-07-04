@@ -41,10 +41,15 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
     private readonly CancellationTokenSource _readerCts = new();
     private DateTime _lastWriteUtc = DateTime.MinValue;
     private volatile bool _faulted;   // set when a read/write fails or the peer closes the socket
+    private volatile string? _lastError;   // why the socket dropped — kept for the "connection lost" message
     private bool _disposed;
 
     /// <summary>False once the socket has dropped (a write/read failed or the device closed it).</summary>
     public bool IsConnected => !_faulted && !_disposed;
+
+    /// <summary>Why the socket dropped (peer closed it, reset, keep-alive timeout, …), or null while healthy. Set
+    /// once, by whichever of the read loop or a write first detects the drop — the most proximate cause.</summary>
+    public string? LastError => _lastError;
 
     /// <summary>The TCP link is held open, so the device expects periodic heartbeats to keep it alive.</summary>
     public bool NeedsKeepAlive => true;
@@ -217,7 +222,7 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
             _lastWriteUtc = DateTime.UtcNow;
         }
         catch (OperationCanceledException) { throw; }
-        catch { _faulted = true; throw; }   // socket write failed (net_io_writefailure) — the link is dead
+        catch (Exception ex) { SetFault(DescribeFault(ex)); throw; }   // socket write failed — the link is dead
         finally { _writeGate.Release(); }
     }
 

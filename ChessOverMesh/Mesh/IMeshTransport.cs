@@ -34,6 +34,12 @@ public interface IMeshTransport : IDisposable
     /// false "unreachable". HTTP is connectionless and always reports "connected", so it leaves this false and the
     /// probe keeps guarding it.</summary>
     bool SelfReportsLiveness => false;
+
+    /// <summary>A short human-readable reason the link dropped (peer closed it, connection reset, keep-alive
+    /// timeout, network unreachable, …), or null if it hasn't dropped or this transport doesn't track one. A
+    /// persistent link sets it the moment it faults so the app can tell the user *why* it disconnected instead of a
+    /// generic "connection lost".</summary>
+    string? LastError => null;
 }
 
 /// <summary>
