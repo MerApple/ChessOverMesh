@@ -1663,6 +1663,14 @@ public sealed class MeshtasticHttpClient : IDisposable
                     if (firstSeen) newNodes.Add(reply);
                     if (pkt.To == MyNodeNum) nodeInfos.Add(reply);
                 }
+                // Our own device's node-info looped back that we didn't send ourselves = the firmware's periodic
+                // NodeInfo broadcast. Surface it so the user can see the device announce itself to the mesh.
+                else if (!IsOwnSend(pkt.Id) && OwnBroadcast != null)
+                {
+                    var user = User.Parser.ParseFrom(decoded.Payload);
+                    var who = NameOf(user.LongName, user.ShortName);
+                    OwnBroadcast($"Our device broadcast its node info to the mesh{(who.Length > 0 ? $" (as {who})" : "")}.");
+                }
                 continue;
             }
 
@@ -1670,6 +1678,21 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (decoded.Portnum == PortNum.TelemetryApp)
             {
                 var tel = Telemetry.Parser.ParseFrom(decoded.Payload);
+                // Our own device's telemetry looped back that we didn't send ourselves = the firmware's periodic
+                // telemetry broadcast. Note it (we still fall through so our own device metrics update the node DB).
+                // LocalStats is skipped here — it's mostly reply-driven and already surfaced as a noise-floor line.
+                if (pkt.From == MyNodeNum && !IsOwnSend(pkt.Id) && OwnBroadcast != null)
+                {
+                    string? kind = tel.VariantCase switch
+                    {
+                        Telemetry.VariantOneofCase.DeviceMetrics => "device metrics",
+                        Telemetry.VariantOneofCase.EnvironmentMetrics => "environment telemetry",
+                        Telemetry.VariantOneofCase.AirQualityMetrics => "air-quality telemetry",
+                        Telemetry.VariantOneofCase.PowerMetrics => "power telemetry",
+                        _ => null,
+                    };
+                    if (kind != null) OwnBroadcast($"Our device broadcast its {kind} to the mesh.");
+                }
                 // An incoming telemetry REQUEST (want_response) aimed at us — the firmware answers it; surface it
                 // and don't treat the empty request payload as a reading.
                 if (decoded.WantResponse && pkt.To == MyNodeNum && pkt.From != MyNodeNum)
@@ -1709,6 +1732,22 @@ public sealed class MeshtasticHttpClient : IDisposable
                 {
                     _noiseFloor[pkt.From] = noise;   // store raw; surface with the hardware calibration offset applied
                     noiseFloors.Add(new MeshNoiseFloor(pkt.From, DescribeNode(pkt.From), noise + NoiseCalibrationFor(pkt.From)));
+                }
+                continue;
+            }
+
+            // Our own device's position looped back that we didn't send ourselves = the firmware's periodic
+            // position broadcast. Surface it (with the fix, when present) so the user sees the device transmit.
+            if (decoded.Portnum == PortNum.PositionApp && pkt.From == MyNodeNum && !IsOwnSend(pkt.Id))
+            {
+                if (OwnBroadcast != null)
+                {
+                    var p = Position.Parser.ParseFrom(decoded.Payload);
+                    string where = (p.LatitudeI != 0 || p.LongitudeI != 0)
+                        ? $": {(p.LatitudeI / 1e7).ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, " +
+                          $"{(p.LongitudeI / 1e7).ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}"
+                        : "";
+                    OwnBroadcast($"Our device broadcast its position to the mesh{where}.");
                 }
                 continue;
             }
@@ -2402,6 +2441,13 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// noise-floor), with a human-readable description, so the app can log it in system messages. May fire off
     /// the UI thread — subscribers should marshal to the UI thread.</summary>
     public event Action<string>? IncomingRequest;
+
+    /// <summary>Raised when our OWN device autonomously broadcasts its housekeeping (position / node-info /
+    /// telemetry) to the mesh on the firmware's own timers — i.e. a packet looped back from our node that we
+    /// didn't send ourselves (<see cref="IsOwnSend"/> is false; an app/user-initiated send would be true).
+    /// Human-readable description, so the app can log it in system messages. May fire off the UI thread —
+    /// subscribers should marshal to the UI thread.</summary>
+    public event Action<string>? OwnBroadcast;
 
     // Human-readable label for an admin message (its oneof variant, plus the target node for node-directed ones).
     private static string DescribeAdmin(AdminMessage a)
