@@ -984,6 +984,7 @@ public partial class MainWindow : Window
         _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
         _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
         _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
+        _mesh.TelemetryReceived += OnTelemetryReceived;  // log device/environment metrics received from other nodes (Telemetry)
         _mesh.SetNoiseCalibration(AppSettings.NoiseCalibrations);   // apply the per-hardware noise-floor calibration
         _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
         _currentHost = host;
@@ -2389,6 +2390,9 @@ public partial class MainWindow : Window
 
     /// <summary>Logs our own device's autonomous broadcast (position/nodeinfo/telemetry) to system messages, tagged Outgoing.</summary>
     private void OnOwnBroadcast(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Outgoing));
+
+    /// <summary>Logs device/environment metrics received from another node to system messages, tagged Telemetry.</summary>
+    private void OnTelemetryReceived(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Telemetry));
 
     /// <summary>Persists the current node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     private void SaveNodeCache()

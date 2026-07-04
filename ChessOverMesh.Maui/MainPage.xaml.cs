@@ -740,6 +740,7 @@ public partial class MainPage : ContentPage
             _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
             _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
             _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
+            _mesh.TelemetryReceived += OnTelemetryReceived;  // log device/environment metrics received from other nodes (Telemetry)
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) { AppSettings.LastHost = cacheKey; AppSettings.AddRecentHost(cacheKey); }   // remember for the Host dropdown
             // If this device's cache is encrypted, unlock (or delete) it before reading or writing any cache.
@@ -2624,6 +2625,9 @@ public partial class MainPage : ContentPage
 
     /// <summary>Logs our own device's autonomous broadcast (position/nodeinfo/telemetry) to system messages, tagged Outgoing.</summary>
     void OnOwnBroadcast(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Outgoing));
+
+    /// <summary>Logs device/environment metrics received from another node to system messages, tagged Telemetry.</summary>
+    void OnTelemetryReceived(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Telemetry));
 
     /// <summary>Persists the node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     void SaveNodeCache()

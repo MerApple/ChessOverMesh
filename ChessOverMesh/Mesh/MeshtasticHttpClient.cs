@@ -1745,6 +1745,8 @@ public sealed class MeshtasticHttpClient : IDisposable
                     hist.Add(new MeshEnvironment(em.Temperature, em.RelativeHumidity, em.BarometricPressure, pkt.RxTime, DateTime.Now));
                     if (hist.Count > MaxEnvironmentHistory) hist.RemoveAt(0);
                     telemetryNodes.Add(pkt.From);
+                    // Log the reception (generic, no values) — our own device's broadcast was already noted above as Outgoing.
+                    if (pkt.From != MyNodeNum) TelemetryReceived?.Invoke($"Environment telemetry received from {DescribeNode(pkt.From)}.");
                 }
                 // Device metrics (battery/voltage/utilization/uptime) — merge into the node DB so "show all info"
                 // reflects a requested or broadcast refresh, for any node (including our own).
@@ -1753,6 +1755,8 @@ public sealed class MeshtasticHttpClient : IDisposable
                     var node = _state.Nodes.FirstOrDefault(n => n.Num == pkt.From);
                     if (node != null) node.DeviceMetrics = tel.DeviceMetrics;
                     telemetryNodes.Add(pkt.From);
+                    // Log the reception (generic, no values) — our own device's broadcast was already noted above as Outgoing.
+                    if (pkt.From != MyNodeNum) TelemetryReceived?.Invoke($"Device metrics received from {DescribeNode(pkt.From)}.");
                 }
                 // LocalStats (Telemetry field 6) carries noise_floor (field 15, dBm) — not modeled by the bundled
                 // protobuf, so read it from the raw payload. Surfaced so the UI can show the requested noise floor.
@@ -2476,6 +2480,12 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// Human-readable description, so the app can log it in system messages. May fire off the UI thread —
     /// subscribers should marshal to the UI thread.</summary>
     public event Action<string>? OwnBroadcast;
+
+    /// <summary>Raised when ANOTHER node's telemetry reading reaches us — device metrics (battery/voltage/
+    /// utilization/uptime) or environment metrics (temperature/humidity/pressure), whether solicited by our
+    /// request or an unsolicited broadcast. Generic notice (no values), so the app can log it in system
+    /// messages. May fire off the UI thread — subscribers should marshal to the UI thread.</summary>
+    public event Action<string>? TelemetryReceived;
 
     // Human-readable label for an admin message (its oneof variant, plus the target node for node-directed ones).
     private static string DescribeAdmin(AdminMessage a)
