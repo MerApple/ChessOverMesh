@@ -17,6 +17,10 @@ internal sealed class MapSettingsWindow : Window
     private static readonly Brush Dim = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0));
     private static readonly Brush Field = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
     private static readonly Brush Border = new SolidColorBrush(Color.FromRgb(0x3F, 0x3F, 0x46));
+    // WPF's default ComboBox template renders the closed selection box on the system's white chrome, ignoring the
+    // dark Background set on the control. Its selected-item text therefore needs a near-black brush to stay readable
+    // there; the dropdown items keep the light Fg (on the dark Field) via ItemContainerStyle.
+    private static readonly Brush BoxText = new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x10));
 
     private readonly MapTileCache _cache;
     private readonly Action<Window> _openCacheArea;
@@ -73,7 +77,7 @@ internal sealed class MapSettingsWindow : Window
         // OpenStreetMap's servers forbid bulk downloading (they return an "Access blocked" tile), so caching an
         // area needs a provider whose terms allow it, with a free API key.
         top.Children.Add(new TextBlock { Text = "Tile provider", Foreground = Fg, Margin = new Thickness(0, 0, 0, 4) });
-        _providerBox = new ComboBox { Background = Field, Foreground = Fg, BorderBrush = Border, Margin = new Thickness(0, 0, 0, 6) };
+        _providerBox = new ComboBox { Background = Field, Foreground = BoxText, BorderBrush = Border, Margin = new Thickness(0, 0, 0, 6) };
         var itemStyle = new Style(typeof(ComboBoxItem));   // dark dropdown items (else light-on-white = invisible)
         itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Field));
         itemStyle.Setters.Add(new Setter(Control.ForegroundProperty, Fg));
