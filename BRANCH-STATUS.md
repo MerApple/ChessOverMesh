@@ -4,8 +4,12 @@
 integrated into `main`, so we never have to re-investigate "is this branch merged?" again.
 When a branch is confirmed merged, **mark it here** (and, ideally, remove its stale worktree).
 
-- Last verified: **2026-07-04**
-- `main` at time of verification: **`453eac2`** (`Release 1.4.4` + `nodeinfo-dump-suppress`)
+- Last verified: **2026-07-04** (re-verified for the 1.4.7 release)
+- `main` at time of verification: **`01d0024`** (`Release 1.4.6` + connection-lost-reason + MAUI node-info button auto-sizing, about to be tagged `1.4.7`)
+
+Re-verified against the moved `main`: every branch below is still merged/no-op except the
+two obsolete ones. New since 1.4.6 and now on `main`: the connection-lost message shows *why*
+the link dropped, and the MAUI "Node info" action buttons auto-size to their text.
 
 ## How status is determined
 
