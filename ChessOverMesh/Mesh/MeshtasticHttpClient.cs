@@ -167,6 +167,11 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly uint? _destination;
     private readonly DeviceStateContainer _state = new();
     private IReadOnlyList<MeshChannel>? _seededChannels;
+    // Set while we're draining a user-initiated want_config RE-dump (e.g. opening Device Settings). The device
+    // replays its ENTIRE stored node DB as NodeInfo frames; those are not live receptions, so we must not surface
+    // them as "Node info received" messages. Stays set past the fetch's own timeout so the poll loop keeps
+    // suppressing the leftover dump frames, and is cleared when the terminating config_complete_id is drained.
+    private volatile bool _suppressDumpNodeInfo;
     private readonly Dictionary<uint, string> _nameCache = new();   // node num -> name, seeded from disk cache
     private readonly Dictionary<uint, string> _shortNameCache = new();   // node num -> short name, seeded from disk cache
     private readonly Dictionary<uint, bool> _favoriteCache = new();      // node num -> device "favorite" flag
@@ -1199,6 +1204,10 @@ public sealed class MeshtasticHttpClient : IDisposable
     public async Task FetchDeviceConfigAsync(TimeSpan timeout, CancellationToken ct = default)
     {
         _seededChannels = null;
+        // The whole node DB re-streams as NodeInfo frames; suppress surfacing them as "received" until the dump's
+        // config_complete_id is drained. If this fetch times out before that, the flag stays set on purpose so the
+        // resumed poll loop keeps swallowing the leftover dump frames (it clears the flag on config_complete_id).
+        _suppressDumpNodeInfo = true;
         await WriteToRadioAsync(new ToRadioMessageFactory().CreateWantConfigMessage(), ct).ConfigureAwait(false);
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -1207,7 +1216,7 @@ public sealed class MeshtasticHttpClient : IDisposable
             var fr = await ReadFromRadioAsync(all: false, ct).ConfigureAwait(false);
             if (fr == null) { await Task.Delay(150, ct).ConfigureAwait(false); continue; }
             _state.AddFromRadio(fr);
-            if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId) break;
+            if (fr.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId) { _suppressDumpNodeInfo = false; break; }
         }
         if (MyNodeNum == 0) MyNodeNum = _state.MyNodeInfo?.MyNodeNum ?? 0;
     }
@@ -1609,10 +1618,17 @@ public sealed class MeshtasticHttpClient : IDisposable
 
             if (fromRadio.PayloadVariantCase != FromRadio.PayloadVariantOneofCase.Packet)
             {
-                // A pushed NodeInfo frame is the device telling us its node DB changed (e.g. a node-info reply, or a
-                // node freshly heard). The want_config dump is drained in InitializeAsync, so anything here is a LIVE
-                // update — surface it so the UI logs it and refreshes, just like a NodeInfo packet would.
+                // The config_complete_id terminates a want_config dump — a re-read (e.g. opening Device Settings)
+                // whose fetch timed out leaves the tail of the dump for us to drain here; clearing the flag on it
+                // re-enables surfacing once the replayed node DB is fully consumed.
+                if (fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId)
+                    _suppressDumpNodeInfo = false;
+                // A pushed NodeInfo frame is normally the device telling us its node DB changed (a node-info reply,
+                // or a node freshly heard) — surface it. But while draining a user-triggered want_config RE-dump the
+                // device replays its ENTIRE stored DB as NodeInfo frames; those aren't live receptions, so skip them
+                // (AddFromRadio above still merges them) to avoid flooding system messages with known nodes.
                 if (fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.NodeInfo
+                    && !_suppressDumpNodeInfo
                     && fromRadio.NodeInfo is { User: { } nu } ni && ni.Num != MyNodeNum
                     && nodeInfos.All(x => x.Node != ni.Num))
                     nodeInfos.Add(new MeshNodeInfoReply(ni.Num, NameOf(nu.LongName, nu.ShortName)));
@@ -1691,9 +1707,10 @@ public sealed class MeshtasticHttpClient : IDisposable
                     if (firstSeen) newNodes.Add(reply);
                     if (pkt.To == MyNodeNum) nodeInfos.Add(reply);
                 }
-                // Our own device's node-info looped back that we didn't send ourselves = the firmware's periodic
-                // NodeInfo broadcast. Surface it so the user can see the device announce itself to the mesh.
-                else if (!IsOwnSend(pkt.Id) && OwnBroadcast != null)
+                // Our own device's node-info looped back that we didn't send ourselves AND actually went over the
+                // radio (hop info present) = the firmware's periodic NodeInfo broadcast. Surface it so the user can
+                // see the device announce itself. A phone-only refresh (no hop info) is not a broadcast — skip it.
+                else if (!IsOwnSend(pkt.Id) && WasTransmittedToMesh(pkt) && OwnBroadcast != null)
                 {
                     var user = User.Parser.ParseFrom(decoded.Payload);
                     var who = NameOf(user.LongName, user.ShortName);
@@ -1706,10 +1723,13 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (decoded.Portnum == PortNum.TelemetryApp)
             {
                 var tel = Telemetry.Parser.ParseFrom(decoded.Payload);
-                // Our own device's telemetry looped back that we didn't send ourselves = the firmware's periodic
-                // telemetry broadcast. Note it (we still fall through so our own device metrics update the node DB).
-                // LocalStats is skipped here — it's mostly reply-driven and already surfaced as a noise-floor line.
-                if (pkt.From == MyNodeNum && !IsOwnSend(pkt.Id) && OwnBroadcast != null)
+                // Our own device's telemetry looped back that we didn't send ourselves AND that actually went over
+                // the radio (hop info present) = the firmware's periodic telemetry broadcast. The firmware also
+                // pushes device metrics to the connected client roughly every minute WITHOUT transmitting them
+                // (WasTransmittedToMesh is false for those) — don't mislabel that local refresh as a broadcast. We
+                // still fall through either way so our own device metrics update the node DB. LocalStats is skipped
+                // here — it's mostly reply-driven and already surfaced as a noise-floor line.
+                if (pkt.From == MyNodeNum && !IsOwnSend(pkt.Id) && WasTransmittedToMesh(pkt) && OwnBroadcast != null)
                 {
                     string? kind = tel.VariantCase switch
                     {
@@ -1772,7 +1792,9 @@ public sealed class MeshtasticHttpClient : IDisposable
             // position broadcast. Surface it (with the fix, when present) so the user sees the device transmit.
             if (decoded.Portnum == PortNum.PositionApp && pkt.From == MyNodeNum && !IsOwnSend(pkt.Id))
             {
-                if (OwnBroadcast != null)
+                // Only announce it if it actually went over the radio (hop info present); a phone-only position
+                // refresh the firmware pushes to the client without transmitting is not a broadcast.
+                if (OwnBroadcast != null && WasTransmittedToMesh(pkt))
                 {
                     var p = Position.Parser.ParseFrom(decoded.Payload);
                     string where = (p.LatitudeI != 0 || p.LongitudeI != 0)
@@ -1874,6 +1896,15 @@ public sealed class MeshtasticHttpClient : IDisposable
         CaptureNodeDbPositionsToHistory();
         return new MeshReceiveResult(messages, ackMap.Values.ToList(), count, traceroutes, nodeInfos, telemetryNodes, newNodes, positions, noiseFloors);
     }
+
+    // A packet our OWN node loops back to the connected client is either a genuine mesh transmission (the
+    // firmware's periodic broadcast, sent over the radio) or a "phone-only" local update the firmware pushes to
+    // the app in between — e.g. the device-metrics telemetry it refreshes for the attached client roughly every
+    // minute, independent of the (much longer) device_update_interval it actually broadcasts on. Only a packet
+    // that went through the router's transmit path carries hop info (hop_start/hop_limit are set there); the
+    // phone-only copy never hits the radio, so both stay 0. That's how we tell a real broadcast from a local push
+    // and avoid announcing the every-minute phone refresh as "broadcast to the mesh".
+    private static bool WasTransmittedToMesh(MeshPacket pkt) => pkt.HopStart > 0 || pkt.HopLimit > 0;
 
     // Parses a RouteDiscovery payload for the forward route (field 1) + SNR (field 2) and the return route
     // (field 3) + SNR (field 4). The bundled protobuf only models field 1, so we read the bytes directly to also
