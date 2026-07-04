@@ -1022,6 +1022,9 @@ public sealed class MeshtasticHttpClient : IDisposable
             Decoded = new Data { Portnum = PortNum.NodeinfoApp, Payload = me.ToByteString() },   // no want_response: this is an announcement, not a request
         };
         await WriteToRadioAsync(new ToRadioMessageFactory().CreateMeshPacketMessage(packet), ct).ConfigureAwait(false);
+        // Log this user-initiated send (Outgoing). The firmware loops the packet back, but WriteToRadioAsync recorded
+        // its id as an own-send so the loopback OwnBroadcast branch stays silent — announce it here instead.
+        OwnBroadcast?.Invoke("You broadcast your node info to the mesh.");
         return packet.Id;
     }
 
@@ -1042,6 +1045,10 @@ public sealed class MeshtasticHttpClient : IDisposable
             Decoded = new Data { Portnum = PortNum.PositionApp, Payload = pos.ToByteString() },
         };
         await WriteToRadioAsync(new ToRadioMessageFactory().CreateMeshPacketMessage(packet), ct).ConfigureAwait(false);
+        // Log this user-initiated send (Outgoing) — see BroadcastOwnNodeInfoAsync for why the loopback stays silent.
+        var where = $": {(pos.LatitudeI / 1e7).ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, " +
+                    $"{(pos.LongitudeI / 1e7).ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}";
+        OwnBroadcast?.Invoke($"You broadcast your position to the mesh{where}.");
         return packet.Id;
     }
 
@@ -1705,7 +1712,10 @@ public sealed class MeshtasticHttpClient : IDisposable
                     // a reply/announcement carrying the sender's info.
                     var reply = new MeshNodeInfoReply(pkt.From, NameOf(user.LongName, user.ShortName), decoded.WantResponse);
                     if (firstSeen) newNodes.Add(reply);
-                    if (pkt.To == MyNodeNum) nodeInfos.Add(reply);
+                    // Surface node-info heard over the air: any packet addressed to us (a reply/request), plus
+                    // broadcast announcements from nodes we already know. A first-ever sighting is announced as
+                    // "New node heard" above, so skip broadcasts from brand-new nodes here to avoid a duplicate line.
+                    if (pkt.To == MyNodeNum || (!firstSeen && pkt.To == 0xffffffff)) nodeInfos.Add(reply);
                 }
                 // Our own device's node-info looped back that we didn't send ourselves AND actually went over the
                 // radio (hop info present) = the firmware's periodic NodeInfo broadcast. Surface it so the user can
