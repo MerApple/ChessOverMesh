@@ -20,7 +20,7 @@ using GameColor = ChessOverMesh.Chess.Color;
 namespace ChessOverMesh.Gui;
 
 /// <summary>Category of a System-messages line, used by the per-type filter.</summary>
-public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Warnings }
+public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings }
 
 public partial class MainWindow : Window
 {
@@ -381,6 +381,7 @@ public partial class MainWindow : Window
     private static readonly MediaColor DefSysTraceroute = MediaColor.FromRgb(0xFF, 0xCC, 0x80);  // orange
     private static readonly MediaColor DefSysAdmin = MediaColor.FromRgb(0xFF, 0xD5, 0x4F);       // gold
     private static readonly MediaColor DefSysRequests = MediaColor.FromRgb(0xF4, 0x8F, 0xB1);    // pink
+    private static readonly MediaColor DefSysOutgoing = MediaColor.FromRgb(0x4D, 0xD0, 0xE1);    // cyan — our device's own broadcasts
     private static readonly MediaColor DefSysWarnings = MediaColor.FromRgb(0xFF, 0x6B, 0x6B);    // red
     private static readonly SolidColorBrush SysGameText = new(DefSysGame);
     private static readonly SolidColorBrush SysConnectionText = new(DefSysConnection);
@@ -390,6 +391,7 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush SysTracerouteText = new(DefSysTraceroute);
     private static readonly SolidColorBrush SysAdminText = new(DefSysAdmin);
     private static readonly SolidColorBrush SysRequestsText = new(DefSysRequests);
+    private static readonly SolidColorBrush SysOutgoingText = new(DefSysOutgoing);
     private static readonly SolidColorBrush SysWarningsText = new(DefSysWarnings);
 
     private static SolidColorBrush SysCategoryBrush(SysCategory cat) => cat switch
@@ -401,6 +403,7 @@ public partial class MainWindow : Window
         SysCategory.Traceroute => SysTracerouteText,
         SysCategory.Admin => SysAdminText,
         SysCategory.Requests => SysRequestsText,
+        SysCategory.Outgoing => SysOutgoingText,
         SysCategory.Warnings => SysWarningsText,
         _ => SysGameText,
     };
@@ -976,6 +979,7 @@ public partial class MainWindow : Window
         _mesh = client;
         _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
         _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
+        _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
         _mesh.SetNoiseCalibration(AppSettings.NoiseCalibrations);   // apply the per-hardware noise-floor calibration
         _currentHost = host;
         _probeHost = probeHost;
@@ -2377,6 +2381,9 @@ public partial class MainWindow : Window
 
     /// <summary>Logs an incoming request another node made of us (position/telemetry/noise-floor), tagged Requests.</summary>
     private void OnIncomingRequest(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Requests));
+
+    /// <summary>Logs our own device's autonomous broadcast (position/nodeinfo/telemetry) to system messages, tagged Outgoing.</summary>
+    private void OnOwnBroadcast(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Outgoing));
 
     /// <summary>Persists the current node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     private void SaveNodeCache()
@@ -4430,6 +4437,7 @@ public partial class MainWindow : Window
     {
         SysCategory.Nodes => "Nodes (node info)",
         SysCategory.Requests => "Requests from others",
+        SysCategory.Outgoing => "Outgoing (our device)",
         SysCategory.Warnings => "Warnings & notices",
         _ => c.ToString(),
     };

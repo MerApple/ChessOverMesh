@@ -455,6 +455,7 @@ public partial class MainPage : ContentPage
         SysCategory.Traceroute => Palette.SysTraceroute,
         SysCategory.Admin => Palette.SysAdmin,
         SysCategory.Requests => Palette.SysRequests,
+        SysCategory.Outgoing => Palette.SysOutgoing,
         SysCategory.Warnings => Palette.SysWarnings,
         _ => Palette.SysGame,
     };
@@ -736,6 +737,7 @@ public partial class MainPage : ContentPage
             _mesh = mesh; mesh = null;
             _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
             _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
+            _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) { AppSettings.LastHost = cacheKey; AppSettings.AddRecentHost(cacheKey); }   // remember for the Host dropdown
             // If this device's cache is encrypted, unlock (or delete) it before reading or writing any cache.
@@ -2610,6 +2612,9 @@ public partial class MainPage : ContentPage
 
     /// <summary>Logs an incoming request another node made of us (position/telemetry/noise-floor), tagged Requests.</summary>
     void OnIncomingRequest(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Requests));
+
+    /// <summary>Logs our own device's autonomous broadcast (position/nodeinfo/telemetry) to system messages, tagged Outgoing.</summary>
+    void OnOwnBroadcast(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Outgoing));
 
     /// <summary>Persists the node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     void SaveNodeCache()

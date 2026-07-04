@@ -16,7 +16,8 @@ public sealed class SystemFilterPage : ContentPage
 
     static readonly SysCategory[] Categories =
         { SysCategory.Game, SysCategory.Connection, SysCategory.Nodes, SysCategory.Position,
-          SysCategory.Telemetry, SysCategory.Traceroute, SysCategory.Admin, SysCategory.Requests, SysCategory.Warnings };
+          SysCategory.Telemetry, SysCategory.Traceroute, SysCategory.Admin, SysCategory.Requests,
+          SysCategory.Outgoing, SysCategory.Warnings };
 
     public SystemFilterPage(MainPage main)
     {
@@ -66,6 +67,7 @@ public sealed class SystemFilterPage : ContentPage
     {
         SysCategory.Nodes => "Nodes (node info)",
         SysCategory.Requests => "Requests from others",
+        SysCategory.Outgoing => "Outgoing (our device)",
         SysCategory.Warnings => "Warnings & notices",
         _ => c.ToString(),
     };
