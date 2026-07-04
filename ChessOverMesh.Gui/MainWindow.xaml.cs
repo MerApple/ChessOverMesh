@@ -4574,6 +4574,23 @@ public partial class MainWindow : Window
             CopyToClipboard(string.Join(Environment.NewLine, lb.Items.Cast<object>().Select(ItemText)));
     }
 
+    /// <summary>Right-click "Copy message": copies just the message body of the selected chat row(s) —
+    /// no "&lt;sender&gt;: " prefix and no metadata line (unlike "Copy", which includes the dim detail).</summary>
+    private void CopyMessage_Click(object sender, RoutedEventArgs e)
+    {
+        if (TargetList(sender) is { } lb)
+            CopyToClipboard(string.Join(Environment.NewLine,
+                lb.SelectedItems.Cast<object>().Select(i => i is LogEntry le ? MessageBody(le.Text) : "")));
+    }
+
+    /// <summary>The body of a chat row's message line — everything after the "&lt;sender&gt;: " prefix
+    /// ("You → Bob: hi" → "hi"). Returns the whole string if there's no such prefix.</summary>
+    private static string MessageBody(string text)
+    {
+        int i = text.IndexOf(": ", StringComparison.Ordinal);
+        return i >= 0 ? text[(i + 2)..] : text;
+    }
+
     private static ListBox? TargetList(object menuItemSender) =>
         ((menuItemSender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget as ListBox;
 

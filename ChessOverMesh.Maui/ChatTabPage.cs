@@ -395,7 +395,7 @@ public sealed class ChatTabPage : ContentPage
         if (canReply) opts.Add("React");
         if (hasSender) { opts.Add("DM"); opts.Add("Request node info"); opts.Add("Node info"); opts.Add("Open location in Google Maps"); }
         opts.Add("Message details");   // received: signal/relay; sent: who acked + RSSI/SNR/hops both ways
-        opts.Add("Copy");
+        opts.Add("Copy message");
         opts.Add("Remove message");
 
         string choice = await ThemedDialogs.ActionSheet(this, "Message", "Cancel", null, opts.ToArray());
@@ -442,14 +442,22 @@ public sealed class ChatTabPage : ContentPage
                     _main.MessageDetailsFor(le) ?? "No additional details for this message yet. Only messages received " +
                     "over the mesh, or sent messages that have been acknowledged, carry signal information.", "OK");
                 break;
-            case "Copy":
-                await Clipboard.SetTextAsync(le.Text ?? "");
+            case "Copy message":
+                await Clipboard.SetTextAsync(MessageBody(le.Text ?? ""));
                 break;
             case "Remove message":
                 _main.RemoveCachedChat(le);   // also drop it from the per-channel cache so it won't return
                 _main.ChatLog.Remove(le);
                 break;
         }
+    }
+
+    // The body of a chat row's message line — everything after the "<sender>: " prefix
+    // ("You → Bob: hi" → "hi"). Returns the whole string if there's no such prefix.
+    static string MessageBody(string text)
+    {
+        int i = text.IndexOf(": ", StringComparison.Ordinal);
+        return i >= 0 ? text[(i + 2)..] : text;
     }
 
     // Shows a bound element only when the string it's bound to is non-empty (used to hide the reactions line).

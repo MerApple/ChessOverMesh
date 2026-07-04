@@ -244,6 +244,7 @@
                             <MenuItem Header="Open location in Google Maps" Click="OpenMessageLocation_Click"/>
                             <MenuItem Header="More information" Click="MessageInfo_Click"/>
                             <MenuItem Header="Remove message" Click="RemoveMessage_Click"/>
+                            <MenuItem Header="Copy message" Click="CopyMessage_Click"/>
                             <MenuItem Header="Copy" Click="CopySelected_Click"/>
                             <MenuItem Header="Copy all" Click="CopyAll_Click"/>
                         </ContextMenu>
