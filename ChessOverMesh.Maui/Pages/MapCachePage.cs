@@ -104,8 +104,38 @@ public sealed class MapCachePage : ContentPage
         return grid;
     }
 
-    static Entry MakeEntry(string text, Keyboard keyboard) =>
-        new() { Text = text, Keyboard = keyboard, TextColor = Fg, BackgroundColor = Bar };
+    static Entry MakeEntry(string text, Keyboard keyboard)
+    {
+        var entry = new Entry { Text = text, Keyboard = keyboard, TextColor = Fg, BackgroundColor = Bar };
+#if ANDROID
+        if (keyboard == Keyboard.Numeric) AllowDecimalInput(entry);
+#endif
+        return entry;
+    }
+
+#if ANDROID
+    /// <summary>
+    /// Android's <c>Keyboard.Numeric</c> installs a digits-only input filter whose accepted characters
+    /// depend on the device locale — on a comma-locale (e.g. Swedish) it strips '.', so a typed or pasted
+    /// "59.33" loses its dot and the field can never hold a decimal. Replace the key listener so the field
+    /// accepts digits plus '.', ',' and '-' regardless of locale, and use <c>SetRawInputType</c> to keep a
+    /// decimal numeric soft-keyboard without re-installing the locale filter. <see cref="TryParseNumber"/>
+    /// then normalises ',' to '.'.
+    /// </summary>
+    static void AllowDecimalInput(Entry entry)
+    {
+        entry.HandlerChanged += (s, _) =>
+        {
+            if (((Entry)s!).Handler?.PlatformView is Android.Widget.EditText edit)
+            {
+                edit.KeyListener = Android.Text.Method.DigitsKeyListener.GetInstance("0123456789.,-");
+                edit.SetRawInputType(Android.Text.InputTypes.ClassNumber
+                    | Android.Text.InputTypes.NumberFlagDecimal
+                    | Android.Text.InputTypes.NumberFlagSigned);
+            }
+        };
+    }
+#endif
 
     static Picker MakeZoomPicker(int selected)
     {
