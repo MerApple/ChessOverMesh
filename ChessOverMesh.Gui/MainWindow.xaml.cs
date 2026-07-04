@@ -5301,6 +5301,9 @@ public partial class MainWindow : Window
                 menu.Items.Add(remoteMenu);
             }
             row.ContextMenu = menu;
+            // Double-click a node row to open its full info window (same as the "Show all info" menu item).
+            // DockPanel isn't a Control, so there's no MouseDoubleClick — detect it on the bubbling mouse-down.
+            row.MouseLeftButtonDown += (_, e) => { if (e.ClickCount == 2) ShowTelemetryHistory(n, dialog); };
 
             string rowText = NodeRowText(n);
             var name = new TextBlock
@@ -5758,6 +5761,118 @@ public partial class MainWindow : Window
         actionPanel.Children.Add(mapBtn);       // Show this node's track on the map
         DockPanel.SetDock(actionPanel, Dock.Bottom);
 
+        // Node-management actions (copied from the node right-click menu) — a separate row so the
+        // favorite/ignore/remove/remote-admin controls sit apart from the request/diagnostic buttons above.
+        var mgmtPanel = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        var mapsBtn = new Button { Content = "Open in Google Maps", MinWidth = 140, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
+        mapsBtn.Click += (_, _) => OpenNodeInMaps(target.Num, win, s => status.Text = s);
+        mgmtPanel.Children.Add(mapsBtn);
+        // Our own node: the manual broadcasts (announce this node / its position to the whole mesh).
+        if (target.IsSelf)
+        {
+            var bcastInfoBtn = new Button { Content = "Broadcast my node info", MinWidth = 150, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
+            bcastInfoBtn.Click += async (_, _) =>
+            {
+                status.Text = "Broadcasting node info to the mesh…";
+                try { await _mesh!.BroadcastOwnNodeInfoAsync(); status.Text = "Node info broadcast sent."; }
+                catch (Exception ex) { status.Text = $"Broadcast failed: {ex.Message}"; }
+            };
+            var bcastPosBtn = new Button { Content = "Broadcast my position", MinWidth = 150, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
+            bcastPosBtn.Click += async (_, _) =>
+            {
+                status.Text = "Broadcasting position to the mesh…";
+                try { await _mesh!.BroadcastOwnPositionAsync(); status.Text = "Position broadcast sent."; }
+                catch (Exception ex) { status.Text = $"Broadcast failed: {ex.Message}"; }
+            };
+            mgmtPanel.Children.Add(bcastInfoBtn);
+            mgmtPanel.Children.Add(bcastPosBtn);
+        }
+        // Other nodes: device NodeDB favorite/ignore, forget-node, and the remote-admin submenu.
+        else
+        {
+            var favBtn = new Button { MinWidth = 120, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
+            favBtn.Content = target.IsFavorite ? "Remove favorite" : "Mark as favorite";
+            favBtn.Click += async (_, _) =>
+            {
+                try
+                {
+                    await _mesh!.SetFavoriteNodeAsync(target.Num, !target.IsFavorite);
+                    SaveNodeCache();
+                    favBtn.Content = target.IsFavorite ? "Remove favorite" : "Mark as favorite";
+                    Load();
+                    _nodesRepopulate?.Invoke();
+                    status.Text = $"{(target.IsFavorite ? "Marked favorite" : "Removed favorite")}: {target.Display}";
+                }
+                catch (Exception ex) { status.Text = $"Favorite failed: {ex.Message}"; }
+            };
+            var ignBtn = new Button { MinWidth = 130, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
+            ignBtn.Content = target.IsIgnored ? "Un-ignore on device" : "Ignore on device";
+            ignBtn.Click += async (_, _) =>
+            {
+                try
+                {
+                    await _mesh!.SetIgnoredNodeAsync(target.Num, !target.IsIgnored);
+                    SaveNodeCache();
+                    ignBtn.Content = target.IsIgnored ? "Un-ignore on device" : "Ignore on device";
+                    Load();
+                    _nodesRepopulate?.Invoke();
+                    status.Text = $"{(target.IsIgnored ? "Ignored" : "Un-ignored")} {target.Display} on the device.";
+                }
+                catch (Exception ex) { status.Text = $"Ignore failed: {ex.Message}"; }
+            };
+            var removeBtn = new Button { Content = "Remove from device", MinWidth = 140, MinHeight = 28, Margin = new Thickness(0, 8, 8, 0) };
+            removeBtn.Click += async (_, _) =>
+            {
+                if (!ThemedDialog.Confirm(win,
+                        $"Remove {target.Display} from the device's node database?\n\n" +
+                        "Use this when the node reinstalled its firmware and direct messages stopped working " +
+                        "(its stored public key is stale). After removal the device re-learns the node — and its " +
+                        "new key — the next time it hears from it.",
+                        "Remove node", defaultYes: true))
+                    return;
+                status.Text = $"Removing {target.Display} from the device…";
+                try
+                {
+                    await _mesh!.RemoveNodeAsync(target.Num);
+                    if (_currentHost.Length > 0) DeviceCache.RemoveNode(_currentHost, target.Num);
+                    _nodePrefs.Remove(target.Num);
+                    RebuildChatTxCombo();
+                    _nodesRepopulate?.Invoke();
+                    win.Close();   // the node is gone — its info window no longer applies
+                }
+                catch (Exception ex) { status.Text = $"Remove failed: {ex.Message}"; }
+            };
+
+            // Remote admin: reuse the exact submenu from the right-click menu, popped from a button so
+            // the four confirm-gated destructive items stay out of the flat button flow.
+            var remoteBtn = new Button { Content = "Remote admin ▾", MinWidth = 120, MinHeight = 28, Margin = new Thickness(0, 8, 0, 0) };
+            var remoteMenu = new ContextMenu();
+            var rReboot = new MenuItem { Header = "Reboot…" };
+            rReboot.Click += async (_, _) => await RunRemoteAdminAction(target, "reboot",
+                "Reboots this remote node in a few seconds.", () => _mesh!.RemoteRebootAsync(target.Num), win, s => status.Text = s);
+            var rShutdown = new MenuItem { Header = "Shut down…" };
+            rShutdown.Click += async (_, _) => await RunRemoteAdminAction(target, "shutdown",
+                "Shuts this remote node down — it must be powered on again by hand.", () => _mesh!.RemoteShutdownAsync(target.Num), win, s => status.Text = s);
+            var rNodeDb = new MenuItem { Header = "Reset node DB…" };
+            rNodeDb.Click += async (_, _) => await RunRemoteAdminAction(target, "node-DB reset",
+                "Clears this remote node's list of known nodes.", () => _mesh!.RemoteNodeDbResetAsync(target.Num), win, s => status.Text = s);
+            var rFactory = new MenuItem { Header = "Factory reset…" };
+            rFactory.Click += async (_, _) => await RunRemoteAdminAction(target, "factory reset",
+                "FACTORY-RESETS this remote node — ALL its settings are wiped. This cannot be undone.", () => _mesh!.RemoteFactoryResetAsync(target.Num), win, s => status.Text = s);
+            remoteMenu.Items.Add(rReboot);
+            remoteMenu.Items.Add(rShutdown);
+            remoteMenu.Items.Add(rNodeDb);
+            remoteMenu.Items.Add(rFactory);
+            remoteBtn.ContextMenu = remoteMenu;
+            remoteBtn.Click += (_, _) => { remoteMenu.PlacementTarget = remoteBtn; remoteMenu.IsOpen = true; };
+
+            mgmtPanel.Children.Add(favBtn);
+            mgmtPanel.Children.Add(ignBtn);
+            mgmtPanel.Children.Add(removeBtn);
+            mgmtPanel.Children.Add(remoteBtn);
+        }
+        DockPanel.SetDock(mgmtPanel, Dock.Bottom);
+
         win.Closed += (_, _) => _telemetryRefresh = null;
 
         root.Children.Add(header);
@@ -5769,6 +5884,7 @@ public partial class MainWindow : Window
         root.Children.Add(status);
         root.Children.Add(btnPanel);      // window/telemetry buttons — bottom-most row
         root.Children.Add(actionPanel);   // node-action buttons — row above
+        root.Children.Add(mgmtPanel);     // node-management buttons — row above the actions
         root.Children.Add(list);          // fills remaining space
         win.Content = root;
         win.ShowDialog();

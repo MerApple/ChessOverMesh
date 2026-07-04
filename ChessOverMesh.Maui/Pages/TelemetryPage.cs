@@ -83,10 +83,88 @@ public sealed class TelemetryPage : ContentPage
         foreach (var b in new[] { infoBtn, posBtn, requestBtn, metricsBtn, traceBtn, noiseBtn, mapBtn })
             FlexLayout.SetShrink(b, 0);
 
+        // Node-management actions (copied from the Nodes list long-press menu) — a separate wrapping row so the
+        // favorite/ignore/remove/remote-admin controls sit apart from the request/diagnostic buttons above.
+        var mgmt = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Direction = Microsoft.Maui.Layouts.FlexDirection.Row };
+        var mgmtBtns = new List<Button>();
+
+        var mapsBtn = new Button { Text = "Open in Google Maps", Margin = new Thickness(0, 0, 8, 8) };
+        mapsBtn.Clicked += async (_, _) =>
+        {
+            var url = _main.NodeMapsUrl(_target.Num);
+            if (url == null)
+                await ThemedDialogs.Alert(this, "No location",
+                    $"No position data found for {_target.Display}.\n\nThis node hasn't shared its location yet. Use \"Request position\" to ask for it, then try again.", "OK");
+            else
+                await Launcher.Default.OpenAsync(url);
+        };
+        mgmtBtns.Add(mapsBtn);
+
+        if (_target.IsSelf)
+        {
+            var bcastInfoBtn = new Button { Text = "Broadcast my node info", Margin = new Thickness(0, 0, 8, 8) };
+            bcastInfoBtn.Clicked += async (_, _) =>
+            {
+                _status.Text = "Broadcasting node info to the mesh…";
+                try { await _main.BroadcastOwnNodeInfoAsync(); _status.Text = "Node info broadcast sent."; }
+                catch (Exception ex) { _status.Text = $"Broadcast failed: {ex.Message}"; }
+            };
+            var bcastPosBtn = new Button { Text = "Broadcast my position", Margin = new Thickness(0, 0, 8, 8) };
+            bcastPosBtn.Clicked += async (_, _) =>
+            {
+                _status.Text = "Broadcasting position to the mesh…";
+                try { await _main.BroadcastOwnPositionAsync(); _status.Text = "Position broadcast sent."; }
+                catch (Exception ex) { _status.Text = $"Broadcast failed: {ex.Message}"; }
+            };
+            mgmtBtns.Add(bcastInfoBtn);
+            mgmtBtns.Add(bcastPosBtn);
+        }
+        else
+        {
+            var favBtn = new Button { Text = _target.IsFavorite ? "Remove favorite" : "Mark as favorite", Margin = new Thickness(0, 0, 8, 8) };
+            favBtn.Clicked += async (_, _) =>
+            {
+                try
+                {
+                    await _main.SetFavoriteNodeAsync(_target.Num, !_target.IsFavorite);
+                    favBtn.Text = _target.IsFavorite ? "Remove favorite" : "Mark as favorite";
+                    _status.Text = $"{(_target.IsFavorite ? "Marked favorite" : "Removed favorite")}: {_target.Display}";
+                }
+                catch (Exception ex) { _status.Text = $"Favorite failed: {ex.Message}"; }
+            };
+            var ignBtn = new Button { Text = _target.IsIgnored ? "Un-ignore on device" : "Ignore on device", Margin = new Thickness(0, 0, 8, 8) };
+            ignBtn.Clicked += async (_, _) =>
+            {
+                try
+                {
+                    await _main.SetIgnoredNodeAsync(_target.Num, !_target.IsIgnored);
+                    ignBtn.Text = _target.IsIgnored ? "Un-ignore on device" : "Ignore on device";
+                    _status.Text = $"{(_target.IsIgnored ? "Ignored" : "Un-ignored")} {_target.Display} on the device.";
+                }
+                catch (Exception ex) { _status.Text = $"Ignore failed: {ex.Message}"; }
+            };
+            var remoteBtn = new Button { Text = "Remote admin…", Margin = new Thickness(0, 0, 8, 8) };
+            remoteBtn.Clicked += async (_, _) => await ShowRemoteAdminMenuAsync(_target);
+            var removeBtn = new Button { Text = "Remove from device", Margin = new Thickness(0, 0, 8, 8) };
+            removeBtn.Clicked += async (_, _) =>
+            {
+                bool ok = await ThemedDialogs.Alert(this, "Remove node",
+                    $"Remove {_target.Display} from the device's node database?\n\nUse this when the node reinstalled its firmware and direct messages stopped working (its stored public key is stale). After removal the device re-learns the node — and its new key — the next time it hears from it.",
+                    "Remove", "Cancel");
+                if (!ok) return;
+                _status.Text = $"Removing {_target.Display} from the device…";
+                try { await _main.RemoveNodeAsync(_target.Num); await Navigation.PopModalAsync(); }
+                catch (Exception ex) { _status.Text = $"Remove failed: {ex.Message}"; }
+            };
+            mgmtBtns.Add(favBtn); mgmtBtns.Add(ignBtn); mgmtBtns.Add(remoteBtn); mgmtBtns.Add(removeBtn);
+        }
+        foreach (var b in mgmtBtns) { mgmt.Add(b); FlexLayout.SetShrink(b, 0); }
+
         var root = new VerticalStackLayout { Padding = 16, Spacing = 8 };
         root.Add(_header);
         root.Add(_info);
         root.Add(actions);
+        root.Add(mgmt);   // node-management actions row, below the request/diagnostic actions
         root.Add(_posHeader);   // position history (latest 20) above telemetry
         root.Add(_posList);
         root.Add(new Label { Text = "Telemetry history:", TextColor = Fg, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 4, 0, 0) });
@@ -170,6 +248,34 @@ public sealed class TelemetryPage : ContentPage
             sb.AppendLine($"{e2.Timestamp:yyyy-MM-dd HH:mm:ss}   {EnvSummary(e2)}");
         await Clipboard.SetTextAsync(sb.ToString());
         _status.Text = "Copied to clipboard.";
+    }
+
+    // Remote-admin submenu: send admin commands to ANOTHER node (needs a shared "admin" channel on both nodes).
+    // Mirrors NodesPage.ShowRemoteAdminMenuAsync so the info window can do everything the long-press menu can.
+    async Task ShowRemoteAdminMenuAsync(MeshNode n)
+    {
+        string choice = await ThemedDialogs.ActionSheet(this, $"Remote admin — {n.Display}", "Cancel", null,
+            "Reboot", "Shut down", "Reset node DB", "Factory reset");
+        var (action, warn) = choice switch
+        {
+            "Reboot" => ("reboot", "Reboots this remote node in a few seconds."),
+            "Shut down" => ("shutdown", "Shuts this remote node down — it must be powered on again by hand."),
+            "Reset node DB" => ("nodedb", "Clears this remote node's list of known nodes."),
+            "Factory reset" => ("factory", "FACTORY-RESETS this remote node — ALL its settings are wiped. This cannot be undone."),
+            _ => (null, null),
+        };
+        if (action == null) return;
+        bool ok = await ThemedDialogs.Alert(this, $"Remote {action}?",
+            $"{warn}\n\nTarget: {n.Display}\n\nRemote admin needs a shared channel named \"admin\" on BOTH this node and the target. Continue?",
+            "Send", "Cancel");
+        if (!ok) return;
+        _status.Text = $"Sending remote {action} to {n.Display}… (negotiating session key)";
+        try
+        {
+            var err = await _main.RemoteAdminAsync(n.Num, action);
+            _status.Text = err == null ? $"Remote {action} sent to {n.Display}." : $"Remote {action} failed: {err}";
+        }
+        catch (Exception ex) { _status.Text = $"Remote {action} failed: {ex.Message}"; }
     }
 
     static string EnvSummary(MeshEnvironment e)
