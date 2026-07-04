@@ -118,11 +118,11 @@ public sealed class MapCachePage : ContentPage
     bool TryReadInputs(out GeoBounds bounds, out int minZoom, out int maxZoom)
     {
         bounds = default; minZoom = 0; maxZoom = 0;
-        if (!double.TryParse(_lat.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double lat) || lat < -85 || lat > 85)
+        if (!TryParseNumber(_lat.Text, out double lat) || lat < -85 || lat > 85)
         { _estimate.Text = "Enter a latitude between -85 and 85."; return false; }
-        if (!double.TryParse(_lon.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double lon) || lon < -180 || lon > 180)
+        if (!TryParseNumber(_lon.Text, out double lon) || lon < -180 || lon > 180)
         { _estimate.Text = "Enter a longitude between -180 and 180."; return false; }
-        if (!double.TryParse(_radius.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double radius) || radius <= 0 || radius > 500)
+        if (!TryParseNumber(_radius.Text, out double radius) || radius <= 0 || radius > 500)
         { _estimate.Text = "Enter a radius between 0 and 500 km."; return false; }
         minZoom = _minZoom.SelectedIndex + 1;
         maxZoom = _maxZoom.SelectedIndex + 1;
@@ -130,6 +130,15 @@ public sealed class MapCachePage : ContentPage
         bounds = GeoBounds.AroundCenter(lat, lon, radius);
         return true;
     }
+
+    /// <summary>
+    /// Parses a number the user typed, accepting either '.' or ',' as the decimal separator.
+    /// Android's numeric keypad shows the *locale* separator (a comma in Swedish and many other
+    /// locales) and hides '.', so we normalise before parsing invariantly.
+    /// </summary>
+    static bool TryParseNumber(string? text, out double value) =>
+        double.TryParse((text ?? "").Trim().Replace(',', '.'),
+            NumberStyles.Float, CultureInfo.InvariantCulture, out value);
 
     void UpdateEstimate()
     {
