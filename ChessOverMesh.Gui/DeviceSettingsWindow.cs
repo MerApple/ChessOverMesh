@@ -82,7 +82,7 @@ internal sealed class DeviceSettingsWindow : Window
         Width = 470;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         BuildRoleItems();

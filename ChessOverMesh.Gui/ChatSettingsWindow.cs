@@ -22,7 +22,7 @@ internal sealed class ChatSettingsWindow : Window
         Width = 420;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
         var main = owner as MainWindow;
 

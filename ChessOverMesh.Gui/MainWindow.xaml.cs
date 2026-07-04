@@ -1741,7 +1741,7 @@ public partial class MainWindow : Window
             Owner = this,
             Width = 340,
             SizeToContent = SizeToContent.Height,
-            ResizeMode = ResizeMode.NoResize,
+            ResizeMode = ResizeMode.CanResize,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = new SolidColorBrush(MediaColor.FromRgb(0x25, 0x25, 0x26)),
         };
@@ -5995,7 +5995,7 @@ public partial class MainWindow : Window
             Title = title,
             Owner = this,
             SizeToContent = SizeToContent.WidthAndHeight,
-            ResizeMode = ResizeMode.NoResize,
+            ResizeMode = ResizeMode.CanResize,
             ShowInTaskbar = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = new SolidColorBrush(MediaColor.FromRgb(0x25, 0x25, 0x26)),

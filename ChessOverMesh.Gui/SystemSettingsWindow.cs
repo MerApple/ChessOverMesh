@@ -23,7 +23,7 @@ internal sealed class SystemSettingsWindow : Window
         Width = 400;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         var root = new StackPanel { Margin = new Thickness(14) };
@@ -184,7 +184,7 @@ internal sealed class SystemSettingsWindow : Window
         var w = new Window
         {
             Title = "Set cache password", Owner = owner, Width = 360, SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = Bg,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize, Background = Bg,
         };
         var panel = new StackPanel { Margin = new Thickness(14) };
         PasswordBox? cur = null;
@@ -230,7 +230,7 @@ internal sealed class SystemSettingsWindow : Window
         var w = new Window
         {
             Title = "Remove cache password", Owner = owner, Width = 360, SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Background = Bg,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize, Background = Bg,
         };
         var panel = new StackPanel { Margin = new Thickness(14) };
         panel.Children.Add(new TextBlock

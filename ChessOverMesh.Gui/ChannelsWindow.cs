@@ -77,7 +77,7 @@ internal sealed class ChannelsWindow : Window
         Width = 470;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         _fetchBtn = new Button { Content = "Fetch from device", MinHeight = 24, Padding = new Thickness(8, 0, 8, 0), HorizontalAlignment = HorizontalAlignment.Right };

@@ -18,7 +18,7 @@ internal static class PromotionPicker
             Owner = owner,
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            ResizeMode = ResizeMode.NoResize,
+            ResizeMode = ResizeMode.CanResize,
             Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2D, 0x2D, 0x30))
         };
 

@@ -20,7 +20,7 @@ internal static class ThemedDialog
             Title = title,
             Owner = owner,
             SizeToContent = SizeToContent.WidthAndHeight,
-            ResizeMode = ResizeMode.NoResize,
+            ResizeMode = ResizeMode.CanResize,
             ShowInTaskbar = false,
             WindowStartupLocation = owner != null ? WindowStartupLocation.CenterOwner : WindowStartupLocation.CenterScreen,
             Background = Bg,

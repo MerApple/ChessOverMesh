@@ -35,7 +35,7 @@ internal sealed class SoundSettingsWindow : Window
         Width = 460;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         var sounds = SoundLibrary.Available();

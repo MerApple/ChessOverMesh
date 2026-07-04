@@ -24,7 +24,7 @@ internal sealed class SettingsWindow : Window
         Width = 280;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         var root = new StackPanel { Margin = new Thickness(14) };

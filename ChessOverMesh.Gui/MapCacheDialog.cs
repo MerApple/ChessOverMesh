@@ -40,7 +40,7 @@ internal sealed class MapCacheDialog : Window
         Width = 460;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
 
         _lat = MakeField(centerLat.ToString("0.#####", CultureInfo.InvariantCulture));
         _lon = MakeField(centerLon.ToString("0.#####", CultureInfo.InvariantCulture));

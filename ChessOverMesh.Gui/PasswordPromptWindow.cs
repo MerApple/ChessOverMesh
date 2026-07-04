@@ -24,7 +24,7 @@ internal sealed class PasswordPromptWindow : Window
         Width = 380;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         var root = new StackPanel { Margin = new Thickness(14) };

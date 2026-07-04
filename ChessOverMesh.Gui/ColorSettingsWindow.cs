@@ -33,7 +33,7 @@ internal sealed class ColorSettingsWindow : Window
         Width = 440;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         Background = Bg;
 
         var root = new StackPanel { Margin = new Thickness(12) };
