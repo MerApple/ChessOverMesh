@@ -11,8 +11,8 @@
                        install the update in place (and Obtainium won't offer it).
   -->
   <PropertyGroup>
-    <AppVersion>1.4.3</AppVersion>
-    <AppVersionCode>26</AppVersionCode>
+    <AppVersion>1.4.4</AppVersion>
+    <AppVersionCode>27</AppVersionCode>
   </PropertyGroup>
 
   <!-- Map the shared values onto the per-SDK version properties. ApplicationDisplayVersion/ApplicationVersion
