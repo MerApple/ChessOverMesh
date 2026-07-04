@@ -694,6 +694,9 @@ public sealed class MeshtasticHttpClient : IDisposable
     {
         _seededChannels = null;        // fresh channels will arrive in the dump
         _state.Channels.Clear();
+        // The whole node DB re-streams as NodeInfo frames; suppress surfacing them as "received" until the
+        // caller's drain (via ReceiveAsync) reaches the terminating config_complete_id, which clears the flag.
+        _suppressDumpNodeInfo = true;
         await WriteToRadioAsync(new ToRadioMessageFactory().CreateWantConfigMessage(), ct).ConfigureAwait(false);
     }
 
@@ -764,6 +767,11 @@ public sealed class MeshtasticHttpClient : IDisposable
         const int maxRounds = 4;
         int rounds = stopWhenChannelsComplete ? maxRounds : 1;
 
+        // The dump re-streams the whole node DB as NodeInfo frames; suppress surfacing them as "received".
+        // Cleared below when this loop consumes config_complete_id; if we break early (channels done) the
+        // leftover DB + completion are deferred to the poll loop, which clears the flag on config_complete_id.
+        _suppressDumpNodeInfo = true;
+
         for (int round = 0; round < rounds; round++)
         {
             int before = seenChannels.Count;
@@ -779,7 +787,10 @@ public sealed class MeshtasticHttpClient : IDisposable
                 _state.AddFromRadio(fromRadio);
 
                 if (fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId)
+                {
+                    _suppressDumpNodeInfo = false;   // full dump drained here; re-enable live surfacing
                     break;
+                }
 
                 if (stopWhenChannelsComplete &&
                     fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.Channel)
@@ -2159,6 +2170,10 @@ public sealed class MeshtasticHttpClient : IDisposable
         // on the first empty /fromradio body, which on a device in live-packet mode often happens before the
         // dump starts — so it returns no channels). Channels (slots 0–7) arrive before the node DB, so we
         // stop as soon as all 8 are seen instead of draining hundreds of nodes to config_complete.
+        // The dump re-streams the whole node DB as NodeInfo frames; suppress surfacing them as "received".
+        // Cleared on config_complete_id below; if we break on channels-complete or time out, the leftover
+        // DB + completion are deferred to the poll loop, which clears the flag on config_complete_id.
+        _suppressDumpNodeInfo = true;
         await WriteToRadioAsync(new ToRadioMessageFactory().CreateWantConfigMessage(), ct).ConfigureAwait(false);
         var seen = new HashSet<int>();
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(12);
@@ -2177,6 +2192,7 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId)
             {
                 _lastChannelReadOk = true;   // a complete config dump counts as a successful read
+                _suppressDumpNodeInfo = false;   // full dump drained here; re-enable live surfacing
                 break;
             }
         }
