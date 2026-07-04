@@ -739,6 +739,7 @@ public partial class MainPage : ContentPage
             _mesh.AdminActivity += OnAdminActivity;      // log admin messages (sent/received) to system messages (Admin)
             _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
             _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
+            _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) { AppSettings.LastHost = cacheKey; AppSettings.AddRecentHost(cacheKey); }   // remember for the Host dropdown
             // If this device's cache is encrypted, unlock (or delete) it before reading or writing any cache.
@@ -2535,9 +2536,16 @@ public partial class MainPage : ContentPage
     /// <summary>node num → recent position track (oldest first) for the map's "Show last positions" track view.</summary>
     public IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> GetPositionHistoryMap() =>
         _mesh?.GetPositionHistoryMap() ?? new Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>();
-    /// <summary>One node's recent position track (oldest first, up to the latest 20), empty if none heard.</summary>
+    /// <summary>One node's recent position track (oldest first, up to the configured per-node limit), empty if none heard.</summary>
     public IReadOnlyList<(double Lat, double Lon, long LastHeard, long PosTime)> NodePositionHistory(uint num) =>
         _mesh?.GetPositionHistory(num) ?? Array.Empty<(double, double, long, long)>();
+
+    /// <summary>Pushes the "positions saved per node" Map setting into the live mesh client, which trims every
+    /// node's existing track to the new limit at once.</summary>
+    public void ApplyMaxPositionsPerNode(int limit)
+    {
+        if (_mesh != null) _mesh.MaxPositionHistory = limit;
+    }
     /// <summary>A Google Maps URL for a node's last known location, or null if we have no fix for it yet.</summary>
     public string? NodeMapsUrl(uint num) =>
         _mesh?.GetNodePosition(num) is { } p ? MeshtasticHttpClient.GoogleMapsUrl(p.Latitude, p.Longitude) : null;

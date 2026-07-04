@@ -21,6 +21,7 @@ public sealed class MapSettingsPage : ContentPage
     readonly Picker _provider;
     readonly Entry _key;
     readonly Label _providerHelp;
+    readonly Entry _maxPositions;
     bool _loading;   // suppress change handlers while populating the controls
 
     public MapSettingsPage(MainPage main)
@@ -53,6 +54,15 @@ public sealed class MapSettingsPage : ContentPage
 
         _providerHelp = new Label { TextColor = Dim, FontSize = 11 };
         stack.Add(_providerHelp);
+
+        // Positions saved per node: how many recent fixes each node's map track keeps (oldest dropped past this).
+        // Applies live to the mesh client and persists in settings; clamped to 1–500 on save.
+        stack.Add(new Label { Text = "Positions saved per node", TextColor = Fg, FontSize = 14 });
+        _maxPositions = new Entry { TextColor = Fg, PlaceholderColor = Dim, BackgroundColor = Bg,
+            Keyboard = Keyboard.Numeric, Text = AppSettings.MaxPositionsPerNode.ToString() };
+        _maxPositions.Unfocused += (_, _) => OnMaxPositionsChanged();
+        stack.Add(_maxPositions);
+        stack.Add(new Label { Text = "How many recent fixes each node's map track keeps (1–500).", TextColor = Dim, FontSize = 11 });
 
         _summary = new Label { TextColor = Fg, FontSize = 14 };
         stack.Add(_summary);
@@ -108,6 +118,19 @@ public sealed class MapSettingsPage : ContentPage
         if (changed) MapCacheService.InvalidateTileSource();
         UpdateProviderHelp();
         Refresh();   // enable/disable the Cache button for the new provider/key
+    }
+
+    // Parses, clamps (1–500), persists the per-node position limit and pushes it into the live mesh client. Always
+    // rewrites the field to the stored value so bad input snaps back to the last good number.
+    void OnMaxPositionsChanged()
+    {
+        if (_loading) return;
+        if (int.TryParse(_maxPositions.Text, out var n))
+        {
+            AppSettings.MaxPositionsPerNode = n;   // setter clamps to 1–500
+            _main.ApplyMaxPositionsPerNode(AppSettings.MaxPositionsPerNode);
+        }
+        _maxPositions.Text = AppSettings.MaxPositionsPerNode.ToString();
     }
 
     // Shows provider-specific guidance: where to get a key, or that OSM can't cache offline.

@@ -25,6 +25,7 @@ internal sealed class MapSettingsWindow : Window
     private readonly MapTileCache _cache;
     private readonly Action<Window> _openCacheArea;
     private readonly Action _onTileSourceChanged;
+    private readonly Action<int> _onMaxPositionsChanged;
     private readonly TextBlock _summary;
     private readonly ItemsControl _regions;
     private readonly Button _deleteBtn;
@@ -32,17 +33,22 @@ internal sealed class MapSettingsWindow : Window
     private readonly ComboBox _providerBox;
     private readonly TextBox _keyBox;
     private readonly TextBlock _providerHelp;
+    private readonly TextBox _maxPositionsBox;
     private bool _loading;   // suppress change handlers while populating the controls
 
     /// <param name="openCacheArea">Opens the "Cache map area" download dialog owned by the given window (the main
     /// window supplies its node-position-centred version).</param>
     /// <param name="onTileSourceChanged">Called after the provider/key changes so the caller can rebuild its tile
     /// cache + server against the new source.</param>
-    public MapSettingsWindow(Window owner, MapTileCache cache, Action<Window> openCacheArea, Action onTileSourceChanged)
+    /// <param name="onMaxPositionsChanged">Called with the new per-node position limit so the caller can push it into
+    /// the live mesh client (trimming existing tracks at once).</param>
+    public MapSettingsWindow(Window owner, MapTileCache cache, Action<Window> openCacheArea, Action onTileSourceChanged,
+        Action<int> onMaxPositionsChanged)
     {
         _cache = cache;
         _openCacheArea = openCacheArea;
         _onTileSourceChanged = onTileSourceChanged;
+        _onMaxPositionsChanged = onMaxPositionsChanged;
 
         Title = "Map settings";
         Owner = owner;
@@ -95,6 +101,20 @@ internal sealed class MapSettingsWindow : Window
 
         _providerHelp = new TextBlock { Foreground = Dim, TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 0, 0, 12) };
         top.Children.Add(_providerHelp);
+
+        // --- Positions saved per node ----------------------------------------------------------------------
+        // How many recent fixes each node's map track keeps (oldest dropped past this). Applies live to the mesh
+        // client and persists in settings. Clamped to 1–500 on save.
+        var posRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+        posRow.Children.Add(new TextBlock { Text = "Positions saved per node", Foreground = Fg, VerticalAlignment = VerticalAlignment.Center });
+        _maxPositionsBox = new TextBox { Background = Field, Foreground = Fg, CaretBrush = Fg, BorderBrush = Border,
+            MinWidth = 60, Padding = new Thickness(4, 2, 4, 2), Margin = new Thickness(8, 0, 0, 0),
+            Text = AppSettings.MaxPositionsPerNode.ToString() };
+        _maxPositionsBox.LostFocus += (_, _) => OnMaxPositionsChanged();
+        posRow.Children.Add(_maxPositionsBox);
+        top.Children.Add(posRow);
+        top.Children.Add(new TextBlock { Text = "How many recent fixes each node's map track keeps (1–500).",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, FontSize = 11, Margin = new Thickness(0, 0, 0, 12) });
 
         _summary = new TextBlock { Foreground = Fg, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
         top.Children.Add(_summary);
@@ -158,6 +178,19 @@ internal sealed class MapSettingsWindow : Window
         if (changed) _onTileSourceChanged();
         UpdateProviderHelp();
         Refresh();   // enable/disable the Cache button for the new provider/key
+    }
+
+    // Parses, clamps (1–500), persists the per-node position limit and pushes it into the live mesh client. Always
+    // rewrites the box to the stored value so bad input snaps back to the last good number.
+    private void OnMaxPositionsChanged()
+    {
+        if (_loading) return;
+        if (int.TryParse(_maxPositionsBox.Text, out var n))
+        {
+            AppSettings.MaxPositionsPerNode = n;   // setter clamps to 1–500
+            _onMaxPositionsChanged(AppSettings.MaxPositionsPerNode);
+        }
+        _maxPositionsBox.Text = AppSettings.MaxPositionsPerNode.ToString();
     }
 
     // Shows provider-specific guidance: where to get a key, or that OSM can't cache offline.

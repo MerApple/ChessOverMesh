@@ -177,8 +177,22 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly Dictionary<uint, string> _hwCache = new();     // node num -> hardware model name, seeded from disk cache
     private readonly Dictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)> _positionCache = new();   // node num -> position + times, seeded from disk
     private readonly Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> _positionHistory = new();   // node num -> recent positions (oldest first)
-    private const int MaxPositionHistory = 20;   // keep only the latest N positions per node (oldest dropped past this)
+    private int _maxPositionHistory = 20;   // keep only the latest N positions per node (oldest dropped past this)
     private const double MinPositionMoveMeters = 15.0;   // only record a new track point once the node has moved this far from the last one
+
+    /// <summary>Max position track points kept per node (oldest dropped past this), configurable via the
+    /// "positions per node" Map setting. Clamped to 1–500. Lowering it immediately trims every node's existing
+    /// track so the change takes effect at once rather than only on the next fix.</summary>
+    public int MaxPositionHistory
+    {
+        get => _maxPositionHistory;
+        set
+        {
+            _maxPositionHistory = Math.Clamp(value, 1, 500);
+            foreach (var hist in _positionHistory.Values)
+                if (hist.Count > _maxPositionHistory) hist.RemoveRange(0, hist.Count - _maxPositionHistory);
+        }
+    }
     private readonly Dictionary<uint, List<MeshEnvironment>> _environmentHistory = new();   // node num -> readings (oldest first)
     private const int MaxEnvironmentHistory = 100;   // keep only the latest N per node (oldest dropped past this)
     private readonly HashSet<uint> _sentTraceroutes = new();   // ids of traceroute requests awaiting a reply (matched by request_id)

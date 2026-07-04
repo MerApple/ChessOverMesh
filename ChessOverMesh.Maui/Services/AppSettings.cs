@@ -58,6 +58,7 @@ internal static class AppSettings
         // OSM forbids bulk downloading, so caching an area requires a keyed provider + key.
         public string? MapProvider { get; set; }
         public string? MapApiKey { get; set; }
+        public int MaxPositionsPerNode { get; set; } = 20;   // max position track points kept per node on the map (1–500)
 
         // Remembered proxy sign-in credentials, keyed by proxy host. The password is protected via SecretProtector.
         public Dictionary<string, ProxyCred> ProxyCreds { get; set; } = new();
@@ -160,6 +161,8 @@ internal static class AppSettings
     public static string? MapProvider { get => Load().MapProvider; set => Mutate(d => d.MapProvider = value); }
     /// <summary>The API key for the chosen keyed tile provider (empty for OSM).</summary>
     public static string? MapApiKey { get => Load().MapApiKey; set => Mutate(d => d.MapApiKey = value); }
+    /// <summary>Max position track points kept per node on the map (oldest dropped past this). Clamped to 1–500.</summary>
+    public static int MaxPositionsPerNode { get => Load().MaxPositionsPerNode; set => Mutate(d => d.MaxPositionsPerNode = Math.Clamp(value, 1, 500)); }
 
     /// <summary>The remembered proxy login for <paramref name="host"/> (password decrypted), or null if none saved.</summary>
     public static (string User, string Pass)? GetProxyCred(string host)

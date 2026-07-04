@@ -31,7 +31,7 @@ public sealed class TelemetryPage : ContentPage
         _info = new Label { TextColor = Fg, FontFamily = "monospace", FontSize = 12 };
         _sub = new Label { TextColor = Dim, FontSize = 12 };
         _status = new Label { TextColor = Dim, FontSize = 12 };
-        _posHeader = new Label { Text = "Position history (latest 20):", TextColor = Fg, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 4, 0, 0) };
+        _posHeader = new Label { Text = $"Position history (latest {AppSettings.MaxPositionsPerNode}):", TextColor = Fg, FontAttributes = FontAttributes.Bold, Margin = new Thickness(0, 4, 0, 0) };
 
         var requestBtn = new Button { Text = "Request telemetry", MinimumHeightRequest = 40, Padding = new Thickness(10, 0), Margin = new Thickness(0, 0, 8, 8) };
         requestBtn.Clicked += OnRequest;

@@ -985,6 +985,7 @@ public partial class MainWindow : Window
         _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
         _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
         _mesh.SetNoiseCalibration(AppSettings.NoiseCalibrations);   // apply the per-hardware noise-floor calibration
+        _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
         _currentHost = host;
         _probeHost = probeHost;
         _probePort = probePort;
@@ -5478,7 +5479,14 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Opens the Map settings section: download areas for offline use and delete the cached tiles.</summary>
-    private void OpenMapSettings() => new MapSettingsWindow(this, MapCache, CacheMapArea, InvalidateMapTileSource).ShowDialog();
+    private void OpenMapSettings() => new MapSettingsWindow(this, MapCache, CacheMapArea, InvalidateMapTileSource, ApplyMaxPositionsPerNode).ShowDialog();
+
+    /// <summary>Pushes the "positions saved per node" Map setting into the live mesh client, which trims every
+    /// node's existing track to the new limit at once.</summary>
+    private void ApplyMaxPositionsPerNode(int limit)
+    {
+        if (_mesh != null) _mesh.MaxPositionHistory = limit;
+    }
 
     /// <summary>Opens the Noise settings section: a per-hardware calibration offset (dBm) added to each node's
     /// reported noise floor. Lists every known hardware model plus any type currently seen or already configured.
@@ -5584,9 +5592,10 @@ public partial class MainWindow : Window
         var status = new TextBlock { Foreground = grey, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(status, Dock.Top);
 
-        // Position history (latest 20 fixes, newest first). Cached with the rest of the device entry, so it's
-        // encrypted on disk whenever a cache key is set. Capped MaxHeight so telemetry still gets room below.
-        var posHeader = new TextBlock { Text = "Position history (latest 20):", Foreground = white, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 4, 0, 2) };
+        // Position history (latest N fixes, newest first; N = the "positions saved per node" Map setting). Cached with
+        // the rest of the device entry, so it's encrypted on disk whenever a cache key is set. Capped MaxHeight so
+        // telemetry still gets room below.
+        var posHeader = new TextBlock { Text = $"Position history (latest {AppSettings.MaxPositionsPerNode}):", Foreground = white, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 4, 0, 2) };
         DockPanel.SetDock(posHeader, Dock.Top);
         var posList = new ListBox
         {
