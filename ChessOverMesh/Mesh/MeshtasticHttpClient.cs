@@ -2028,6 +2028,30 @@ public sealed class MeshtasticHttpClient : IDisposable
         return name.Length > 0 ? name : $"!{nodeNum:x8}";
     }
 
+    /// <summary>
+    /// Parse a user-typed node id into a node number. Accepts the Meshtastic "!a1b2c3d4" hex form
+    /// (with or without the leading '!'/'~' the UI shows), a "0x"-prefixed hex value, or a plain
+    /// decimal node number. Bare all-digit input is tried as hex first (matching the "!hex" convention),
+    /// then as decimal, so a full decimal node number that overflows 32-bit hex still resolves.
+    /// Returns false for blank/garbage or the reserved 0 / broadcast (0xffffffff) values.
+    /// </summary>
+    public static bool TryParseNodeId(string? text, out uint nodeNum)
+    {
+        nodeNum = 0;
+        var s = text?.Trim();
+        if (string.IsNullOrEmpty(s)) return false;
+        if (s[0] == '!' || s[0] == '~') s = s.Substring(1).Trim();   // strip the display prefix
+        if (s.Length == 0) return false;
+
+        var hex = s.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? s.Substring(2) : s;
+        bool ok = uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber,
+                                System.Globalization.CultureInfo.InvariantCulture, out nodeNum);
+        // A bare decimal node number that doesn't fit as 32-bit hex (or contains no a-f digits) falls back here.
+        if (!ok) ok = uint.TryParse(s, System.Globalization.NumberStyles.Integer,
+                                    System.Globalization.CultureInfo.InvariantCulture, out nodeNum);
+        return ok && nodeNum != 0 && nodeNum != 0xffffffff;
+    }
+
     // A compact one-line description of a packet for the verbose mesh-traffic log: direction, port, from → to,
     // and how it travelled. Used only when LogAllPackets is on.
     private string FormatTrafficLine(MeshPacket pkt, Data? decoded)
