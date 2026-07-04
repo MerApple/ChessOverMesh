@@ -389,7 +389,8 @@ public sealed class DeviceTabPage : ContentPage
         _hardware.Text = _main.HardwareModel ?? "—";
         _firmware.Text = _main.FirmwareVersion ?? "(reported after sync)";
         _battery.Text = FormatBattery(_main.DeviceBattery);
-        _noise.Text = _main.DeviceNoiseFloor is int nf ? $"{nf} dBm"
+        _noise.Text = _main.DeviceNoiseFloor is int nf && _main.DeviceRawNoiseFloor is int rawNf
+                        ? MeshtasticHttpClient.DescribeNoiseFloor(nf, rawNf)
                     : !_main.IsSynced ? "(reported after sync)"
                     : _noiseTimedOut ? "(not reported by this device)"
                     : "(requesting…)";

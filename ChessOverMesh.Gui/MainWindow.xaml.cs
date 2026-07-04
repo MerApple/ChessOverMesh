@@ -3056,7 +3056,7 @@ public partial class MainWindow : Window
         foreach (var nf in r.NoiseFloors)
         {
             string name = nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}";
-            string line = $"Noise floor for {name}: {nf.NoiseFloorDbm} dBm";
+            string line = $"Noise floor for {name}: {MeshtasticHttpClient.DescribeNoiseFloor(nf.NoiseFloorDbm, nf.RawNoiseFloorDbm)}";
             AddSystem(Stamp() + line, SysCategory.Telemetry);
             _nodeDiagHandler?.Invoke(line);
         }

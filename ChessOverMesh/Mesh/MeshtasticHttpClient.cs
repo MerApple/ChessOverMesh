@@ -130,8 +130,10 @@ public readonly record struct MeshReceiveResult(List<MeshTextMessage> Texts, Lis
 public readonly record struct MeshPositionReport(uint Node, string Name, double Latitude, double Longitude);
 
 /// <summary>A node's reported noise floor (LocalStats.noise_floor, dBm) — its measured ambient RF noise level,
-/// from a LocalStats telemetry reply (e.g. to <see cref="MeshtasticHttpClient.RequestNoiseFloorAsync"/>).</summary>
-public readonly record struct MeshNoiseFloor(uint Node, string Name, int NoiseFloorDbm);
+/// from a LocalStats telemetry reply (e.g. to <see cref="MeshtasticHttpClient.RequestNoiseFloorAsync"/>).
+/// <see cref="NoiseFloorDbm"/> has the per-hardware calibration offset applied; <see cref="RawNoiseFloorDbm"/> is
+/// the value as the radio reported it (they're equal when no offset is configured for the node's hardware).</summary>
+public readonly record struct MeshNoiseFloor(uint Node, string Name, int NoiseFloorDbm, int RawNoiseFloorDbm);
 
 /// <summary>A node's position for the map: number, name, decimal-degree coordinates, and timestamps (epoch
 /// seconds, 0 if unknown) for when the node was last heard and when this position was recorded.</summary>
@@ -557,8 +559,8 @@ public sealed class MeshtasticHttpClient : IDisposable
         // Firmware version — only the local (connected) device reports it, via its metadata.
         if (num == MyNodeNum && FirmwareVersion is { } fw)
             lines.Add($"Firmware: {fw}");
-        if (GetNoiseFloor(num) is int nf)
-            lines.Add($"Noise floor: {nf} dBm");
+        if (GetNoiseFloor(num) is int nf && GetRawNoiseFloor(num) is int rawNf)
+            lines.Add($"Noise floor: {DescribeNoiseFloor(nf, rawNf)}");
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -1112,6 +1114,18 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// one for it.</summary>
     public int? GetNoiseFloor(uint num) =>
         _noiseFloor.TryGetValue(num, out var v) ? v + NoiseCalibrationFor(num) : null;
+
+    /// <summary>The node's most recently reported noise floor in dBm exactly as the radio reported it — before any
+    /// per-hardware calibration offset — or null if we've never received one for it.</summary>
+    public int? GetRawNoiseFloor(uint num) =>
+        _noiseFloor.TryGetValue(num, out var v) ? v : null;
+
+    /// <summary>Formats a noise floor for display: "<paramref name="calibratedDbm"/> dBm", plus a
+    /// " (&lt;raw&gt; dBm without calibration)" suffix when a non-zero calibration offset was applied (i.e. the
+    /// calibrated and raw values differ). Used for node info and the noise-floor system messages.</summary>
+    public static string DescribeNoiseFloor(int calibratedDbm, int rawDbm) =>
+        calibratedDbm == rawDbm ? $"{calibratedDbm} dBm"
+                                : $"{calibratedDbm} dBm ({rawDbm} dBm without calibration)";
 
     /// <summary>Requests a node's LocalStats — to read its noise_floor (dBm) — by sending a Telemetry request with
     /// the local_stats variant (Telemetry field 6, empty), want_response set. The bundled protobuf doesn't model
@@ -1707,8 +1721,8 @@ public sealed class MeshtasticHttpClient : IDisposable
                 // protobuf, so read it from the raw payload. Surfaced so the UI can show the requested noise floor.
                 else if (ReadInt32SubField(decoded.Payload.ToByteArray(), 6, 15) is int noise)
                 {
-                    _noiseFloor[pkt.From] = noise;   // store raw; surface with the hardware calibration offset applied
-                    noiseFloors.Add(new MeshNoiseFloor(pkt.From, DescribeNode(pkt.From), noise + NoiseCalibrationFor(pkt.From)));
+                    _noiseFloor[pkt.From] = noise;   // store raw; surface both the calibrated value and the raw one
+                    noiseFloors.Add(new MeshNoiseFloor(pkt.From, DescribeNode(pkt.From), noise + NoiseCalibrationFor(pkt.From), noise));
                 }
                 continue;
             }
