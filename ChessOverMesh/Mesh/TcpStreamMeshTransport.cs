@@ -258,13 +258,13 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
             while (!ct.IsCancellationRequested)
             {
                 int n = await _stream.ReadAsync(buffer.AsMemory(), ct).ConfigureAwait(false);
-                if (n <= 0) break;   // socket closed by peer
+                if (n <= 0) { SetFault("the device closed the connection"); break; }   // orderly close by peer
                 for (int i = 0; i < n; i++) acc.Add(buffer[i]);
                 DrainFrames(acc);
             }
         }
         catch (OperationCanceledException) { /* disposed */ }
-        catch (Exception) { /* socket error */ }
+        catch (Exception ex) { SetFault(DescribeFault(ex)); }   // socket error — remember why for the app
         finally
         {
             // If the loop ended for any reason other than us disposing, the link is dead — flag it so the app
@@ -272,6 +272,34 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
             if (!_disposed) _faulted = true;
             _inbox.Writer.TryComplete();
         }
+    }
+
+    // Record the drop: flag the link dead and keep the first reason (the most proximate cause — the read loop and a
+    // racing write can both notice the same drop, so whichever gets here first wins).
+    private void SetFault(string reason)
+    {
+        _lastError ??= reason;
+        _faulted = true;
+    }
+
+    // Turn a socket/IO exception into a short, user-facing reason for the "connection lost" message. Unwraps the
+    // SocketException the .NET stream layers wrap in an IOException and maps the common drop codes to plain English.
+    private static string DescribeFault(Exception ex)
+    {
+        var sock = ex as SocketException ?? ex.InnerException as SocketException;
+        if (sock != null)
+            return sock.SocketErrorCode switch
+            {
+                SocketError.ConnectionReset   => "the device reset the connection",
+                SocketError.ConnectionAborted => "the connection was aborted",
+                SocketError.TimedOut          => "the connection timed out (keep-alive probes went unanswered — device asleep, off, or out of range)",
+                SocketError.NetworkUnreachable or SocketError.HostUnreachable => "the device became unreachable on the network",
+                SocketError.NetworkDown       => "the network went down",
+                SocketError.NetworkReset      => "the network connection was reset",
+                _ => $"socket error: {sock.SocketErrorCode}",
+            };
+        if (ex is System.IO.IOException) return $"the network stream failed ({ex.InnerException?.Message ?? ex.Message})";
+        return ex.Message;
     }
 
     // Parse every complete frame currently in the accumulator into the inbox, leaving any partial tail behind.

@@ -2900,7 +2900,10 @@ public partial class MainWindow : Window
     {
         if (!_connected) return;   // already torn down
         string host = _currentHost;
-        AddSystemWarning(Stamp() + "— Connection to the device was lost (it may have been turned off or left the network). —", SysCategory.Connection);
+        // Read the reason before Disconnect() disposes the transport. Fall back to the generic guess if the link
+        // didn't record one (e.g. HTTP, or a probe-detected loss with no socket fault).
+        string reason = _mesh?.TransportLastError is { Length: > 0 } r ? r : "it may have been turned off or left the network";
+        AddSystemWarning(Stamp() + $"— Connection to the device was lost ({reason}). —", SysCategory.Connection);
         Disconnect("Connection lost.", forgetCache: false);   // keep the cache password so auto-reconnect doesn't re-prompt
         if (AppSettings.AutoReconnect && host.Length > 0)
             StartAutoReconnect(host);

@@ -1664,7 +1664,9 @@ public partial class MainPage : ContentPage
         if (!_connected) return;
         string host = _currentHost;
         var rebuildBle = _reconnectBle;   // Disconnect() leaves this intact so auto-reconnect can rebuild the link
-        AddSystem(Stamp() + "— Connection to the device was lost (it may have been turned off, slept, or left the network). —", Palette.Warning, SysCategory.Connection);
+        // Read the reason before Disconnect() disposes the transport; fall back to the generic guess if none was recorded.
+        string reason = _mesh?.TransportLastError is { Length: > 0 } r ? r : "it may have been turned off, slept, or left the network";
+        AddSystem(Stamp() + $"— Connection to the device was lost ({reason}). —", Palette.Warning, SysCategory.Connection);
         Disconnect("Connection lost.", forgetCache: false);   // keep the cache password so auto-reconnect doesn't re-prompt
         // Auto-reconnect works for WiFi (reconnect to the host) and BLE (rebuild the GATT link).
         bool canReconnect = (_transportIsIp && host.Length > 0) || rebuildBle != null;

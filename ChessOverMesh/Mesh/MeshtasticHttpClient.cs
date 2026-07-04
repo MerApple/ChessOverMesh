@@ -211,6 +211,10 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// device is still reachable by a fresh connection. HTTP is always true (its loss is probed separately).</summary>
     public bool TransportConnected => _transport.IsConnected;
 
+    /// <summary>A short reason the persistent link dropped (peer closed it, reset, keep-alive timeout, …), or null if
+    /// it's healthy or the transport doesn't track one. Surfaced in the "connection lost" system message.</summary>
+    public string? TransportLastError => _transport.LastError;
+
     /// <summary>True when the link is persistent and needs periodic heartbeats (TCP/BLE), false for HTTP.</summary>
     public bool TransportNeedsKeepAlive => _transport.NeedsKeepAlive;
 
