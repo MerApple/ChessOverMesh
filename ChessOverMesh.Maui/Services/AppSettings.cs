@@ -19,6 +19,7 @@ internal static class AppSettings
         public int ChatMessageLimit { get; set; } = 100;        // max chat messages kept per channel (cache + on-screen)
         public int SystemMessageLimit { get; set; } = 200;      // max system messages kept on screen
         public string? SystemFilterHidden { get; set; }         // CSV of SysCategory names hidden in the system-messages filter
+        public bool ShowMeshTraffic { get; set; }               // opt-in to the verbose "Mesh traffic" category (off by default — it's a firehose)
         public string? ChessSoundPath { get; set; }
         public string? ChatSoundPath { get; set; }
         public int ChessVolume { get; set; } = 80;
@@ -124,6 +125,7 @@ internal static class AppSettings
     public static int ChatMessageLimit { get => Load().ChatMessageLimit; set => Mutate(d => d.ChatMessageLimit = value); }
     public static int SystemMessageLimit { get => Load().SystemMessageLimit; set => Mutate(d => d.SystemMessageLimit = value); }
     public static string? SystemFilterHidden { get => Load().SystemFilterHidden; set => Mutate(d => d.SystemFilterHidden = value); }
+    public static bool ShowMeshTraffic { get => Load().ShowMeshTraffic; set => Mutate(d => d.ShowMeshTraffic = value); }
     public static string? ChessSoundPath { get => Load().ChessSoundPath; set => Mutate(d => d.ChessSoundPath = value); }
     public static string? ChatSoundPath { get => Load().ChatSoundPath; set => Mutate(d => d.ChatSoundPath = value); }
     public static int ChessVolume { get => Load().ChessVolume; set => Mutate(d => d.ChessVolume = value); }

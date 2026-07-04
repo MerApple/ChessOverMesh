@@ -458,6 +458,7 @@ public partial class MainPage : ContentPage
         SysCategory.Requests => Palette.SysRequests,
         SysCategory.Outgoing => Palette.SysOutgoing,
         SysCategory.Warnings => Palette.SysWarnings,
+        SysCategory.MeshTraffic => Palette.SysMeshTraffic,
         _ => Palette.SysGame,
     };
 
@@ -741,6 +742,8 @@ public partial class MainPage : ContentPage
             _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
             _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
             _mesh.TelemetryReceived += OnTelemetryReceived;  // log device/environment metrics received from other nodes (Telemetry)
+            _mesh.PacketLogged += OnPacketLogged;        // verbose one-line-per-packet mesh-traffic log (MeshTraffic)
+            _mesh.LogAllPackets = !_hiddenSysCats.Contains(SysCategory.MeshTraffic);  // only build the strings when shown
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) { AppSettings.LastHost = cacheKey; AppSettings.AddRecentHost(cacheKey); }   // remember for the Host dropdown
             // If this device's cache is encrypted, unlock (or delete) it before reading or writing any cache.
@@ -2629,6 +2632,9 @@ public partial class MainPage : ContentPage
     /// <summary>Logs device/environment metrics received from another node to system messages, tagged Telemetry.</summary>
     void OnTelemetryReceived(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Telemetry));
 
+    /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category.</summary>
+    void OnPacketLogged(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.MeshTraffic));
+
     /// <summary>Persists the node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     void SaveNodeCache()
     {
@@ -3554,6 +3560,10 @@ public partial class MainPage : ContentPage
         _hiddenSysCats.Clear();
         foreach (var name in (AppSettings.SystemFilterHidden ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             if (Enum.TryParse<SysCategory>(name, out var c)) _hiddenSysCats.Add(c);
+        // "Mesh traffic" is a verbose firehose: hidden unless the user has explicitly opted in (independent of the
+        // saved CSV, so existing installs that predate the category also default it off).
+        if (AppSettings.ShowMeshTraffic) _hiddenSysCats.Remove(SysCategory.MeshTraffic);
+        else _hiddenSysCats.Add(SysCategory.MeshTraffic);
     }
 
     /// <summary>Shows/hides a system-message category live (re-stamps every current row) and persists the choice.</summary>
@@ -3562,6 +3572,12 @@ public partial class MainPage : ContentPage
         if (hidden) _hiddenSysCats.Add(cat); else _hiddenSysCats.Remove(cat);
         foreach (var e in _system) e.Visible = !_hiddenSysCats.Contains(e.Category);
         AppSettings.SystemFilterHidden = string.Join(",", _hiddenSysCats);
+        // The verbose packet log has its own opt-in flag; keep it and the client's per-packet gate in sync.
+        if (cat == SysCategory.MeshTraffic)
+        {
+            AppSettings.ShowMeshTraffic = !hidden;
+            if (_mesh != null) _mesh.LogAllPackets = !hidden;
+        }
     }
 
     static LogEntry Append(ObservableCollection<LogEntry> list, CollectionView? view, string text, Color? color,

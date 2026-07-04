@@ -5,7 +5,7 @@ using Microsoft.Maui.Graphics;
 namespace ChessOverMesh.Maui;
 
 /// <summary>Category of a System-messages line, used by the per-type filter.</summary>
-public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings }
+public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings, MeshTraffic }
 
 /// <summary>A move/system/chat list row whose text and colour update live (e.g. when an ack arrives).
 /// MAUI port of the desktop LogEntry — bound by a CollectionView DataTemplate.</summary>
@@ -159,4 +159,5 @@ public static class Palette
     public static Color SysRequests   { get; set; } = Color.FromRgb(0xF4, 0x8F, 0xB1);   // pink
     public static Color SysOutgoing   { get; set; } = Color.FromRgb(0x4D, 0xD0, 0xE1);   // cyan — our device's own broadcasts
     public static Color SysWarnings   { get; set; } = Color.FromRgb(0xFF, 0x6B, 0x6B);   // red
+    public static Color SysMeshTraffic{ get; set; } = Color.FromRgb(0x8A, 0x9A, 0xA8);   // slate — verbose packet log
 }
