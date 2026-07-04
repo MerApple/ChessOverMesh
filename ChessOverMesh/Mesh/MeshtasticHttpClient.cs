@@ -1655,6 +1655,10 @@ public sealed class MeshtasticHttpClient : IDisposable
 
             var pkt = fromRadio.Packet;
             var decoded = pkt.Decoded;
+            // Verbose mesh-traffic log: one compact line per packet (transmitted + received). Gated on LogAllPackets
+            // so we don't build the string when the app's "Mesh traffic" view is hidden. Emitted before the
+            // decoded==null skip below so packets we couldn't decrypt still show (as "Encrypted").
+            if (LogAllPackets) PacketLogged?.Invoke(FormatTrafficLine(pkt, decoded));
             if (decoded == null) continue;
 
             // For packets from other nodes (our own echoes excluded): remember the channel index we decoded
@@ -2018,6 +2022,41 @@ public sealed class MeshtasticHttpClient : IDisposable
         string name = NameOf(node?.User?.LongName, node?.User?.ShortName);
         if (name.Length == 0 && _nameCache.TryGetValue(nodeNum, out var cached)) name = cached;
         return name.Length > 0 ? name : $"!{nodeNum:x8}";
+    }
+
+    // A compact one-line description of a packet for the verbose mesh-traffic log: direction, port, from → to,
+    // and how it travelled. Used only when LogAllPackets is on.
+    private string FormatTrafficLine(MeshPacket pkt, Data? decoded)
+    {
+        bool tx = MyNodeNum != 0 && pkt.From == MyNodeNum;
+        string port = decoded != null ? PrettyPort(decoded.Portnum) : "Encrypted";
+        string to = pkt.To == 0xffffffff ? "all" : DescribeNode(pkt.To);
+        string route = DescribeRoute(pkt, tx);
+        return $"{(tx ? "TX" : "RX")} {port}  {DescribeNode(pkt.From)} → {to}{(route.Length > 0 ? "  · " + route : "")}";
+    }
+
+    // "PositionApp" → "Position"; other/unknown ports fall back to the enum name.
+    private static string PrettyPort(PortNum p)
+    {
+        string s = p.ToString();
+        return s.EndsWith("App", StringComparison.Ordinal) ? s[..^3] : s;
+    }
+
+    // How a packet travelled: for our own TX, whether it went out to the mesh (hop_start set by the router) or is
+    // just a phone-only loopback the firmware pushed without transmitting (hop_start 0); for RX, the hop count
+    // (direct / N hops). MQTT-relayed packets are flagged either way. Empty when nothing meaningful is known.
+    private static string DescribeRoute(MeshPacket pkt, bool tx)
+    {
+        var parts = new List<string>();
+        if (tx)
+            parts.Add(pkt.HopStart > 0 ? "to mesh" : "phone-local");
+        else if (pkt.HopStart > 0)
+        {
+            int hops = Math.Max(0, (int)pkt.HopStart - (int)pkt.HopLimit);
+            parts.Add(hops == 0 ? "direct" : $"{hops} hop{(hops == 1 ? "" : "s")}");
+        }
+        if (pkt.ViaMqtt) parts.Add("MQTT");
+        return string.Join(" · ", parts);
     }
 
     /// <summary>
@@ -2540,6 +2579,15 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// Human-readable description, so the app can log it in system messages. May fire off the UI thread —
     /// subscribers should marshal to the UI thread.</summary>
     public event Action<string>? OwnBroadcast;
+
+    /// <summary>True to raise <see cref="PacketLogged"/> for every mesh packet. Gated so we skip building the
+    /// per-packet string when the app's verbose "Mesh traffic" view is hidden. Set by the app from its filter.</summary>
+    public bool LogAllPackets { get; set; }
+
+    /// <summary>Raised once per mesh packet — transmitted or received — when <see cref="LogAllPackets"/> is on,
+    /// with a compact one-line description, so the app can show a raw traffic log. May fire off the UI thread —
+    /// subscribers should marshal to the UI thread.</summary>
+    public event Action<string>? PacketLogged;
 
     /// <summary>Raised when ANOTHER node's telemetry reading reaches us — device metrics (battery/voltage/
     /// utilization/uptime) or environment metrics (temperature/humidity/pressure), whether solicited by our

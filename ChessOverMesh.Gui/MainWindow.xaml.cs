@@ -20,7 +20,7 @@ using GameColor = ChessOverMesh.Chess.Color;
 namespace ChessOverMesh.Gui;
 
 /// <summary>Category of a System-messages line, used by the per-type filter.</summary>
-public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings }
+public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings, MeshTraffic }
 
 public partial class MainWindow : Window
 {
@@ -385,6 +385,7 @@ public partial class MainWindow : Window
     private static readonly MediaColor DefSysRequests = MediaColor.FromRgb(0xF4, 0x8F, 0xB1);    // pink
     private static readonly MediaColor DefSysOutgoing = MediaColor.FromRgb(0x4D, 0xD0, 0xE1);    // cyan — our device's own broadcasts
     private static readonly MediaColor DefSysWarnings = MediaColor.FromRgb(0xFF, 0x6B, 0x6B);    // red
+    private static readonly MediaColor DefSysMeshTraffic = MediaColor.FromRgb(0x8A, 0x9A, 0xA8); // slate — verbose packet log
     private static readonly SolidColorBrush SysGameText = new(DefSysGame);
     private static readonly SolidColorBrush SysConnectionText = new(DefSysConnection);
     private static readonly SolidColorBrush SysNodesText = new(DefSysNodes);
@@ -395,6 +396,7 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush SysRequestsText = new(DefSysRequests);
     private static readonly SolidColorBrush SysOutgoingText = new(DefSysOutgoing);
     private static readonly SolidColorBrush SysWarningsText = new(DefSysWarnings);
+    private static readonly SolidColorBrush SysMeshTrafficText = new(DefSysMeshTraffic);
 
     private static SolidColorBrush SysCategoryBrush(SysCategory cat) => cat switch
     {
@@ -407,6 +409,7 @@ public partial class MainWindow : Window
         SysCategory.Requests => SysRequestsText,
         SysCategory.Outgoing => SysOutgoingText,
         SysCategory.Warnings => SysWarningsText,
+        SysCategory.MeshTraffic => SysMeshTrafficText,
         _ => SysGameText,
     };
 
@@ -985,6 +988,8 @@ public partial class MainWindow : Window
         _mesh.IncomingRequest += OnIncomingRequest;  // log position/telemetry/noise-floor requests from others (Requests)
         _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
         _mesh.TelemetryReceived += OnTelemetryReceived;  // log device/environment metrics received from other nodes (Telemetry)
+        _mesh.PacketLogged += OnPacketLogged;        // verbose one-line-per-packet mesh-traffic log (MeshTraffic)
+        _mesh.LogAllPackets = !_hiddenSysCats.Contains(SysCategory.MeshTraffic);  // only build the strings when shown
         _mesh.SetNoiseCalibration(AppSettings.NoiseCalibrations);   // apply the per-hardware noise-floor calibration
         _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
         _currentHost = host;
@@ -2390,6 +2395,9 @@ public partial class MainWindow : Window
 
     /// <summary>Logs our own device's autonomous broadcast (position/nodeinfo/telemetry) to system messages, tagged Outgoing.</summary>
     private void OnOwnBroadcast(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Outgoing));
+
+    /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category.</summary>
+    private void OnPacketLogged(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.MeshTraffic));
 
     /// <summary>Logs device/environment metrics received from another node to system messages, tagged Telemetry.</summary>
     private void OnTelemetryReceived(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Telemetry));
@@ -4430,6 +4438,10 @@ public partial class MainWindow : Window
         _hiddenSysCats.Clear();
         foreach (var name in (AppSettings.SystemFilterHidden ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             if (Enum.TryParse<SysCategory>(name, out var c)) _hiddenSysCats.Add(c);
+        // "Mesh traffic" is a verbose firehose: hidden unless the user has explicitly opted in (independent of the
+        // saved CSV, so existing installs that predate the category also default it off).
+        if (AppSettings.ShowMeshTraffic) _hiddenSysCats.Remove(SysCategory.MeshTraffic);
+        else _hiddenSysCats.Add(SysCategory.MeshTraffic);
     }
 
     // Shows/hides a category live (re-stamps every current system row's visibility) and persists the choice.
@@ -4438,6 +4450,12 @@ public partial class MainWindow : Window
         if (hidden) _hiddenSysCats.Add(cat); else _hiddenSysCats.Remove(cat);
         foreach (LogEntry e in SystemList.Items) e.Visible = !_hiddenSysCats.Contains(e.Category);
         AppSettings.SystemFilterHidden = string.Join(",", _hiddenSysCats);
+        // The verbose packet log has its own opt-in flag; keep it and the client's per-packet gate in sync.
+        if (cat == SysCategory.MeshTraffic)
+        {
+            AppSettings.ShowMeshTraffic = !hidden;
+            if (_mesh != null) _mesh.LogAllPackets = !hidden;
+        }
     }
 
     private void SystemFilterBtn_Click(object sender, RoutedEventArgs e) => SystemFilterPopup.IsOpen = !SystemFilterPopup.IsOpen;
@@ -4448,6 +4466,7 @@ public partial class MainWindow : Window
         SysCategory.Requests => "Requests from others",
         SysCategory.Outgoing => "Outgoing (our device)",
         SysCategory.Warnings => "Warnings & notices",
+        SysCategory.MeshTraffic => "Mesh traffic (all packets)",
         _ => c.ToString(),
     };
 

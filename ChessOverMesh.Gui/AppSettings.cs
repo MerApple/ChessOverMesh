@@ -19,6 +19,7 @@ internal static class AppSettings
         public int SystemMessageLimit { get; set; } = 200;      // max system messages kept on screen
         public bool ShowChessboard { get; set; } = true;        // show the chessboard; off = system-messages + chat only
         public string? SystemFilterHidden { get; set; }         // CSV of SysCategory names hidden in the system-messages filter
+        public bool ShowMeshTraffic { get; set; }               // opt-in to the verbose "Mesh traffic" category (off by default — it's a firehose)
         // Notification sounds: file path per category ("" = off, null = not chosen yet → a default is used),
         // and 0–100 volume.
         public string? ChessSoundPath { get; set; }
@@ -207,6 +208,12 @@ internal static class AppSettings
     {
         get => Load().SystemFilterHidden;
         set => Mutate(d => d.SystemFilterHidden = value);
+    }
+
+    public static bool ShowMeshTraffic
+    {
+        get => Load().ShowMeshTraffic;
+        set => Mutate(d => d.ShowMeshTraffic = value);
     }
 
     // Notification sound per category: null until the user has chosen (caller substitutes a default).
