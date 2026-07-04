@@ -1900,11 +1900,14 @@ public sealed class MeshtasticHttpClient : IDisposable
     // A packet our OWN node loops back to the connected client is either a genuine mesh transmission (the
     // firmware's periodic broadcast, sent over the radio) or a "phone-only" local update the firmware pushes to
     // the app in between — e.g. the device-metrics telemetry it refreshes for the attached client roughly every
-    // minute, independent of the (much longer) device_update_interval it actually broadcasts on. Only a packet
-    // that went through the router's transmit path carries hop info (hop_start/hop_limit are set there); the
-    // phone-only copy never hits the radio, so both stay 0. That's how we tell a real broadcast from a local push
-    // and avoid announcing the every-minute phone refresh as "broadcast to the mesh".
-    private static bool WasTransmittedToMesh(MeshPacket pkt) => pkt.HopStart > 0 || pkt.HopLimit > 0;
+    // minute, independent of the (much longer) device_update_interval it actually broadcasts on.
+    // The discriminator is hop_start, NOT hop_limit: the firmware stamps hop_limit onto EVERY packet when it's
+    // allocated (allocForSending copies the configured hop count), so a phone-only copy still has hop_limit > 0.
+    // hop_start is only set when the router actually transmits the packet to the mesh, so it stays 0 on the
+    // phone-only push and equals the hop count on a real broadcast. Gate on that so we don't announce the
+    // every-minute phone refresh as "broadcast to the mesh". (A device configured for 0 hops is the sole edge
+    // case where a real broadcast also reads hop_start == 0 and would go unannounced — acceptable.)
+    private static bool WasTransmittedToMesh(MeshPacket pkt) => pkt.HopStart > 0;
 
     // Parses a RouteDiscovery payload for the forward route (field 1) + SNR (field 2) and the return route
     // (field 3) + SNR (field 4). The bundled protobuf only models field 1, so we read the bytes directly to also
