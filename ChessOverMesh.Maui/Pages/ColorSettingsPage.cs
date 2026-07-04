@@ -31,6 +31,7 @@ public sealed class ColorSettingsPage : ContentPage
         var choices = new[]
         {
             new Choice("Received / normal", () => Palette.Normal, v => { Palette.Normal = v; AppSettings.NormalColor = Hex(v); }, Color.FromRgb(0xE0,0xE0,0xE0)),
+            new Choice("Received direct message", () => Palette.Dm, v => { Palette.Dm = v; AppSettings.DmColor = Hex(v); }, Color.FromRgb(0xC7,0x9E,0xFF)),
             new Choice("Sending — awaiting ack", () => Palette.Pending, v => { Palette.Pending = v; AppSettings.PendingColor = Hex(v); }, Color.FromRgb(0xFF,0xC1,0x07)),
             new Choice("Delivered / acknowledged", () => Palette.Acked, v => { Palette.Acked = v; AppSettings.AckedColor = Hex(v); }, Color.FromRgb(0x77,0xDD,0x77)),
             new Choice("Relayed (rebroadcast heard)", () => Palette.Relayed, v => { Palette.Relayed = v; AppSettings.RelayedColor = Hex(v); }, Color.FromRgb(0x80,0xCB,0xC4)),

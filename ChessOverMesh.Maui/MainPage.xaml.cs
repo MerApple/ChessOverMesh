@@ -348,7 +348,7 @@ public partial class MainPage : ContentPage
         detail += $"  · chunked ({g.Total} parts)";
         var msg0 = g.First;
         string bodyPart = decryptFailed ? $"{body}  ⚠ decryption failed (wrong/missing key)" : text;
-        LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, decryptFailed ? Palette.Warning : Palette.Normal, msg0);
+        LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, decryptFailed ? Palette.Warning : (wasDm ? Palette.Dm : Palette.Normal), msg0);
         entry.ChatNameBody = sentDmFromUs ? null : bodyPart;
         entry.Channel = ch;
         entry.PacketId = g.PacketIds.Count > 0 ? g.PacketIds[0] : 0;
@@ -429,6 +429,7 @@ public partial class MainPage : ContentPage
     static void LoadColors()
     {
         Palette.Normal = ParseHex(AppSettings.NormalColor) ?? Palette.Normal;
+        Palette.Dm = ParseHex(AppSettings.DmColor) ?? Palette.Dm;
         Palette.Pending = ParseHex(AppSettings.PendingColor) ?? Palette.Pending;
         Palette.Acked = ParseHex(AppSettings.AckedColor) ?? Palette.Acked;
         Palette.Relayed = ParseHex(AppSettings.RelayedColor) ?? Palette.Relayed;
@@ -1938,7 +1939,7 @@ public partial class MainPage : ContentPage
                 // The part after the "<name>: " prefix; stored on the row so it can be re-rendered with the real
                 // name once this node's info arrives (an unknown sender first shows as "!hex").
                 string bodyPart = msg.DecryptFailed ? $"{msg.Text}  ⚠ decryption failed (wrong/missing key)" : body;
-                LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : Palette.Normal, msg);
+                LogEntry entry = AddChatLine($"{dmTag}{who}: {bodyPart}", detail, msg.DecryptFailed ? Palette.Warning : (wasDm ? Palette.Dm : Palette.Normal), msg);
                 entry.ChatNameBody = sentDmFromUs ? null : bodyPart;   // outgoing DMs aren't re-rendered (the prefix differs)
                 entry.Channel = msg.Channel;
                 // Honour the sender's self-destruct: expiry is counted from the radio's receive time (falls back to

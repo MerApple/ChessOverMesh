@@ -29,6 +29,7 @@ internal static class AppSettings
         public string? RelayedColor { get; set; }
         public string? CachedColor { get; set; }
         public string? WarningColor { get; set; }
+        public string? DmColor { get; set; }
         public string? SysGameColor { get; set; }
         public string? SysConnectionColor { get; set; }
         public string? SysNodesColor { get; set; }
@@ -132,6 +133,7 @@ internal static class AppSettings
     public static string? RelayedColor { get => Load().RelayedColor; set => Mutate(d => d.RelayedColor = value); }
     public static string? CachedColor { get => Load().CachedColor; set => Mutate(d => d.CachedColor = value); }
     public static string? WarningColor { get => Load().WarningColor; set => Mutate(d => d.WarningColor = value); }
+    public static string? DmColor { get => Load().DmColor; set => Mutate(d => d.DmColor = value); }
     public static string? SysGameColor { get => Load().SysGameColor; set => Mutate(d => d.SysGameColor = value); }
     public static string? SysConnectionColor { get => Load().SysConnectionColor; set => Mutate(d => d.SysConnectionColor = value); }
     public static string? SysNodesColor { get => Load().SysNodesColor; set => Mutate(d => d.SysNodesColor = value); }

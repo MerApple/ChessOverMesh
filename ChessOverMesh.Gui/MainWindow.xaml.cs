@@ -361,12 +361,14 @@ public partial class MainWindow : Window
     private static readonly MediaColor DefAckedColor = MediaColor.FromRgb(0x77, 0xDD, 0x77);     // green (acknowledged)
     private static readonly MediaColor DefRelayedColor = MediaColor.FromRgb(0x80, 0xCB, 0xC4);   // teal (rebroadcast heard)
     private static readonly MediaColor DefCachedColor = MediaColor.FromRgb(0x9E, 0x9E, 0x9E);    // grey (old cached history)
+    private static readonly MediaColor DefDmColor = MediaColor.FromRgb(0xC7, 0x9E, 0xFF);        // lavender (received direct message)
     internal static readonly SolidColorBrush NormalText = new(DefNormalColor);
     internal static readonly SolidColorBrush WarningText = new(DefWarningColor);
     internal static readonly SolidColorBrush PendingText = new(DefPendingColor);
     internal static readonly SolidColorBrush AckedText = new(DefAckedColor);
     internal static readonly SolidColorBrush RelayedText = new(DefRelayedColor);
     internal static readonly SolidColorBrush CachedText = new(DefCachedColor);
+    internal static readonly SolidColorBrush DmText = new(DefDmColor);
 
     // Subtle semi-transparent yellow wash behind an unread received row (~15% alpha over the dark chat background).
     internal static readonly SolidColorBrush UnreadHighlight = new(MediaColor.FromArgb(0x26, 0xFF, 0xEB, 0x3B));
@@ -593,6 +595,7 @@ public partial class MainWindow : Window
         RelayedText.Color = ParseHex(AppSettings.RelayedColor) ?? DefRelayedColor;
         CachedText.Color = ParseHex(AppSettings.CachedColor) ?? DefCachedColor;
         WarningText.Color = ParseHex(AppSettings.WarningColor) ?? DefWarningColor;
+        DmText.Color = ParseHex(AppSettings.DmColor) ?? DefDmColor;
 
         SysGameText.Color = ParseHex(AppSettings.SysGameColor) ?? DefSysGame;
         SysConnectionText.Color = ParseHex(AppSettings.SysConnectionColor) ?? DefSysConnection;
@@ -611,6 +614,7 @@ public partial class MainWindow : Window
         var choices = new List<ColorChoice>
         {
             new("Received / normal text", NormalText, DefNormalColor, c => AppSettings.NormalColor = ToHex(c)),
+            new("Received direct message",  DmText, DefDmColor, c => AppSettings.DmColor = ToHex(c)),
             new("Sending — awaiting ack",  PendingText, DefPendingColor, c => AppSettings.PendingColor = ToHex(c)),
             new("Delivered / acknowledged", AckedText, DefAckedColor, c => AppSettings.AckedColor = ToHex(c)),
             new("Relayed (rebroadcast heard)", RelayedText, DefRelayedColor, c => AppSettings.RelayedColor = ToHex(c)),
@@ -3296,7 +3300,7 @@ public partial class MainWindow : Window
             LogEntry entry = msg.DecryptFailed
                 // Channel has an app key set, but this didn't decrypt — show the raw payload in red.
                 ? AddChatLine($"{who}: {msg.Text}  ⚠ decryption failed (wrong/missing key)", detail, WarningText, msg)
-                : AddChatLine($"{who}: {body}", detail, NormalText, msg);
+                : AddChatLine($"{who}: {body}", detail, wasDm ? DmText : NormalText, msg);
             entry.PacketId = msg.PacketId;                       // so it can be replied to
             entry.Channel = msg.Channel;
             // Honour the sender's self-destruct: expiry is counted from the radio's receive time (falls back to now),
@@ -4250,7 +4254,7 @@ public partial class MainWindow : Window
         var msg0 = g.First;
         LogEntry entry = decryptFailed
             ? AddChatLine($"{who}: {body}  ⚠ decryption failed (wrong/missing key)", detail, WarningText, msg0)
-            : AddChatLine($"{who}: {text}", detail, NormalText, msg0);
+            : AddChatLine($"{who}: {text}", detail, wasDm ? DmText : NormalText, msg0);
         entry.Channel = ch;
         entry.PacketId = g.PacketIds.Count > 0 ? g.PacketIds[0] : 0;
         entry.PartPacketIds = new List<uint>(g.PacketIds);

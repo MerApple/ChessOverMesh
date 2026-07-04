@@ -32,6 +32,7 @@ internal static class AppSettings
         public string? RelayedColor { get; set; }
         public string? CachedColor { get; set; }
         public string? WarningColor { get; set; }
+        public string? DmColor { get; set; }
         // Per-system-message-category colours ("#RRGGBB"; null = built-in default).
         public string? SysGameColor { get; set; }
         public string? SysConnectionColor { get; set; }
@@ -220,6 +221,7 @@ internal static class AppSettings
     public static string? RelayedColor { get => Load().RelayedColor; set => Mutate(d => d.RelayedColor = value); }
     public static string? CachedColor { get => Load().CachedColor; set => Mutate(d => d.CachedColor = value); }
     public static string? WarningColor { get => Load().WarningColor; set => Mutate(d => d.WarningColor = value); }
+    public static string? DmColor { get => Load().DmColor; set => Mutate(d => d.DmColor = value); }
 
     // Per-system-message-category colours.
     public static string? SysGameColor { get => Load().SysGameColor; set => Mutate(d => d.SysGameColor = value); }

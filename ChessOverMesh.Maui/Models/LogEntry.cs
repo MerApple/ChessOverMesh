@@ -145,6 +145,7 @@ public static class Palette
     public static Color Relayed { get; set; } = Color.FromRgb(0x80, 0xCB, 0xC4);   // teal — rebroadcast heard
     public static Color Cached  { get; set; } = Color.FromRgb(0x9E, 0x9E, 0x9E);   // grey — old cached history
     public static Color Warning { get; set; } = Color.FromRgb(0xFF, 0x6B, 0x6B);   // red — failed/warning
+    public static Color Dm      { get; set; } = Color.FromRgb(0xC7, 0x9E, 0xFF);   // lavender — received direct message
     public static Color Unread  { get; set; } = Color.FromArgb("#26FFEB3B");        // subtle ~15%-alpha yellow wash — unread row
 
     // Per-system-message-category colours (System messages only — chat is never coloured by these).
