@@ -52,12 +52,12 @@ internal sealed class MapSettingsWindow : Window
 
         Title = "Map settings";
         Owner = owner;
-        Width = 420;
-        Height = 460;
+        Width = 480;
+        Height = 680;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResizeWithGrip;
         MinWidth = 360;
-        MinHeight = 240;
+        MinHeight = 520;
         Background = Bg;
 
         // Grid so the cached-region list (star row) soaks up any extra height when the user resizes the window;
