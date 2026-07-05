@@ -376,6 +376,7 @@ public partial class MainPage : ContentPage
 
         MovesView.ItemsSource = _moves;
         SystemView.ItemsSource = _system;
+        SystemView.ItemTemplate = BuildSystemItemTemplate();
 
         _showSignal = AppSettings.ShowSignal;
         _chessSound = AppSettings.ChessSoundPath ?? SoundLibrary.DefaultChess();
@@ -2912,7 +2913,7 @@ public partial class MainPage : ContentPage
         {
             if (t.IsRequest)   // someone traced us — the firmware auto-replies; just note it in the system log
             {
-                AddSystem(Stamp() + $"Traceroute request received from {_mesh?.DescribeNode(t.Node)} — the device is replying.", cat: SysCategory.Requests);
+                AddSystem(Stamp() + $"Traceroute request received from {_mesh?.DescribeNode(t.Node)} — the device is replying.", cat: SysCategory.Requests, nodeId: t.Node);
                 continue;
             }
             if (_tracerouteWaiters.TryGetValue(t.Node, out var waiter)) waiter(t);
@@ -2922,7 +2923,7 @@ public partial class MainPage : ContentPage
         foreach (var pos in result.Positions)
             {
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
-                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", cat: SysCategory.Position);
+                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", cat: SysCategory.Position, nodeId: pos.Node);
             }
         if (result.Positions.Count > 0)
         {
@@ -2944,14 +2945,14 @@ public partial class MainPage : ContentPage
         }
         // Noise floor replies (requested via the node info page): log them and refresh any open node page.
         foreach (var nf in result.NoiseFloors)
-            AddSystem(Stamp() + $"Noise floor for {(nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}")}: {MeshtasticHttpClient.DescribeNoiseFloor(nf.NoiseFloorDbm, nf.RawNoiseFloorDbm)}", cat: SysCategory.Telemetry);
+            AddSystem(Stamp() + $"Noise floor for {(nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}")}: {MeshtasticHttpClient.DescribeNoiseFloor(nf.NoiseFloorDbm, nf.RawNoiseFloorDbm)}", cat: SysCategory.Telemetry, nodeId: nf.Node);
         if (result.NoiseFloors.Count > 0) { _telemetryRefresh?.Invoke(); NodesChanged?.Invoke(); StateChanged?.Invoke(); }   // StateChanged → Device tab noise-floor row
 
         // New-node / node-info events in the system log. Always logged; the System-messages filter
         // (Nodes category) controls whether these are shown.
         {
             foreach (var nn in result.NewNodes)
-                AddSystem(Stamp() + $"New node heard: {(nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}")}.", cat: SysCategory.Nodes);
+                AddSystem(Stamp() + $"New node heard: {(nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}")}.", cat: SysCategory.Nodes, nodeId: nn.Node);
             foreach (var ni in result.NodeInfos)
             {
                 string who = ni.Name.Length > 0 ? ni.Name : $"!{ni.Node:x8}";
@@ -2959,7 +2960,7 @@ public partial class MainPage : ContentPage
                 // it's an answer/announcement carrying that node's info.
                 AddSystem(Stamp() + (ni.IsRequest
                     ? $"Node info request received from {who} — replying with ours."
-                    : $"Node info received from {who}."), cat: SysCategory.Nodes);
+                    : $"Node info received from {who}."), cat: SysCategory.Nodes, nodeId: ni.Node);
             }
         }
         if (result.NodeInfos.Count > 0 || result.NewNodes.Count > 0)
@@ -3431,13 +3432,68 @@ public partial class MainPage : ContentPage
         return $"[{index}]";
     }
 
+    // The System list's row template, built in code (not XAML) so the Android long-press hook below can reach the
+    // native view — mirrors the chat list's approach in ChatTabPage. Long-pressing a node-related system row offers
+    // "Request node info", exactly like the chat long-press menu.
+    DataTemplate BuildSystemItemTemplate() => new DataTemplate(() =>
+    {
+        var msg = new Label();
+        msg.SetBinding(Label.TextProperty, nameof(LogEntry.Text));
+        msg.SetBinding(Label.TextColorProperty, nameof(LogEntry.TextColor));
+        msg.SetBinding(Label.FontFamilyProperty, nameof(LogEntry.FontFamily));
+        msg.SetBinding(Label.FontSizeProperty, nameof(LogEntry.FontSize));
+        var cell = new VerticalStackLayout { Padding = new Thickness(4, 2), Children = { msg } };
+        cell.SetBinding(IsVisibleProperty, nameof(LogEntry.Visible));   // the System-messages filter hides rows by category
+#if ANDROID
+        void OnLongClick(object? s, Android.Views.View.LongClickEventArgs e)
+        {
+            e.Handled = true;
+            if (cell.BindingContext is LogEntry le)
+                MainThread.BeginInvokeOnMainThread(() => _ = ShowSystemMenuAsync(le));
+        }
+        cell.HandlerChanged += (_, _) =>
+        {
+            if (cell.Handler?.PlatformView is Android.Views.View av)
+            {
+                av.LongClickable = true;
+                av.LongClick -= OnLongClick;   // avoid double-subscribing if the handler is re-created
+                av.LongClick += OnLongClick;
+            }
+        };
+#endif
+        return cell;
+    });
+
+    // Long-press menu on a system message. "Request node info" appears only for rows tied to a node (NodeId set when
+    // the row was logged) and reuses the same mesh call as the chat menu; "Copy message" is always offered.
+    async Task ShowSystemMenuAsync(LogEntry le)
+    {
+        var opts = new List<string>();
+        if (le.NodeId != 0) opts.Add("Request node info");
+        opts.Add("Copy message");
+        string choice = await ThemedDialogs.ActionSheet(this, "System message", "Cancel", null, opts.ToArray());
+        switch (choice)
+        {
+            case "Request node info":
+                await ThemedDialogs.Alert(this, "Node info", await RequestNodeInfoForAsync(le.NodeId), "OK");
+                break;
+            case "Copy message":
+                try { await Clipboard.Default.SetTextAsync(le.Text ?? ""); Status("Copied message to the clipboard."); }
+                catch (Exception ex) { Status($"Copy failed: {ex.Message}"); }
+                break;
+        }
+    }
+
     LogEntry AddMove(string text, Color? color = null) => Append(_moves, MovesView, text, color, _movesFamily, _movesSize);
-    LogEntry AddSystem(string text, Color? color = null, SysCategory cat = SysCategory.Game)
+    // nodeId ties a node-related row (node heard/info/position/noise/traceroute) to a node so the long-press menu
+    // can request its node info; 0 = not tied to a node.
+    LogEntry AddSystem(string text, Color? color = null, SysCategory cat = SysCategory.Game, uint nodeId = 0)
     {
         // No explicit colour → use the category colour (game-flow rows that later show ack status pass an
         // explicit Pending/Acked/Warning colour, so status still wins there).
         var entry = Append(_system, SystemView, text, color ?? SysCategoryColor(cat), _systemFamily, _systemSize);
         entry.Category = cat;
+        entry.NodeId = nodeId;
         entry.Visible = !_hiddenSysCats.Contains(cat);
         TrimSystemMessages();
         return entry;

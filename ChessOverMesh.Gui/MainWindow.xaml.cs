@@ -306,6 +306,10 @@ public partial class MainWindow : Window
         // For system rows: the message category, so the System-messages filter can show/hide by type.
         public SysCategory Category = SysCategory.Game;
 
+        // For a node-related system row (node heard/info/position/noise/traceroute): the node it concerns, so
+        // right-click → "Request node info" can ask the mesh for it. 0 = not tied to a node (menu no-ops).
+        public uint SysNode;
+
         // Whether this row is shown (the RX filter can hide a channel/DM's rows). Notifies so the list updates live.
         private bool _visible = true;
         public bool Visible
@@ -3029,7 +3033,7 @@ public partial class MainWindow : Window
             if (t.IsRequest)   // someone traced us — the firmware auto-replies; just note it in the log
             {
                 string reqLine = $"Traceroute request received from {_mesh.DescribeNode(t.Node)} — the device is replying.";
-                AddSystem(Stamp() + reqLine, SysCategory.Requests);
+                AddSystem(Stamp() + reqLine, SysCategory.Requests, t.Node);
                 _nodeDiagHandler?.Invoke(reqLine);
                 continue;
             }
@@ -3039,7 +3043,7 @@ public partial class MainWindow : Window
             if (t.Route.Count == 0 || t.Route[^1] != t.Node) parts.Add(_mesh.DescribeNode(t.Node));
             int hops = Math.Max(0, parts.Count - 1);
             string line = $"Traceroute to {_mesh.DescribeNode(t.Node)}: {string.Join(" → ", parts)}  ({hops} hop{(hops == 1 ? "" : "s")})";
-            AddSystem(Stamp() + line, SysCategory.Traceroute);
+            AddSystem(Stamp() + line, SysCategory.Traceroute, t.Node);
             // Deliver to the open traceroute window for this node; otherwise fall back to the Nodes status line.
             if (_tracerouteWaiters.TryGetValue(t.Node, out var waiter)) waiter(t);
             else _nodeDiagHandler?.Invoke(line);
@@ -3053,7 +3057,7 @@ public partial class MainWindow : Window
             string line = ni.IsRequest
                 ? $"Node info request received from {name} — replying with ours."
                 : $"Node info received from {name}.";
-            AddSystem(Stamp() + line, SysCategory.Nodes);   // shown/hidden via the System-messages filter (Nodes)
+            AddSystem(Stamp() + line, SysCategory.Nodes, ni.Node);   // shown/hidden via the System-messages filter (Nodes)
             _nodeDiagHandler?.Invoke(line);
         }
 
@@ -3062,7 +3066,7 @@ public partial class MainWindow : Window
         {
             string name = nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}";
             string line = $"New node heard: {name}.";
-            AddSystem(Stamp() + line, SysCategory.Nodes);   // shown/hidden via the System-messages filter (Nodes)
+            AddSystem(Stamp() + line, SysCategory.Nodes, nn.Node);   // shown/hidden via the System-messages filter (Nodes)
             _nodeDiagHandler?.Invoke(line);
         }
 
@@ -3076,7 +3080,7 @@ public partial class MainWindow : Window
         foreach (var pos in r.Positions)
             {
                 string name = pos.Name.Length > 0 ? pos.Name : $"!{pos.Node:x8}";
-                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", SysCategory.Position);
+                AddSystem(Stamp() + $"Position received from {name}: {pos.Latitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}, {pos.Longitude.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)}.", SysCategory.Position, pos.Node);
             }
 
         // Noise floor replies (requested via the node info window): log them and refresh any open node window.
@@ -3084,7 +3088,7 @@ public partial class MainWindow : Window
         {
             string name = nf.Name.Length > 0 ? nf.Name : $"!{nf.Node:x8}";
             string line = $"Noise floor for {name}: {MeshtasticHttpClient.DescribeNoiseFloor(nf.NoiseFloorDbm, nf.RawNoiseFloorDbm)}";
-            AddSystem(Stamp() + line, SysCategory.Telemetry);
+            AddSystem(Stamp() + line, SysCategory.Telemetry, nf.Node);
             _nodeDiagHandler?.Invoke(line);
         }
         if (r.NoiseFloors.Count > 0) { _nodesRefresh?.Invoke(); _telemetryRefresh?.Invoke(); }
@@ -3739,6 +3743,24 @@ public partial class MainWindow : Window
         catch (Exception ex) { Status($"Request failed: {ex.Message}"); }
     }
 
+    /// <summary>Right-click on a system message → Request node info: asks the mesh for the node that message concerns
+    /// (node heard/info/position/noise/traceroute). Mirrors the chat <see cref="RequestNodeInfo_Click"/>, but sources
+    /// the node id from the row's <see cref="LogEntry.SysNode"/> (set when the row was logged) instead of a received
+    /// message. No-ops with a status for system rows not tied to a node.</summary>
+    private async void RequestSystemNodeInfo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_mesh == null) return;
+        if (SystemList.SelectedItem is not LogEntry entry || entry.SysNode == 0)
+        {
+            Status("Select a node-related system message to request its node info.");
+            return;
+        }
+        string who = _mesh.DescribeNode(entry.SysNode);
+        Status($"Requesting node info from {who} (!{entry.SysNode:x8})…");
+        try { await _mesh.RequestNodeInfoAsync(entry.SysNode); }
+        catch (Exception ex) { Status($"Request failed: {ex.Message}"); }
+    }
+
     /// <summary>Right-click → Node info: opens the full "all info" window for the selected message's sender —
     /// the same node-details + telemetry-history view as the Nodes list's "Show all info" button. For a message
     /// WE sent, this shows our own node's info.</summary>
@@ -4317,17 +4339,19 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Logs a system/event message to the right-panel "System messages" list (never the chat), tagged
-    /// with a category so the per-type filter can show/hide it.</summary>
-    private LogEntry AddSystem(string line, SysCategory cat = SysCategory.Game) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat);
+    /// with a category so the per-type filter can show/hide it. <paramref name="nodeId"/> ties the row to a node
+    /// (0 = none) so right-click → "Request node info" can ask the mesh for it.</summary>
+    private LogEntry AddSystem(string line, SysCategory cat = SysCategory.Game, uint nodeId = 0) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat, nodeId);
 
     /// <summary>Logs a system/event message using its category colour (the Warnings default is red). Game-flow
     /// rows that later show ack status override their own colour afterward, so status still wins there.</summary>
-    private LogEntry AddSystemWarning(string line, SysCategory cat = SysCategory.Warnings) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat);
+    private LogEntry AddSystemWarning(string line, SysCategory cat = SysCategory.Warnings, uint nodeId = 0) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat, nodeId);
 
-    // Stamps a system row's category and initial visibility (hidden if its category is filtered out).
-    private LogEntry TagSystem(LogEntry entry, SysCategory cat)
+    // Stamps a system row's category, associated node (0 = none), and initial visibility (hidden if its category is filtered out).
+    private LogEntry TagSystem(LogEntry entry, SysCategory cat, uint nodeId = 0)
     {
         entry.Category = cat;
+        entry.SysNode = nodeId;
         entry.Visible = !_hiddenSysCats.Contains(cat);
         TrimSystemMessages();
         return entry;

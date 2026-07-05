@@ -89,6 +89,10 @@ public sealed class LogEntry : INotifyPropertyChanged
     // For system rows: the message category, so the System-messages filter can show/hide by type.
     public SysCategory Category = SysCategory.Game;
 
+    // For a node-related system row (node heard/info/position/noise/traceroute): the node it concerns, so the
+    // long-press menu can request its node info. 0 = not tied to a node (the menu omits "Request node info").
+    public uint NodeId;
+
     // For a received chat row: the message text shown after the "<name>: " prefix. Kept so the row can be
     // re-rendered with the sender's real name once that node's info arrives (it first shows as "!hex"). Null otherwise.
     public string? ChatNameBody;

@@ -45,13 +45,8 @@
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
                     </CollectionView>
-                    <CollectionView x:Name="SystemView" IsVisible="False">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate x:DataType="local:LogEntry">
-                                <Label Text="{Binding Text}" TextColor="{Binding TextColor}" FontFamily="{Binding FontFamily}" FontSize="{Binding FontSize}" Padding="4,2" IsVisible="{Binding Visible}"/>
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
+                    <!-- ItemTemplate is built in code-behind (MainPage ctor) so it can hook Android long-press → Request node info. -->
+                    <CollectionView x:Name="SystemView" IsVisible="False"/>
                 </Grid>
             </Border>
         </Grid>
