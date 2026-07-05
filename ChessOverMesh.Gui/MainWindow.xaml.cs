@@ -1449,6 +1449,11 @@ public partial class MainWindow : Window
     private bool IsReceiveChannel(uint channel) =>
         _mesh?.GetAvailableChannels().Any(c => !c.IsDisabled && c.Index == channel) ?? false;
 
+    // Whether the device has reported this channel yet (it's an enabled channel we've learned from the config dump).
+    // Used in Dispatch to tell "not streamed in yet" (still syncing) apart from "genuinely disabled" (absent for good).
+    private bool ChannelIsKnown(uint channel) =>
+        _mesh?.GetAvailableChannels().Any(c => c.Index == channel) ?? false;
+
     /// <summary>The RX (view-filter) targets: ALL enabled device channels followed by the DM peers — independent
     /// of the TX channel set, so you can show/hide any channel the device has.</summary>
     private List<TxTarget> GetRxTargets()
@@ -3227,7 +3232,11 @@ public partial class MainWindow : Window
         if (_mesh == null) return;
         // Chess traffic is confined to the chess channel; chat is shown for any channel chat listens to.
         bool onChess = msg.Channel == _mesh.ChannelIndex;
-        bool onChat = IsReceiveChannel(msg.Channel);   // chat is received on ALL enabled channels; the RX filter chooses what shows
+        // chat is received on ALL enabled channels; the RX filter chooses what shows. During the initial post-connect
+        // sync the device's channel list can still be streaming in, so a buffered/replayed message can arrive before its
+        // enabled channel is known. Treat a not-yet-known channel as receivable until the sync completes so those old
+        // messages aren't silently dropped; once synced, a channel that's still absent is genuinely disabled (strict).
+        bool onChat = IsReceiveChannel(msg.Channel) || (!_synced && !ChannelIsKnown(msg.Channel));
         // A direct message addressed to us: shown as chat regardless of channel — unless the sender is blocked.
         bool wasDm = msg.IsDmTo(_mesh.MyNodeNum);
         // A DM that OUR node sent to another node, seen by the other apps sharing this node via the proxy. Show it

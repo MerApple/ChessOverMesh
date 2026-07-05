@@ -1881,7 +1881,12 @@ public partial class MainPage : ContentPage
     {
         if (_mesh == null) return;
         bool onChess = msg.Channel == _mesh.ChannelIndex;
-        bool onChat = IsReceiveChannel(msg.Channel);   // chat is received on ALL enabled channels; the RX filter chooses what shows
+        // chat is received on ALL enabled channels; the RX filter chooses what shows. During the initial post-connect
+        // sync the device's channel list can still be streaming in (see the note above the RunSyncAsync drain loop), so
+        // a buffered/replayed message can arrive before its enabled channel is known. Treat a not-yet-known channel as
+        // receivable until the sync completes so those old messages aren't silently dropped; once synced, a channel
+        // that's still absent is genuinely disabled, so we stay strict.
+        bool onChat = IsReceiveChannel(msg.Channel) || (!_synced && !ChannelIsKnown(msg.Channel));
         bool wasDm = msg.IsDmTo(_mesh.MyNodeNum);   // a direct message addressed to us specifically
         // A DM that OUR node sent to another node, seen by the other apps sharing this node via the proxy. Show it
         // in that peer's DM thread as an outgoing message, so every connected app sees the same DM conversation.
@@ -2390,6 +2395,9 @@ public partial class MainPage : ContentPage
     List<uint> ReceiveChannels() =>
         _mesh?.GetAvailableChannels().Where(c => !c.IsDisabled).Select(c => c.Index).OrderBy(i => i).ToList() ?? new List<uint>();
     bool IsReceiveChannel(uint channel) => _mesh?.GetAvailableChannels().Any(c => !c.IsDisabled && c.Index == channel) ?? false;
+    // Whether the device has reported this channel yet (it's an enabled channel we've learned from the config dump).
+    // Used in Dispatch to tell "not streamed in yet" (still syncing) apart from "genuinely disabled" (absent for good).
+    bool ChannelIsKnown(uint channel) => _mesh?.GetAvailableChannels().Any(c => c.Index == channel) ?? false;
 
     /// <summary>The RX (view-filter) targets: ALL enabled device channels followed by the DM peers — independent
     /// of the TX channel set, so you can show/hide any channel the device has.</summary>
