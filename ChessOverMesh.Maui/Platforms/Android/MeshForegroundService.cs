@@ -26,6 +26,10 @@ public sealed class MeshForegroundService : Service
     const string MessageChannelId = "mesh_messages";
     const int OngoingNotificationId = 1001;
     const string ExtraLabel = "label";
+    /// <summary>Intent extra key + value that flags a launch as "opened from a message notification", so
+    /// MainActivity routes to the Chat tab instead of dumping the user on whatever tab was last shown.</summary>
+    public const string ExtraNav = "nav";
+    public const string NavChat = "chat";
     static int _messageId = 2000;
     // Ids of the per-message notifications we've posted, so they can be dismissed when the user reads the chat.
     static readonly object _msgLock = new();
@@ -128,7 +132,7 @@ public sealed class MeshForegroundService : Service
             .SetSmallIcon(Android.Resource.Drawable.StatNotifyChat)
             .SetPriority((int)NotificationPriority.High)
             .SetAutoCancel(true)
-            .SetContentIntent(LaunchIntent(ctx))
+            .SetContentIntent(MessageLaunchIntent(ctx))
             .Build();
         int id = System.Threading.Interlocked.Increment(ref _messageId);
         NotificationManagerCompat.From(ctx).Notify(id, notification);
@@ -146,13 +150,26 @@ public sealed class MeshForegroundService : Service
         foreach (var id in ids) mgr.Cancel(id);
     }
 
-    // Tapping a notification brings the app's single activity back to the front.
+    // Tapping the ongoing "connected" notification just brings the app's single activity back to the front.
     static PendingIntent? LaunchIntent(Context ctx)
     {
         var launch = ctx.PackageManager?.GetLaunchIntentForPackage(ctx.PackageName!);
         if (launch == null) return null;
         launch.AddFlags(ActivityFlags.NewTask | ActivityFlags.SingleTop);
         return PendingIntent.GetActivity(ctx, 0, launch,
+            PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
+    }
+
+    // Tapping a message notification brings the app forward AND asks MainActivity to route to the Chat tab (so the
+    // user lands on the message, not the disconnected Device tab). A distinct request code (1) keeps this
+    // PendingIntent separate from the ongoing one's (0) so their extras don't overwrite each other.
+    static PendingIntent? MessageLaunchIntent(Context ctx)
+    {
+        var launch = ctx.PackageManager?.GetLaunchIntentForPackage(ctx.PackageName!);
+        if (launch == null) return null;
+        launch.AddFlags(ActivityFlags.NewTask | ActivityFlags.SingleTop);
+        launch.PutExtra(ExtraNav, NavChat);
+        return PendingIntent.GetActivity(ctx, 1, launch,
             PendingIntentFlags.Immutable | PendingIntentFlags.UpdateCurrent);
     }
 

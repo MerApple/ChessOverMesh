@@ -6,12 +6,19 @@ public partial class AppShell : Shell
 	const string ChatAlert = "Chat ●";   // unread marker shown on the bottom tab
 	const string ChessTitle = "Chess";
 	const string SystemTabTitle = "System messages";   // shown on the chess tab when the board is hidden
+	const string ChatRoute = "chat";     // the Chat tab's shell route, used by RequestChatTab's GoToAsync
 
 	readonly ShellContent _chessTab;
 	readonly ShellContent _chatTab;
 	IDispatcherTimer? _flashTimer;
 	int _flashTicks;
 	bool _onChatTab;
+
+	// The live Shell instance, so a notification tap (handled in MainActivity) can route to the Chat tab. Set in the
+	// constructor; there's only ever one AppShell. A tap that arrives before the Shell is built sets _pendingChatNav,
+	// applied on the first navigation.
+	static AppShell? _instance;
+	static bool _pendingChatNav;
 
 	/// <summary>Whether the Chat tab is the one currently showing (used to decide if an incoming message is "unread").</summary>
 	public bool ChatTabVisible => _onChatTab;
@@ -28,10 +35,39 @@ public partial class AppShell : Shell
 		tabs.Items.Add(new ShellContent { Title = "Device", Content = new DeviceTabPage(main) });
 		_chessTab = new ShellContent { Title = AppSettings.ShowChessboard ? ChessTitle : SystemTabTitle, Content = main };
 		tabs.Items.Add(_chessTab);
-		_chatTab = new ShellContent { Title = ChatTitle, Content = new ChatTabPage(main) };
+		_chatTab = new ShellContent { Title = ChatTitle, Content = new ChatTabPage(main), Route = ChatRoute };
 		tabs.Items.Add(_chatTab);
 		tabs.Items.Add(new ShellContent { Title = "Settings", Content = new SettingsTabPage(main) });
 		Items.Add(tabs);
+
+		_instance = this;
+	}
+
+	/// <summary>Show the Chat tab. Called (via MainActivity) when the user taps a message notification, so they land
+	/// on the message instead of the last-shown / disconnected Device tab. If the Shell isn't built yet (a cold start
+	/// from the notification), the request is deferred and applied on the first navigation.</summary>
+	public static void RequestChatTab()
+	{
+		var inst = _instance;
+		if (inst == null) { _pendingChatNav = true; return; }
+		inst.Dispatcher.Dispatch(async () => await inst.GoToChatTabAsync());
+	}
+
+	async Task GoToChatTabAsync()
+	{
+		try { await GoToAsync("//" + ChatRoute); }
+		catch { /* best effort — worst case we stay on the current tab */ }
+	}
+
+	protected override void OnNavigated(ShellNavigatedEventArgs args)
+	{
+		base.OnNavigated(args);
+		// Apply a nav requested before the Shell was ready (cold start from a notification tap).
+		if (_pendingChatNav)
+		{
+			_pendingChatNav = false;
+			Dispatcher.Dispatch(async () => await GoToChatTabAsync());
+		}
 	}
 
 	/// <summary>Updates the chess tab's title from the "Show chessboard" setting — "Chess" when the board is
