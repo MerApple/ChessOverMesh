@@ -4721,6 +4721,10 @@ public partial class MainWindow : Window
             $"From: {_mesh?.DescribeNode(msg.FromNode)}  (!{msg.FromNode:x8})",
             $"Channel: {msg.Channel}",
         };
+        // Length of the message text. Show the UTF-8 byte count too when it differs (non-ASCII), since it's the
+        // byte length that counts against the mesh packet limit — not the character count.
+        int chars = msg.Text.Length, bytes = System.Text.Encoding.UTF8.GetByteCount(msg.Text);
+        lines.Add(bytes == chars ? $"Length: {chars} characters" : $"Length: {chars} characters ({bytes} bytes)");
         DateTime when = msg.RxTime != 0 ? DateTimeOffset.FromUnixTimeSeconds(msg.RxTime).LocalDateTime : DateTime.Now;
         lines.Add($"Received: {when:yyyy-MM-dd HH:mm:ss}");
         lines.Add($"Packet id: {msg.PacketId}");
