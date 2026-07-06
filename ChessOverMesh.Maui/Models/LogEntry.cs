@@ -57,6 +57,10 @@ public sealed class LogEntry : INotifyPropertyChanged
     // and show the signal/relay breakdown. Null for sent/system rows.
     public MeshTextMessage? Rx;
 
+    // For sent chat rows: the raw message body we typed (without the "You:"/recipient prefix), so
+    // "Message details" can report its character/byte length. Null for received/system rows.
+    public string? SentBody;
+
     // The mesh packet id of this chat message (sent or received), 0 if none — the target for replies/reactions.
     public uint PacketId;
 
