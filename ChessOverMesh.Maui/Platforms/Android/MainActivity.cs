@@ -1,4 +1,5 @@
 ﻿using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Android.Views;
@@ -17,6 +18,23 @@ public class MainActivity : MauiAppCompatActivity
         base.OnCreate(savedInstanceState);
         ApplyKeyboardHandling();
         try { BackgroundPoll.Apply(); } catch { /* scheduling the background job is best-effort */ }
+        HandleNavIntent(Intent);   // cold start from a message notification
+    }
+
+    // The activity is SingleTop, so tapping a notification while it's already running delivers the new intent here
+    // (not a fresh OnCreate). Route the "open chat" flag through the same handler.
+    protected override void OnNewIntent(Intent? intent)
+    {
+        base.OnNewIntent(intent);
+        Intent = intent;   // so a later getIntent() reflects the tap that brought us forward
+        HandleNavIntent(intent);
+    }
+
+    // If we were launched/resumed by tapping a message notification, ask the Shell to show the Chat tab.
+    static void HandleNavIntent(Intent? intent)
+    {
+        if (intent?.GetStringExtra(MeshForegroundService.ExtraNav) == MeshForegroundService.NavChat)
+            AppShell.RequestChatTab();
     }
 
     protected override void OnResume()
