@@ -277,6 +277,10 @@ public partial class MainWindow : Window
         // full signal/relay breakdown. Null for sent/system/move rows.
         public MeshTextMessage? Rx;
 
+        // For sent chat rows: the raw message body we typed (without the "You:"/recipient prefix), so
+        // "More information" can report its character/byte length. Null for received/system/move rows.
+        public string? SentBody;
+
         // The mesh packet id of this chat message (sent or received), 0 if none — used as the target for replies.
         public uint PacketId;
 
@@ -4004,6 +4008,7 @@ public partial class MainWindow : Window
         bool relayConfirm = isDm || !_chatAckOn.Contains(_chatTxChannel);
 
         var entry = AddChatLine(msgLine, detailBase + MarkSending, PendingText);   // amber while awaiting confirmation
+        entry.SentBody = text;   // so "More information" can report the message length
         // Start our own copy's self-destruct countdown immediately (before the ack) so it's visible right away.
         DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
         if (ttlSeconds > 0)
@@ -4166,6 +4171,7 @@ public partial class MainWindow : Window
         string baseDetail = $"{Stamp()}{dmTag}{chan}".Trim();
         if (replyRef.Length > 0) baseDetail = $"{replyRef}  ·  {baseDetail}".Trim(' ', '·');
         var entry = AddChatLine(msgLine, baseDetail + $"  · sending 1/{parts.Count}" + MarkSending, PendingText);
+        entry.SentBody = displayText;   // so "More information" can report the message length
         entry.Channel = ch;
         DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
         if (ttlSeconds > 0) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(TimeSpan.FromSeconds(ttlSeconds)); }
@@ -4662,6 +4668,10 @@ public partial class MainWindow : Window
             baseText = "No additional details for this line (only messages received over the mesh, or sent " +
                        "messages that have been acknowledged, carry signal/relay information).";
 
+        // For a sent message, lead with its length (received messages get this inside BuildMessageDetails).
+        if (entry.Rx is null && entry.SentBody is { } sentBody)
+            baseText = $"{LengthLine(sentBody)}{Environment.NewLine}{Environment.NewLine}{baseText}";
+
         // For a received message, append the acks we overheard OTHER nodes send for it.
         if (entry.Rx is not null && entry.PacketId != 0
             && _overheardAcks.TryGetValue(entry.PacketId, out var oh) && oh.Ackers.Count > 0)
@@ -4714,6 +4724,14 @@ public partial class MainWindow : Window
         return string.Join(Environment.NewLine, lines);
     }
 
+    /// <summary>"Length: N characters" for a message body, appending the UTF-8 byte count when it differs
+    /// (non-ASCII) — it's the byte length that counts against the mesh packet limit, not the character count.</summary>
+    private static string LengthLine(string body)
+    {
+        int chars = body.Length, bytes = System.Text.Encoding.UTF8.GetByteCount(body);
+        return bytes == chars ? $"Length: {chars} characters" : $"Length: {chars} characters ({bytes} bytes)";
+    }
+
     private string BuildMessageDetails(MeshTextMessage msg)
     {
         var lines = new List<string>
@@ -4721,6 +4739,7 @@ public partial class MainWindow : Window
             $"From: {_mesh?.DescribeNode(msg.FromNode)}  (!{msg.FromNode:x8})",
             $"Channel: {msg.Channel}",
         };
+        lines.Add(LengthLine(msg.Text));
         DateTime when = msg.RxTime != 0 ? DateTimeOffset.FromUnixTimeSeconds(msg.RxTime).LocalDateTime : DateTime.Now;
         lines.Add($"Received: {when:yyyy-MM-dd HH:mm:ss}");
         lines.Add($"Packet id: {msg.PacketId}");

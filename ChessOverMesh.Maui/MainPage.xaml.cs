@@ -2186,6 +2186,7 @@ public partial class MainPage : ContentPage
         ClearReply();
         bool relayConfirm = isDm || !_chatAckOn.Contains(_chatTxChannel);
         var entry = AddChatLine(msgLine, detailBase + MarkSending, Palette.Pending);
+        entry.SentBody = text;   // so "Message details" can report the message length
         DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
         if (ttlSeconds > 0) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(TimeSpan.FromSeconds(ttlSeconds)); }
         try
@@ -2308,6 +2309,7 @@ public partial class MainPage : ContentPage
         if (replyRef.Length > 0) baseDetail = $"{replyRef}  ·  {baseDetail}".Trim(' ', '·');
         ClearReply();
         var entry = AddChatLine(msgLine, baseDetail + $"  · sending 1/{parts.Count}" + MarkSending, Palette.Pending);
+        entry.SentBody = displayText;   // so "Message details" can report the message length
         entry.Channel = ch;
         DateTime expiresAt = ttlSeconds > 0 ? DateTime.Now.AddSeconds(ttlSeconds) : default;
         if (ttlSeconds > 0) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(TimeSpan.FromSeconds(ttlSeconds)); }
@@ -2837,6 +2839,14 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>A human-readable signal/relay breakdown for a received message (chat long-press → details).</summary>
+    /// <summary>"Length: N characters" for a message body, appending the UTF-8 byte count when it differs
+    /// (non-ASCII) — it's the byte length that counts against the mesh packet limit, not the character count.</summary>
+    static string LengthLine(string body)
+    {
+        int chars = body.Length, bytes = System.Text.Encoding.UTF8.GetByteCount(body);
+        return bytes == chars ? $"Length: {chars} characters" : $"Length: {chars} characters ({bytes} bytes)";
+    }
+
     public string MessageDetails(MeshTextMessage msg)
     {
         var lines = new List<string>
@@ -2844,6 +2854,7 @@ public partial class MainPage : ContentPage
             $"From: {_mesh?.DescribeNode(msg.FromNode)}  (!{msg.FromNode:x8})",
             $"Channel: {msg.Channel}",
         };
+        lines.Add(LengthLine(msg.Text));
         DateTime when = msg.RxTime != 0 ? DateTimeOffset.FromUnixTimeSeconds(msg.RxTime).LocalDateTime : DateTime.Now;
         lines.Add($"Received: {when:yyyy-MM-dd HH:mm:ss}");
         lines.Add($"Packet id: {msg.PacketId}");
@@ -2880,6 +2891,9 @@ public partial class MainPage : ContentPage
             : _chatAckers.Values.FirstOrDefault(i => i.Entry == entry) is { Ackers.Count: > 0 } info
                 ? BuildAckDetails(info, mine: true)   // sent + ack-tracked
                 : null;
+        // For a sent message, lead with its length (received messages get this inside MessageDetails).
+        if (entry.Rx is null && entry.SentBody is { } sentBody)
+            baseText = baseText is null ? LengthLine(sentBody) : $"{LengthLine(sentBody)}\n\n{baseText}";
         // For a received message, append the acks we overheard OTHER nodes send for it.
         if (entry.Rx is not null && entry.PacketId != 0
             && _overheardAcks.TryGetValue(entry.PacketId, out var oh) && oh.Ackers.Count > 0)
