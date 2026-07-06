@@ -215,21 +215,10 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// it's healthy or the transport doesn't track one. Surfaced in the "connection lost" system message.</summary>
     public string? TransportLastError => _transport.LastError;
 
-    /// <summary>True when the link is persistent and needs periodic heartbeats (TCP/BLE), false for HTTP.</summary>
-    public bool TransportNeedsKeepAlive => _transport.NeedsKeepAlive;
-
     /// <summary>True when the transport reports its own liveness (TCP/BLE) so the external reachability probe should
     /// be skipped — opening a competing connection to a single-client port would be a false "lost". See
     /// <see cref="IMeshTransport.SelfReportsLiveness"/>.</summary>
     public bool TransportSelfReportsLiveness => _transport.SelfReportsLiveness;
-
-    // ToRadio.heartbeat is field 7, an empty Heartbeat message — the bundled proto predates it, so encode the two
-    // wire bytes by hand: tag (7<<3 | 2 = 0x3A) + length 0.
-    private static readonly byte[] HeartbeatToRadio = { 0x3A, 0x00 };
-
-    /// <summary>Sends a keep-alive heartbeat so the device doesn't close an idle persistent connection. Throws if
-    /// the link is dead (which the caller can treat as a dropped connection).</summary>
-    public Task SendHeartbeatAsync(CancellationToken ct = default) => _transport.WriteAsync(HeartbeatToRadio, ct);
 
     /// <summary>Asks a <c>Meshtastic.Proxy</c> to replay every cached text message newer than
     /// <paramref name="sinceEpoch"/> (the message rx_time), so this client catches up on what it missed while
@@ -2058,9 +2047,47 @@ public sealed class MeshtasticHttpClient : IDisposable
     {
         bool tx = MyNodeNum != 0 && pkt.From == MyNodeNum;
         string port = decoded != null ? PrettyPort(decoded.Portnum) : "Encrypted";
+        // A TX row is by definition our own connected node's packet looped back — say so, since the once-a-minute
+        // phone-local telemetry otherwise reads as a mystery packet "from" our node name.
+        string from = DescribeNode(pkt.From) + (tx ? " (our device)" : "");
         string to = pkt.To == 0xffffffff ? "all" : DescribeNode(pkt.To);
         string route = DescribeRoute(pkt, tx);
-        return $"{(tx ? "TX" : "RX")} {port}  {DescribeNode(pkt.From)} → {to}{(route.Length > 0 ? "  · " + route : "")}";
+        // Summarise a telemetry payload inline so the log shows what was reported (battery/util/uptime, temp/…), not
+        // just the port name — most useful for our own device's phone-local metrics the firmware pushes every minute.
+        string detail = decoded?.Portnum == PortNum.TelemetryApp ? DescribeTelemetryPayload(decoded) : "";
+        return $"{(tx ? "TX" : "RX")} {port}  {from} → {to}" +
+               (route.Length > 0 ? "  · " + route : "") +
+               (detail.Length > 0 ? "  · " + detail : "");
+    }
+
+    // A compact inline summary of a Telemetry payload for the mesh-traffic log — device metrics (battery / voltage /
+    // channel + air utilization / uptime) or environment metrics (temperature / humidity / pressure). Returns "" for
+    // variants we don't summarise or an unparseable payload, so the caller just omits the detail.
+    private static string DescribeTelemetryPayload(Data decoded)
+    {
+        Telemetry tel;
+        try { tel = Telemetry.Parser.ParseFrom(decoded.Payload); }
+        catch { return ""; }
+        var parts = new List<string>();
+        switch (tel.VariantCase)
+        {
+            case Telemetry.VariantOneofCase.DeviceMetrics:
+                var dm = tel.DeviceMetrics;
+                if (dm.BatteryLevel > 100) parts.Add("powered");
+                else if (dm.BatteryLevel > 0) parts.Add($"battery {dm.BatteryLevel}%");
+                if (dm.Voltage > 0) parts.Add($"{dm.Voltage:0.##} V");
+                if (dm.HasChannelUtilization) parts.Add($"ChUtil {dm.ChannelUtilization:0.#}%");
+                if (dm.HasAirUtilTx) parts.Add($"AirTx {dm.AirUtilTx:0.#}%");
+                if (dm.HasUptimeSeconds && dm.UptimeSeconds > 0) parts.Add($"up {FormatUptime(dm.UptimeSeconds)}");
+                break;
+            case Telemetry.VariantOneofCase.EnvironmentMetrics:
+                var em = tel.EnvironmentMetrics;
+                if (em.HasTemperature) parts.Add($"{em.Temperature:0.#}°C");
+                if (em.HasRelativeHumidity && em.RelativeHumidity > 0) parts.Add($"{em.RelativeHumidity:0}%RH");
+                if (em.HasBarometricPressure && em.BarometricPressure > 0) parts.Add($"{em.BarometricPressure:0} hPa");
+                break;
+        }
+        return string.Join(" · ", parts);
     }
 
     // "PositionApp" → "Position"; other/unknown ports fall back to the enum name.

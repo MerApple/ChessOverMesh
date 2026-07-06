@@ -4604,7 +4604,10 @@ public partial class MainWindow : Window
     private void CopyAll_Click(object sender, RoutedEventArgs e)
     {
         if (TargetList(sender) is { } lb)
-            CopyToClipboard(string.Join(Environment.NewLine, lb.Items.Cast<object>().Select(ItemText)));
+            // "Copy all" copies what's actually shown — skip rows the filter has hidden (category filter on the system
+            // list, channel/DM filter on the chat list), which stay in Items with Visible == false.
+            CopyToClipboard(string.Join(Environment.NewLine,
+                lb.Items.Cast<object>().Where(o => o is not LogEntry le || le.Visible).Select(ItemText)));
     }
 
     /// <summary>Right-click "Copy message": copies just the message body of the selected chat row(s) —

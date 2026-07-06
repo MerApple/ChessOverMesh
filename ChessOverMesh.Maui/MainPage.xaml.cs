@@ -1102,16 +1102,19 @@ public partial class MainPage : ContentPage
     {
         var src = SystemView.IsVisible ? _system : _moves;
         var sb = new System.Text.StringBuilder();
+        int copied = 0;
         foreach (var le in src)
         {
+            if (!le.Visible) continue;   // copy what's shown — skip rows the category filter has hidden
             sb.Append(le.Text);
             if (!string.IsNullOrEmpty(le.Detail)) { sb.Append("   "); sb.Append(le.Detail); }
             sb.Append('\n');
+            copied++;
         }
         try
         {
             await Clipboard.Default.SetTextAsync(sb.ToString());
-            Status($"Copied {src.Count} {(SystemView.IsVisible ? "System" : "Moves")} line(s) to the clipboard.");
+            Status($"Copied {copied} {(SystemView.IsVisible ? "System" : "Moves")} line(s) to the clipboard.");
         }
         catch (Exception ex) { Status($"Copy failed: {ex.Message}"); }
     }

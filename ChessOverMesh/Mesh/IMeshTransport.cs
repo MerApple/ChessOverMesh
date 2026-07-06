@@ -23,10 +23,6 @@ public interface IMeshTransport : IDisposable
     /// is detected separately by the reachability probe.</summary>
     bool IsConnected => true;
 
-    /// <summary>True for a persistent link that the device may close when idle, so the client should send
-    /// periodic heartbeats. Connectionless HTTP doesn't need them (every poll is a fresh request).</summary>
-    bool NeedsKeepAlive => false;
-
     /// <summary>True when <see cref="IsConnected"/> authoritatively reflects this link's own liveness — a persistent
     /// socket (TCP/BLE) that faults the moment its link drops. For these the external reachability probe must NOT
     /// run: opening a SECOND connection to "probe" the device can be refused precisely because this live connection
