@@ -25,7 +25,8 @@ internal sealed class ConnectionSettingsWindow : Window
     {
         Title = "Connection settings";
         Owner = owner;
-        Width = 360;
+        Width = 480;
+        MinHeight = 320;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
