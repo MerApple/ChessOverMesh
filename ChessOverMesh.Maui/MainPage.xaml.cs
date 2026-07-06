@@ -451,6 +451,7 @@ public partial class MainPage : ContentPage
     internal static Color SysCategoryColor(SysCategory cat) => cat switch
     {
         SysCategory.Connection => Palette.SysConnection,
+        SysCategory.Heartbeat => Palette.SysHeartbeat,
         SysCategory.Nodes => Palette.SysNodes,
         SysCategory.Position => Palette.SysPosition,
         SysCategory.Telemetry => Palette.SysTelemetry,
@@ -744,6 +745,8 @@ public partial class MainPage : ContentPage
             _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
             _mesh.TelemetryReceived += OnTelemetryReceived;  // log device/environment metrics received from other nodes (Telemetry)
             _mesh.PacketLogged += OnPacketLogged;        // verbose one-line-per-packet mesh-traffic log (MeshTraffic)
+        _mesh.HeartbeatLogged += OnHeartbeatLogged;  // TCP keep-alive heartbeats sent + link-alive/failed result (Heartbeat)
+        _mesh.HeartbeatIntervalSeconds = AppSettings.HeartbeatIntervalSeconds;   // 0 = off; applied live from the Device tab
             _mesh.LogAllPackets = !_hiddenSysCats.Contains(SysCategory.MeshTraffic);  // only build the strings when shown
             _currentHost = cacheKey; _transportIsIp = isIp; _connected = true; _synced = false;
             if (isIp) { AppSettings.LastHost = cacheKey; AppSettings.AddRecentHost(cacheKey); }   // remember for the Host dropdown
@@ -2648,6 +2651,18 @@ public partial class MainPage : ContentPage
 
     /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category.</summary>
     void OnPacketLogged(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.MeshTraffic));
+
+    /// <summary>Logs a TCP keep-alive heartbeat (sent / link-alive / failed) to the "Heartbeat" category.</summary>
+    void OnHeartbeatLogged(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Heartbeat));
+
+    /// <summary>Sets the TCP keep-alive heartbeat period (seconds; 0 = off), persists it, and applies it live to the
+    /// current connection without reconnecting.</summary>
+    public void SetHeartbeatIntervalSeconds(int seconds)
+    {
+        seconds = Math.Max(0, seconds);
+        AppSettings.HeartbeatIntervalSeconds = seconds;
+        if (_mesh != null) _mesh.HeartbeatIntervalSeconds = seconds;
+    }
 
     /// <summary>Persists the node caches (names/short/role/hw/favorite/ignored/hops/last-heard) for this device.</summary>
     void SaveNodeCache()

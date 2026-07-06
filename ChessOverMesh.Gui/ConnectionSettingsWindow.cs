@@ -12,10 +12,16 @@ internal sealed class ConnectionSettingsWindow : Window
     private static readonly Brush Dim = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0));
 
     private readonly CheckBox _autoReconnect;
+    private readonly TextBox _heartbeat;
+    private readonly int _initialHeartbeat;
 
     public bool AutoReconnect => _autoReconnect.IsChecked == true;
 
-    public ConnectionSettingsWindow(Window owner, bool autoReconnect, Action onClearRecentHosts)
+    /// <summary>The keep-alive heartbeat period in seconds (0 = off). Falls back to the value passed in if the field
+    /// isn't a valid non-negative integer.</summary>
+    public int HeartbeatSeconds => int.TryParse(_heartbeat.Text.Trim(), out var v) && v >= 0 ? v : _initialHeartbeat;
+
+    public ConnectionSettingsWindow(Window owner, bool autoReconnect, int heartbeatSeconds, Action onClearRecentHosts)
     {
         Title = "Connection settings";
         Owner = owner;
@@ -24,8 +30,27 @@ internal sealed class ConnectionSettingsWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         Background = Bg;
+        _initialHeartbeat = Math.Max(0, heartbeatSeconds);
 
         var root = new StackPanel { Margin = new Thickness(14) };
+
+        // TCP keep-alive: send an empty heartbeat every N seconds so the device doesn't drop an idle connection
+        // (it closes a client that's silent for ~15 min). 0 turns it off.
+        var hbRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+        hbRow.Children.Add(new TextBlock
+        {
+            Text = "Keep-alive heartbeat (seconds, 0 = off):", Foreground = Fg,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0),
+        });
+        _heartbeat = new TextBox { Text = _initialHeartbeat.ToString(), Width = 60, VerticalAlignment = VerticalAlignment.Center };
+        hbRow.Children.Add(_heartbeat);
+        root.Children.Add(hbRow);
+        root.Children.Add(new TextBlock
+        {
+            Text = "Keeps a WiFi/TCP link alive when idle. Each heartbeat is logged under the Heartbeat category in " +
+                   "system messages. 300 (5 min) is a safe default; 0 disables it.",
+            Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 14),
+        });
 
         _autoReconnect = new CheckBox { Content = "Auto-reconnect", Foreground = Fg, IsChecked = autoReconnect };
         root.Children.Add(_autoReconnect);

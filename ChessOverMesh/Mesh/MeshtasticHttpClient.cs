@@ -220,6 +220,29 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// <see cref="IMeshTransport.SelfReportsLiveness"/>.</summary>
     public bool TransportSelfReportsLiveness => _transport.SelfReportsLiveness;
 
+    /// <summary>The keep-alive heartbeat period in seconds for a persistent link (TCP); 0 disables it. A no-op for
+    /// HTTP. Applied live — changing it reschedules the next heartbeat without reconnecting.</summary>
+    public int HeartbeatIntervalSeconds
+    {
+        get => _transport.KeepAliveSeconds;
+        set => _transport.KeepAliveSeconds = value;
+    }
+
+    /// <summary>Raised for each keep-alive heartbeat — sent, link-alive, or failed — with a ready-to-log message.
+    /// Fires off the UI thread (from the transport's heartbeat task); subscribers must marshal to the UI thread.</summary>
+    public event Action<string>? HeartbeatLogged;
+
+    // Turns a heartbeat phase into the system-message line. There's no device reply to a heartbeat (FromRadio has no
+    // Heartbeat variant); a successful write means the socket accepted it and the link is still up, a failed one is
+    // the drop that triggers reconnect.
+    private static string DescribeKeepAlive(KeepAlivePhase phase, string? error) => phase switch
+    {
+        KeepAlivePhase.Sent => "Keep-alive heartbeat sent to the device.",
+        KeepAlivePhase.LinkAlive => "Device link alive — heartbeat accepted (Meshtastic sends no heartbeat reply).",
+        KeepAlivePhase.Failed => $"Keep-alive heartbeat failed — {error ?? "the link dropped"}.",
+        _ => "Keep-alive heartbeat.",
+    };
+
     /// <summary>Asks a <c>Meshtastic.Proxy</c> to replay every cached text message newer than
     /// <paramref name="sinceEpoch"/> (the message rx_time), so this client catches up on what it missed while
     /// disconnected. A side-channel frame ("MPXY") the proxy recognises. Only the app's proxy-link path calls this —
@@ -260,6 +283,7 @@ public sealed class MeshtasticHttpClient : IDisposable
     public MeshtasticHttpClient(IMeshTransport transport, uint channelIndex = 0, uint? destination = null)
     {
         _transport = transport;
+        _transport.KeepAliveObserver = (phase, err) => HeartbeatLogged?.Invoke(DescribeKeepAlive(phase, err));
         ChannelIndex = channelIndex;
         _destination = destination;
     }

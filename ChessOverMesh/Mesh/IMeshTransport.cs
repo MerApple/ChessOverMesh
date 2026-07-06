@@ -2,6 +2,10 @@ using System.Net.Http.Headers;
 
 namespace ChessOverMesh.Mesh;
 
+/// <summary>The stage of a keep-alive heartbeat the transport reports to <see cref="IMeshTransport.KeepAliveObserver"/>:
+/// the heartbeat was written, the write succeeded (link alive — Meshtastic sends no heartbeat reply), or it failed.</summary>
+public enum KeepAlivePhase { Sent, LinkAlive, Failed }
+
 /// <summary>
 /// The byte-level link to a Meshtastic device. Every link (HTTP, BLE, serial, TCP) carries the same
 /// ToRadio/FromRadio protobufs — a transport only moves the serialized bytes. <see cref="MeshtasticHttpClient"/>
@@ -36,6 +40,15 @@ public interface IMeshTransport : IDisposable
     /// persistent link sets it the moment it faults so the app can tell the user *why* it disconnected instead of a
     /// generic "connection lost".</summary>
     string? LastError => null;
+
+    /// <summary>Keep-alive heartbeat period in seconds for a persistent link; 0 disables it. Applied live — the
+    /// transport reschedules the next heartbeat when this changes. No-op for connectionless links (HTTP) that don't
+    /// hold a socket open.</summary>
+    int KeepAliveSeconds { get => 0; set { } }
+
+    /// <summary>Invoked by the transport for each keep-alive heartbeat (sent / link-alive / failed) so the app can
+    /// log the exchange. Fires off the UI thread — subscribers must marshal. No-op for links without a keep-alive.</summary>
+    Action<KeepAlivePhase, string?>? KeepAliveObserver { get => null; set { } }
 }
 
 /// <summary>

@@ -132,6 +132,28 @@ public sealed class DeviceTabPage : ContentPage
         stack.Add(new Label { Text = "If the connection drops, retry once a minute until it reconnects (or you tap " +
             "Stop reconnecting).", TextColor = Dim, FontSize = 12 });
 
+        // TCP keep-alive heartbeat: send an empty heartbeat every N seconds so an idle WiFi/TCP link isn't dropped
+        // (the device closes a client that's silent for ~15 min). 0 turns it off. Each heartbeat is logged under
+        // the Heartbeat category and applied live.
+        var hbEntry = new Entry
+        {
+            Text = AppSettings.HeartbeatIntervalSeconds.ToString(), Keyboard = Keyboard.Numeric, WidthRequest = 80,
+            HorizontalTextAlignment = TextAlignment.End, VerticalOptions = LayoutOptions.Center,
+        };
+        void ApplyHeartbeat()
+        {
+            if (int.TryParse(hbEntry.Text?.Trim(), out var s) && s >= 0) _main.SetHeartbeatIntervalSeconds(s);
+            hbEntry.Text = AppSettings.HeartbeatIntervalSeconds.ToString();   // normalise the field (clamp / reject bad input)
+        }
+        hbEntry.Completed += (_, _) => ApplyHeartbeat();
+        hbEntry.Unfocused += (_, _) => ApplyHeartbeat();
+        var hbRow = new HorizontalStackLayout { Spacing = 8, Margin = new Thickness(0, 6, 0, 0) };
+        hbRow.Add(new Label { Text = "Keep-alive heartbeat (s, 0 = off)", TextColor = Fg, VerticalOptions = LayoutOptions.Center });
+        hbRow.Add(hbEntry);
+        stack.Add(hbRow);
+        stack.Add(new Label { Text = "Keeps a WiFi/TCP link alive when idle; each heartbeat is logged under the Heartbeat " +
+            "category in system messages. 300 (5 min) is a safe default; 0 disables it.", TextColor = Dim, FontSize = 12 });
+
         // Opt-in background poll: while the phone sleeps, check the device for new messages every ~15 minutes.
         var bgSwitch = new Switch { IsToggled = AppSettings.BackgroundPoll, VerticalOptions = LayoutOptions.Center };
         bgSwitch.Toggled += (_, e) => { AppSettings.BackgroundPoll = e.Value; BackgroundPoll.Apply(); };

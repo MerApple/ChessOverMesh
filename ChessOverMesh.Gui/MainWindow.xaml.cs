@@ -20,7 +20,7 @@ using GameColor = ChessOverMesh.Chess.Color;
 namespace ChessOverMesh.Gui;
 
 /// <summary>Category of a System-messages line, used by the per-type filter.</summary>
-public enum SysCategory { Game, Connection, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings, MeshTraffic }
+public enum SysCategory { Game, Connection, Heartbeat, Nodes, Position, Telemetry, Traceroute, Admin, Requests, Outgoing, Warnings, MeshTraffic }
 
 public partial class MainWindow : Window
 {
@@ -381,6 +381,7 @@ public partial class MainWindow : Window
     // the Color/Fonts window recolours existing system rows live via the shared brush, mirroring the type colours.
     private static readonly MediaColor DefSysGame = MediaColor.FromRgb(0xE0, 0xE0, 0xE0);        // white/grey
     private static readonly MediaColor DefSysConnection = MediaColor.FromRgb(0x80, 0xCB, 0xC4);  // teal
+    private static readonly MediaColor DefSysHeartbeat = MediaColor.FromRgb(0x7E, 0x8C, 0xE0);   // periwinkle — keep-alive
     private static readonly MediaColor DefSysNodes = MediaColor.FromRgb(0x7F, 0xC8, 0xE8);       // light blue
     private static readonly MediaColor DefSysPosition = MediaColor.FromRgb(0xA5, 0xD6, 0xA7);    // green
     private static readonly MediaColor DefSysTelemetry = MediaColor.FromRgb(0xC5, 0xA3, 0xFF);   // lavender
@@ -392,6 +393,7 @@ public partial class MainWindow : Window
     private static readonly MediaColor DefSysMeshTraffic = MediaColor.FromRgb(0x8A, 0x9A, 0xA8); // slate — verbose packet log
     private static readonly SolidColorBrush SysGameText = new(DefSysGame);
     private static readonly SolidColorBrush SysConnectionText = new(DefSysConnection);
+    private static readonly SolidColorBrush SysHeartbeatText = new(DefSysHeartbeat);
     private static readonly SolidColorBrush SysNodesText = new(DefSysNodes);
     private static readonly SolidColorBrush SysPositionText = new(DefSysPosition);
     private static readonly SolidColorBrush SysTelemetryText = new(DefSysTelemetry);
@@ -405,6 +407,7 @@ public partial class MainWindow : Window
     private static SolidColorBrush SysCategoryBrush(SysCategory cat) => cat switch
     {
         SysCategory.Connection => SysConnectionText,
+        SysCategory.Heartbeat => SysHeartbeatText,
         SysCategory.Nodes => SysNodesText,
         SysCategory.Position => SysPositionText,
         SysCategory.Telemetry => SysTelemetryText,
@@ -554,10 +557,12 @@ public partial class MainWindow : Window
 
     private void OpenConnectionSettings()
     {
-        var dlg = new ConnectionSettingsWindow(this, AppSettings.AutoReconnect, ClearRecentHosts);
+        var dlg = new ConnectionSettingsWindow(this, AppSettings.AutoReconnect, AppSettings.HeartbeatIntervalSeconds, ClearRecentHosts);
         if (dlg.ShowDialog() != true) return;
         AppSettings.AutoReconnect = dlg.AutoReconnect;
         if (!AppSettings.AutoReconnect) StopAutoReconnect(reconnected: false);   // turning it off cancels any retry loop
+        AppSettings.HeartbeatIntervalSeconds = dlg.HeartbeatSeconds;
+        if (_mesh != null) _mesh.HeartbeatIntervalSeconds = dlg.HeartbeatSeconds;   // apply live (0 = off) without reconnecting
     }
 
     // Forgets the remembered Host dropdown entries (after confirmation) and refreshes the live list.
@@ -993,6 +998,8 @@ public partial class MainWindow : Window
         _mesh.OwnBroadcast += OnOwnBroadcast;        // log our device's own auto-broadcasts (position/nodeinfo/telemetry) (Outgoing)
         _mesh.TelemetryReceived += OnTelemetryReceived;  // log device/environment metrics received from other nodes (Telemetry)
         _mesh.PacketLogged += OnPacketLogged;        // verbose one-line-per-packet mesh-traffic log (MeshTraffic)
+        _mesh.HeartbeatLogged += OnHeartbeatLogged;  // TCP keep-alive heartbeats sent + link-alive/failed result (Heartbeat)
+        _mesh.HeartbeatIntervalSeconds = AppSettings.HeartbeatIntervalSeconds;   // 0 = off; applied live from Connection settings
         _mesh.LogAllPackets = !_hiddenSysCats.Contains(SysCategory.MeshTraffic);  // only build the strings when shown
         _mesh.SetNoiseCalibration(AppSettings.NoiseCalibrations);   // apply the per-hardware noise-floor calibration
         _mesh.MaxPositionHistory = AppSettings.MaxPositionsPerNode;  // apply the per-node position-track limit
@@ -2407,6 +2414,9 @@ public partial class MainWindow : Window
 
     /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category.</summary>
     private void OnPacketLogged(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.MeshTraffic));
+
+    /// <summary>Logs a TCP keep-alive heartbeat (sent / link-alive / failed) to system messages, tagged Heartbeat.</summary>
+    private void OnHeartbeatLogged(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Heartbeat));
 
     /// <summary>Logs device/environment metrics received from another node to system messages, tagged Telemetry.</summary>
     private void OnTelemetryReceived(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Telemetry));
@@ -4498,6 +4508,7 @@ public partial class MainWindow : Window
 
     private static string SysCategoryLabel(SysCategory c) => c switch
     {
+        SysCategory.Heartbeat => "Heartbeat (keep-alive)",
         SysCategory.Nodes => "Nodes (node info)",
         SysCategory.Requests => "Requests from others",
         SysCategory.Outgoing => "Outgoing (our device)",

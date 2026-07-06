@@ -12,7 +12,7 @@ internal static class AppSettings
         public List<string> RecentHosts { get; set; } = new();   // recently connected hosts, newest first
         public bool ShowSignal { get; set; } = true;
         public bool RainbowEffect { get; set; }   // rainbow wave on each move (default off)
-        public bool HeartbeatEnabled { get; set; } = false;   // opt-in TCP keep-alive (off by default)
+        public int HeartbeatIntervalSeconds { get; set; } = 300;   // TCP keep-alive heartbeat period; 0 = off (5 min default)
         public bool AutoReconnect { get; set; } = true;       // retry once a minute when the device drops (on by default)
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
         public int ChatMessageLimit { get; set; } = 100;        // max chat messages kept per channel (cache + on-screen)
@@ -158,11 +158,12 @@ internal static class AppSettings
         set => Mutate(d => d.RainbowEffect = value);
     }
 
-    /// <summary>Send a periodic TCP keep-alive heartbeat (opt-in, off by default).</summary>
-    public static bool HeartbeatEnabled
+    /// <summary>TCP keep-alive heartbeat period in seconds; 0 disables it. Default 5 min — under the device's
+    /// ~15 min idle timeout. Negative values are clamped to 0 (off).</summary>
+    public static int HeartbeatIntervalSeconds
     {
-        get => Load().HeartbeatEnabled;
-        set => Mutate(d => d.HeartbeatEnabled = value);
+        get => Load().HeartbeatIntervalSeconds;
+        set => Mutate(d => d.HeartbeatIntervalSeconds = Math.Max(0, value));
     }
 
     /// <summary>When a connected device drops, automatically retry the connection once a minute (opt-in).</summary>

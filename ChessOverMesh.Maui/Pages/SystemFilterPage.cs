@@ -15,7 +15,7 @@ public sealed class SystemFilterPage : ContentPage
     readonly VerticalStackLayout _list = new() { Spacing = 2 };
 
     static readonly SysCategory[] Categories =
-        { SysCategory.Game, SysCategory.Connection, SysCategory.Nodes, SysCategory.Position,
+        { SysCategory.Game, SysCategory.Connection, SysCategory.Heartbeat, SysCategory.Nodes, SysCategory.Position,
           SysCategory.Telemetry, SysCategory.Traceroute, SysCategory.Admin, SysCategory.Requests,
           SysCategory.Outgoing, SysCategory.Warnings, SysCategory.MeshTraffic };
 
@@ -65,6 +65,7 @@ public sealed class SystemFilterPage : ContentPage
 
     static string Label(SysCategory c) => c switch
     {
+        SysCategory.Heartbeat => "Heartbeat (keep-alive)",
         SysCategory.Nodes => "Nodes (node info)",
         SysCategory.Requests => "Requests from others",
         SysCategory.Outgoing => "Outgoing (our device)",

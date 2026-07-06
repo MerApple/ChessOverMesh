@@ -32,11 +32,9 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
     // frame during that window so a brief gap mid-dump doesn't look like "queue drained" and truncate the read.
     private static readonly TimeSpan PostWriteReadWait = TimeSpan.FromSeconds(6);
     private static readonly TimeSpan PostWriteWindow = TimeSpan.FromSeconds(8);
-    // The device's TCP/WiFi API closes a client that has sent nothing for its idle timeout (~15 min). This app is
-    // otherwise a pure reader (it only drains FromRadio), so without a keep-alive the socket is dropped and
-    // reconnected every ~15 min. Send an empty heartbeat once the link has been write-idle this long; any real
-    // write (chat/admin/want_config) pushes the next one out, so a busy link sends none.
-    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMinutes(5);
+    // When off (KeepAliveSeconds == 0) the heartbeat loop polls this often so a settings change takes effect
+    // without reconnecting.
+    private static readonly TimeSpan KeepAliveOffPoll = TimeSpan.FromSeconds(30);
     // ToRadio.heartbeat is field 7, an empty Heartbeat message: tag (7<<3 | 2 = 0x3A) + length 0, hand-encoded
     // because the bundled proto predates the field. WriteAsync adds the [0x94 0xc3][len] stream framing.
     private static readonly byte[] HeartbeatToRadio = { 0x3A, 0x00 };
@@ -62,6 +60,14 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
     /// <summary>The persistent socket reports its own liveness (faults on drop + OS keep-alive), so the app must not
     /// open a competing connection to probe this single-client port — see <see cref="IMeshTransport.SelfReportsLiveness"/>.</summary>
     public bool SelfReportsLiveness => true;
+
+    /// <summary>Keep-alive heartbeat period in seconds (0 = off). Read live by the heartbeat loop, so changing it
+    /// takes effect without reconnecting. Defaults to 5 min — comfortably under the device's ~15 min idle timeout.</summary>
+    public int KeepAliveSeconds { get; set; } = 300;
+
+    /// <summary>Invoked for each keep-alive heartbeat (sent / link-alive / failed) so the app can log it. Fires on
+    /// the heartbeat background task — the handler must marshal to the UI thread.</summary>
+    public Action<KeepAlivePhase, string?>? KeepAliveObserver { get; set; }
 
     private TcpStreamMeshTransport(TcpClient client, Stream stream)
     {
@@ -282,26 +288,47 @@ public sealed class TcpStreamMeshTransport : IMeshTransport
 
     // Holds the persistent link open: the device drops a client that's been idle (no ToRadio sent) past its timeout,
     // and this app only ever reads, so without this the socket is closed and reconnected every ~15 min. Sends an
-    // empty heartbeat once the link has been write-idle for HeartbeatInterval; every real write updates _lastWriteUtc
-    // and so defers the next heartbeat, meaning nothing extra is sent while traffic is already flowing.
+    // empty heartbeat once the link has been write-idle for KeepAliveSeconds; every real write updates _lastWriteUtc
+    // and so defers the next heartbeat, meaning nothing extra is sent while traffic is already flowing. KeepAliveObserver
+    // is notified of each heartbeat (sent / link-alive / failed) so the app can surface it. KeepAliveSeconds is read
+    // live: 0 disables the heartbeat (polled so re-enabling it doesn't require a reconnect).
     private async Task HeartbeatLoopAsync(CancellationToken ct)
     {
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                var due = HeartbeatInterval - (DateTime.UtcNow - _lastWriteUtc);
+                int secs = KeepAliveSeconds;
+                if (secs <= 0)
+                {
+                    await Task.Delay(KeepAliveOffPoll, ct).ConfigureAwait(false);   // disabled — re-check periodically
+                    continue;
+                }
+                var due = TimeSpan.FromSeconds(secs) - (DateTime.UtcNow - _lastWriteUtc);
                 if (due > TimeSpan.Zero)
                 {
                     await Task.Delay(due, ct).ConfigureAwait(false);
-                    continue;   // a real write may have landed during the wait — re-check before sending
+                    continue;   // a real write (or a settings change) may have landed during the wait — re-check
                 }
                 if (_faulted || _disposed) return;
-                await WriteAsync(HeartbeatToRadio, ct).ConfigureAwait(false);   // WriteAsync updates _lastWriteUtc
+                KeepAliveObserver?.Invoke(KeepAlivePhase.Sent, null);
+                try
+                {
+                    await WriteAsync(HeartbeatToRadio, ct).ConfigureAwait(false);   // WriteAsync updates _lastWriteUtc
+                }
+                catch (OperationCanceledException) { return; }   // disposed
+                catch (Exception ex)
+                {
+                    // The write faulted the link (SetFault ran in WriteAsync); report why, then stop — the read loop
+                    // has flagged the drop and the app will reconnect.
+                    KeepAliveObserver?.Invoke(KeepAlivePhase.Failed, _lastError ?? DescribeFault(ex));
+                    return;
+                }
+                KeepAliveObserver?.Invoke(KeepAlivePhase.LinkAlive, null);
             }
         }
         catch (OperationCanceledException) { /* disposed */ }
-        catch { /* the write faulted the link; the read loop records the reason and the app reconnects */ }
+        catch { /* never let an unexpected error (e.g. in a log observer) silently kill the keep-alive loop */ }
     }
 
     // Record the drop: flag the link dead and keep the first reason (the most proximate cause — the read loop and a

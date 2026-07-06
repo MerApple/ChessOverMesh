@@ -11,7 +11,7 @@ internal static class AppSettings
         public string? LastHost { get; set; }
         public List<string> RecentHosts { get; set; } = new();   // recently connected hosts, newest first
         public bool ShowSignal { get; set; } = true;
-        public bool HeartbeatEnabled { get; set; } = false;   // opt-in TCP keep-alive (off by default)
+        public int HeartbeatIntervalSeconds { get; set; } = 300;   // TCP keep-alive heartbeat period; 0 = off (5 min default)
         public bool AutoReconnect { get; set; } = true;       // retry once a minute when the device drops (on by default)
         public bool BackgroundPoll { get; set; } = true;      // periodic ~15-min poll for messages while asleep (on by default)
         public bool CacheMessages { get; set; } = true;         // persist chat history per device (off = never cache)
@@ -117,7 +117,7 @@ internal static class AppSettings
     /// <summary>Forgets all remembered recent hosts.</summary>
     public static void ClearRecentHosts() => Mutate(d => d.RecentHosts.Clear());
     public static bool ShowSignal { get => Load().ShowSignal; set => Mutate(d => d.ShowSignal = value); }
-    public static bool HeartbeatEnabled { get => Load().HeartbeatEnabled; set => Mutate(d => d.HeartbeatEnabled = value); }
+    public static int HeartbeatIntervalSeconds { get => Load().HeartbeatIntervalSeconds; set => Mutate(d => d.HeartbeatIntervalSeconds = Math.Max(0, value)); }
     public static bool AutoReconnect { get => Load().AutoReconnect; set => Mutate(d => d.AutoReconnect = value); }
     public static bool BackgroundPoll { get => Load().BackgroundPoll; set => Mutate(d => d.BackgroundPoll = value); }
     public static bool CacheMessages { get => Load().CacheMessages; set => Mutate(d => d.CacheMessages = value); }
