@@ -36,6 +36,7 @@ internal static class DeviceCache
         public string? Id { get; set; }   // stable id so a single message can be removed from the cache
         public uint RxTime { get; set; }  // the message's device rx_time (epoch s, 0 if unknown), for proxy catch-up
         public DateTime ExpiresAt { get; set; }   // sender-set self-destruct time (local); default = never expires
+        public uint DmPeer { get; set; }  // conversation peer node num for a DM (0 = channel message), so it reloads under its DM thread
     }
 
     /// <summary>One cached environment telemetry reading (temperature °C, humidity %, pressure hPa) with the

@@ -1365,15 +1365,16 @@ public partial class MainWindow : Window
     {
         if (host.Length == 0 || ChatList.Items.Count > 0) return;
         var chat = DeviceCache.GetChat(host);
-        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt)>();
+        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt, uint DmPeer)>();
         foreach (var ch in ReceiveChannels())   // all enabled channels (RX shows everything; the filter hides)
             if (chat.TryGetValue(ch, out var list))
-                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt));
+                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt, m.DmPeer));
         if (msgs.Count == 0) return;
         foreach (var m in msgs.OrderBy(m => m.Time))
         {
             var e = AddChatLine(m.Text, m.Detail, CachedText);   // grey — saved history from a previous session
             e.Channel = m.Channel;
+            e.DmPeer = m.DmPeer;   // restore DM attribution so the row reloads under its DM thread (RxKey), not as a channel row
             e.CacheId = m.Id;
             e.Time = m.Time;   // preserve original time for age-based auto-delete
             if (m.ExpiresAt != default)   // resume the self-destruct countdown for a still-pending message
@@ -1390,11 +1391,11 @@ public partial class MainWindow : Window
     /// <summary>Caches a chat line (latest 100 per channel) for the current device. Returns the stable id given
     /// to the cached copy (or null when not cached), so the caller can stamp it on the displayed row for later
     /// per-message removal.</summary>
-    private string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default)
+    private string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default, uint dmPeer = 0)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt, DmPeer = dmPeer });
         return id;
     }
 
@@ -3361,7 +3362,7 @@ public partial class MainWindow : Window
             if (!msg.DecryptFailed)
             {
                 _chatById[msg.PacketId] = body;                  // remember its text for reply quoting
-                entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt);   // persist (latest 100 per channel)
+                entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt, isDm ? dmPeer : 0);   // persist (latest 100 per channel; DM tagged with its peer)
             }
             // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there instead
             // of notifying (so a hidden conversation just shows a badge in the RX list).
@@ -4026,7 +4027,7 @@ public partial class MainWindow : Window
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);   // hide if its target is filtered out
             _chatEntryById[id] = entry;   // so reactions can attach to this row
             _chatById[id] = text;         // remember its text for quoting in future replies
-            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt);   // persist (latest 100 per channel)
+            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt, isDm ? _chatTxDest!.Value : 0);   // persist (latest 100 per channel; DM tagged with its peer)
             _pending[id] = new PendingSend
             {
                 Id = id,
@@ -4207,7 +4208,7 @@ public partial class MainWindow : Window
             entry.PacketId = sentIds.Count > 0 ? sentIds[0] : 0;
             entry.PartPacketIds = sentIds;
             if (sentIds.Count > 0) { _chatEntryById[sentIds[0]] = entry; _chatById[sentIds[0]] = displayText; }
-            entry.CacheId = CacheChat(ch, msgLine, entry.Detail, 0, expiresAt);
+            entry.CacheId = CacheChat(ch, msgLine, entry.Detail, 0, expiresAt, isDm ? dest!.Value : 0);
         }
         else
         {
@@ -4329,7 +4330,7 @@ public partial class MainWindow : Window
         if (!decryptFailed)
         {
             if (entry.PacketId != 0) _chatById[entry.PacketId] = text;
-            entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt);
+            entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt, isDm ? dmPeer : 0);
         }
         bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
         if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil) { FlashNotify(); PlayChatSound(); }

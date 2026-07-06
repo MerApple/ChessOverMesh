@@ -357,7 +357,7 @@ public partial class MainPage : ContentPage
         DateTime expiresAt = (ttlSeconds > 0 && !decryptFailed) ? rxLocal.AddSeconds(ttlSeconds) : default;
         if (expiresAt != default) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now); }
         TrimChatChannel(ch);
-        if (!decryptFailed) entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt);
+        if (!decryptFailed) entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt, isDm ? dmPeer : 0);
         bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
         if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil)
         {
@@ -919,15 +919,16 @@ public partial class MainPage : ContentPage
     {
         if (host.Length == 0 || _chat.Count > 0) return;
         var chat = DeviceCache.GetChat(host);
-        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt)>();
+        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt, uint DmPeer)>();
         foreach (var ch in ReceiveChannels())   // all enabled channels (RX shows everything; the filter hides)
             if (chat.TryGetValue(ch, out var list))
-                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt));
+                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt, m.DmPeer));
         if (msgs.Count == 0) return;
         foreach (var m in msgs.OrderBy(m => m.Time))
         {
             var e = AddChatLine(m.Text, m.Detail, Palette.Cached);   // grey — saved history from a previous session
             e.Channel = m.Channel;
+            e.DmPeer = m.DmPeer;   // restore DM attribution so the row reloads under its DM thread (RxKey), not as a channel row
             e.CacheId = m.Id;
             e.Time = m.Time;   // preserve original time for age-based auto-delete
             if (m.ExpiresAt != default)   // resume the self-destruct countdown for a still-pending message
@@ -941,11 +942,11 @@ public partial class MainPage : ContentPage
     }
 
     // Caches a chat line (latest 100 per channel) for the current device; returns the stable id stamped on the row.
-    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default)
+    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default, uint dmPeer = 0)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt, DmPeer = dmPeer });
         return id;
     }
 
@@ -1971,7 +1972,7 @@ public partial class MainPage : ContentPage
                     entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now);
                 }
                 TrimChatChannel(msg.Channel);   // cap on-screen rows per channel
-                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt);   // persist (latest N per channel)
+                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt, isDm ? dmPeer : 0);   // persist (latest N per channel; DM tagged with its peer)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
                 // instead of notifying (so a hidden conversation just shows a badge in the RX list).
                 bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
@@ -2197,7 +2198,7 @@ public partial class MainPage : ContentPage
             ClearChannelUnread(_chatTxChannel);   // replying on this channel marks its messages read (drops the yellow wash)
             TrimChatChannel(_chatTxChannel);
             RouteRx(entry, isDm, isDm ? _chatTxDest!.Value : 0, incoming: false);
-            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt);
+            entry.CacheId = CacheChat(_chatTxChannel, msgLine, detailBase, 0, expiresAt, isDm ? _chatTxDest!.Value : 0);
             _chatEntryById[id] = entry;
             _pending[id] = new PendingSend { Id = id, Payload = text, LastSentUtc = DateTime.UtcNow, Attempts = 1, IsChat = true, IsRelayConfirm = relayConfirm, IsDm = isDm, Channel = _chatTxChannel, Label = isDm ? $"direct message to {dmName}" : "chat message", Entry = entry, BaseText = detailBase,
                 SendDeadlineUtc = DateTime.UtcNow + TimeSpan.FromSeconds(MaxSendAttempts * AckTimeout.TotalSeconds) };
@@ -2345,7 +2346,7 @@ public partial class MainPage : ContentPage
             entry.PacketId = sentIds.Count > 0 ? sentIds[0] : 0;
             entry.PartPacketIds = sentIds;
             if (sentIds.Count > 0) _chatEntryById[sentIds[0]] = entry;
-            entry.CacheId = CacheChat(ch, msgLine, entry.Detail, 0, expiresAt);
+            entry.CacheId = CacheChat(ch, msgLine, entry.Detail, 0, expiresAt, isDm ? dest!.Value : 0);
         }
         else
         {
