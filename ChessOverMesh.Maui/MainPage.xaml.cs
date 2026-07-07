@@ -357,7 +357,9 @@ public partial class MainPage : ContentPage
         DateTime expiresAt = (ttlSeconds > 0 && !decryptFailed) ? rxLocal.AddSeconds(ttlSeconds) : default;
         if (expiresAt != default) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now); }
         TrimChatChannel(ch);
-        if (!decryptFailed) entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt, isDm ? dmPeer : 0);
+        // Cache decrypt-failed rows too (they carry the sender node in their header), so an encrypted message
+        // survives a restart and its sender can still be asked for node info. They have no expiry (expiresAt == default).
+        entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt, isDm ? dmPeer : 0, msg0.FromNode);
         bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
         if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil)
         {
@@ -919,16 +921,17 @@ public partial class MainPage : ContentPage
     {
         if (host.Length == 0 || _chat.Count > 0) return;
         var chat = DeviceCache.GetChat(host);
-        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt, uint DmPeer)>();
+        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt, uint DmPeer, uint FromNode)>();
         foreach (var ch in ReceiveChannels())   // all enabled channels (RX shows everything; the filter hides)
             if (chat.TryGetValue(ch, out var list))
-                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt, m.DmPeer));
+                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt, m.DmPeer, m.FromNode));
         if (msgs.Count == 0) return;
         foreach (var m in msgs.OrderBy(m => m.Time))
         {
             var e = AddChatLine(m.Text, m.Detail, Palette.Cached);   // grey — saved history from a previous session
             e.Channel = m.Channel;
             e.DmPeer = m.DmPeer;   // restore DM attribution so the row reloads under its DM thread (RxKey), not as a channel row
+            e.SenderNode = m.FromNode;   // restore the sender so a reloaded row can still request node info / DM / etc.
             e.CacheId = m.Id;
             e.Time = m.Time;   // preserve original time for age-based auto-delete
             if (m.ExpiresAt != default)   // resume the self-destruct countdown for a still-pending message
@@ -942,11 +945,11 @@ public partial class MainPage : ContentPage
     }
 
     // Caches a chat line (latest 100 per channel) for the current device; returns the stable id stamped on the row.
-    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default, uint dmPeer = 0)
+    string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default, uint dmPeer = 0, uint fromNode = 0)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt, DmPeer = dmPeer });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt, DmPeer = dmPeer, FromNode = fromNode });
         return id;
     }
 
@@ -1295,7 +1298,7 @@ public partial class MainPage : ContentPage
         var color = pm.AnnouncedColor ?? _joinColor;
         _joining = false; _joinGame = null;
         BeginGame(color, game.GameId, pm.Fen);
-        AddSystem(Stamp() + $"— Joined {_mesh?.DescribeNode(game.CreatorNode)}'s game '{game.GameId}' as {color} (board received from host). —");
+        AddSystem(Stamp() + $"— Joined {_mesh?.DescribeNode(game.CreatorNode)}'s game '{game.GameId}' as {color} (board received from host). —", nodeId: game.CreatorNode);
         Status($"Joined game '{game.GameId}' — you are {color}.");
     }
 
@@ -1497,7 +1500,7 @@ public partial class MainPage : ContentPage
         if (isNew)
         {
             string resumes = string.IsNullOrEmpty(saveName) ? "" : $" (resuming '{saveName}')";
-            AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} started game '{pm.GameId}'{resumes} (they're {creatorColor}). Tap Join to play as {creatorColor.Opposite()}.");
+            AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} started game '{pm.GameId}'{resumes} (they're {creatorColor}). Tap Join to play as {creatorColor.Opposite()}.", nodeId: msg.FromNode);
         }
         ApplyConnectionState();
     }
@@ -1509,7 +1512,7 @@ public partial class MainPage : ContentPage
         {
             SendControl(ProtocolMessage.EncodeBoard(_gameId, _myColor.Opposite(), _board.ToFen()), encrypt: false);
             _awaitingOpponent = false;
-            AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} joined as {_myColor.Opposite()} — sent them the board. Game on!");
+            AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} joined as {_myColor.Opposite()} — sent them the board. Game on!", nodeId: msg.FromNode);
             NotifyBackground("Opponent joined", $"{_mesh?.DescribeNode(msg.FromNode)} joined as {_myColor.Opposite()} — game on!");
             UpdateTurnStatus();
         }
@@ -1972,7 +1975,9 @@ public partial class MainPage : ContentPage
                     entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now);
                 }
                 TrimChatChannel(msg.Channel);   // cap on-screen rows per channel
-                if (!msg.DecryptFailed) entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt, isDm ? dmPeer : 0);   // persist (latest N per channel; DM tagged with its peer)
+                // Cache decrypt-failed rows too (their header carries the sender node), so an encrypted message
+                // survives a restart and its sender can still be asked for node info. They have no expiry (expiresAt == default).
+                entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt, isDm ? dmPeer : 0, msg.FromNode);   // persist (latest N per channel; DM tagged with its peer)
                 // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there
                 // instead of notifying (so a hidden conversation just shows a badge in the RX list).
                 bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
@@ -2010,7 +2015,7 @@ public partial class MainPage : ContentPage
                     SendChatAck(msg.PacketId, msg.Channel, ackSignal);
                     if (keywordAck)   // log keyword-triggered acks so range-test pings are visible even with channel acks off
                         AddSystem(Stamp() + $"Keyword auto-ack sent to {_mesh?.DescribeNode(msg.FromNode)} on channel {msg.Channel}" +
-                            (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".", cat: SysCategory.Warnings);
+                            (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".", cat: SysCategory.Warnings, nodeId: msg.FromNode);
                     _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;
                     if (_chatHoldTimer != null) { _chatHoldTimer.Stop(); _chatHoldTimer.Interval = ChatSendDelay + TimeSpan.FromMilliseconds(200); _chatHoldTimer.Start(); }
                 }
@@ -2741,6 +2746,14 @@ public partial class MainPage : ContentPage
         try { await _mesh.RequestNodeInfoAsync(nodeNum); return $"Requested node info from {who} (!{nodeNum:x8}). It should appear in Nodes shortly."; }
         catch (Exception ex) { return $"Request failed: {ex.Message}"; }
     }
+
+    // Shown (dialog + system message) when the user asks for node info on a row that carries no sender node number —
+    // an old cached row saved before senders were persisted, or a system row not tied to a specific node.
+    public const string NoSenderForNodeInfoText = "Can't request node info: this message isn't tied to a known node (an old cached row or an encrypted/unknown-sender row).";
+
+    /// <summary>Logs a visible system message explaining why a node-info request couldn't be sent, so the action
+    /// never fails silently.</summary>
+    public void NoteNoSenderForNodeInfo() => AddSystem(NoSenderForNodeInfoText, cat: SysCategory.Requests);
 
     /// <summary>The snippet of the message currently being replied to (for the Chat tab's reply banner), or null
     /// when not replying.</summary>
@@ -3510,13 +3523,19 @@ public partial class MainPage : ContentPage
     async Task ShowSystemMenuAsync(LogEntry le)
     {
         var opts = new List<string>();
-        if (le.NodeId != 0) opts.Add("Request node info");
+        opts.Add("Request node info");   // always offered; if the row isn't tied to a node we explain why on tap
         opts.Add("Copy message");
         string choice = await ThemedDialogs.ActionSheet(this, "System message", "Cancel", null, opts.ToArray());
         switch (choice)
         {
             case "Request node info":
-                await ThemedDialogs.Alert(this, "Node info", await RequestNodeInfoForAsync(le.NodeId), "OK");
+                if (le.NodeId != 0)
+                    await ThemedDialogs.Alert(this, "Node info", await RequestNodeInfoForAsync(le.NodeId), "OK");
+                else
+                {
+                    NoteNoSenderForNodeInfo();
+                    await ThemedDialogs.Alert(this, "Node info", NoSenderForNodeInfoText, "OK");
+                }
                 break;
             case "Copy message":
                 try { await Clipboard.Default.SetTextAsync(le.Text ?? ""); Status("Copied message to the clipboard."); }
@@ -3641,6 +3660,7 @@ public partial class MainPage : ContentPage
         var entry = Append(_chat, null, message, color, _chatFamily, _chatSize, detail);
         entry.Time = DateTime.Now;           // for age-based auto-delete (LoadCachedChat overrides with the cached time)
         entry.Rx = rx;                       // received rows carry the raw message (for node info / details / reply)
+        entry.SenderNode = rx?.FromNode ?? 0;// unified sender for node-addressed actions (reloaded rows set this from the cache)
         entry.PacketId = rx?.PacketId ?? 0;  // received rows can be replied to / reacted to by id
         if (entry.PacketId != 0)
         {
