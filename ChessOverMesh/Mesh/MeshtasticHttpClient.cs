@@ -2090,6 +2090,21 @@ public sealed class MeshtasticHttpClient : IDisposable
                (detail.Length > 0 ? "  · " + detail : "");
     }
 
+    // A TX mesh-traffic line for a packet we're about to hand to the radio. Called from WriteToRadioAsync BEFORE the
+    // write, so From is still 0 and hop_start unset — we can't reuse FormatTrafficLine (it keys "TX" off From==MyNodeNum
+    // and would mislabel the route "phone-local"). Format it as TX explicitly with a "queued" marker plus the want-ack /
+    // want-response flags, so the log shows which request went to which node the moment it's sent.
+    private string FormatOutgoingTrafficLine(MeshPacket pkt, Data decoded)
+    {
+        string port = PrettyPort(decoded.Portnum);
+        string from = DescribeNode(MyNodeNum) + " (our device)";
+        string to = pkt.To == 0xffffffff ? "all" : DescribeNode(pkt.To);
+        var flags = new List<string> { "queued" };
+        if (decoded.WantResponse) flags.Add("want-response");
+        if (pkt.WantAck) flags.Add("want-ack");
+        return $"TX {port}  {from} → {to}  · {string.Join(" · ", flags)}";
+    }
+
     // A compact inline summary of a Telemetry payload for the mesh-traffic log — device metrics (battery / voltage /
     // channel + air utilization / uptime) or environment metrics (temperature / humidity / pressure). Returns "" for
     // variants we don't summarise or an unparseable payload, so the caller just omits the detail.
@@ -2731,6 +2746,11 @@ public sealed class MeshtasticHttpClient : IDisposable
             try { AdminActivity($"→ Admin to {DescribeNode(toRadio.Packet.To)}: {DescribeAdmin(AdminMessage.Parser.ParseFrom(dsent.Payload))}"); }
             catch { /* unparseable admin payload — skip logging */ }
         }
+        // Mesh-traffic log for our own outbound packet. The firmware never loops the actual request back (it only echoes
+        // a Routing ack addressed to ourselves), so without this a node-info / position / other request never shows which
+        // node it went to. Gated on LogAllPackets so it respects the "Mesh traffic" filter, same as the RX side.
+        if (LogAllPackets && toRadio.Packet?.Decoded is { } dtx)
+            PacketLogged?.Invoke(FormatOutgoingTrafficLine(toRadio.Packet, dtx));
         _state.AddToRadio(toRadio);
         await _transport.WriteAsync(toRadio.ToByteArray(), ct).ConfigureAwait(false);
     }
