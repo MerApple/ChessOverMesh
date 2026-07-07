@@ -155,6 +155,10 @@ public partial class MainWindow : Window
     private bool _isProxy;                        // connected through Meshtastic.Proxy (proxy:// link), not a device
     private DateTime _suppressAcksUntil;          // don't auto-ack until this time (covers the proxy backfill burst)
     private readonly HashSet<SysCategory> _hiddenSysCats = new();   // system-message categories hidden by the filter
+    // Free-text search filters (trimmed, matched case-insensitively). Empty = no search (show everything the other
+    // filters allow). A row is shown only when it passes BOTH its base filter (category / RX target) AND the search.
+    private string _systemSearch = "";
+    private string _chatSearch = "";
     private int _retentionTick;   // counts ack-timer ticks; a chat auto-delete sweep runs every 60
     private readonly HashSet<uint> _chatAckOn = new();   // channels where chat acks are on (default off; chess always acks)
     private readonly HashSet<uint> _chatAckSignalOn = new();   // channels whose chat ack also reports RSSI/SNR/hops
@@ -1161,7 +1165,7 @@ public partial class MainWindow : Window
             _mesh.ChannelIndex = dlg.ChessChannel;             // chess channel
             // Chat channel selection now lives in the chat RX dropdown, not this dialog — just keep a valid TX channel.
             if (!_chatListen.Contains(_chatTxChannel))
-                _chatTxChannel = _chatListen.Contains(dlg.ChessChannel) ? dlg.ChessChannel : _chatListen.FirstOrDefault();
+                SetChatTxChannel(_chatListen.Contains(dlg.ChessChannel) ? dlg.ChessChannel : _chatListen.FirstOrDefault());
             RebuildChatTxCombo();
 
             if (_currentHost.Length > 0)
@@ -1229,7 +1233,7 @@ public partial class MainWindow : Window
         else
         {
             _chatTxDest = null;
-            _chatTxChannel = t.Id;
+            SetChatTxChannel(t.Id);   // cancels any chat still awaiting retransmit on the old channel
             if (_mesh != null && _currentHost.Length > 0)
                 DeviceCache.SaveChannelPrefs(_currentHost, _mesh.ChannelIndex, _chatListen, _chatTxChannel);
         }
@@ -1504,7 +1508,7 @@ public partial class MainWindow : Window
             ? items.FirstOrDefault(it => it.IsDm && it.Id == _chatTxDest.Value)
             : items.FirstOrDefault(it => !it.IsDm && it.Id == _chatTxChannel) ?? items.FirstOrDefault(it => !it.IsDm);
         ChatTxCombo.SelectedItem = sel;
-        if (sel is { IsDm: false }) _chatTxChannel = sel.Id;
+        if (sel is { IsDm: false }) SetChatTxChannel(sel.Id);
         UpdateChatAckCheck();
         RefreshRxButton();
         ApplyConnectionState();
@@ -1521,28 +1525,58 @@ public partial class MainWindow : Window
     /// it's in the selected-channel set; a DM is shown unless it's been hidden in the RX dropdown.</summary>
     private bool IsRxVisible(bool isDm, uint id) => isDm ? !_rxHidden.Contains((true, id)) : _chatListen.Contains(id);
 
-    /// <summary>Stamps a chat row's RX target, sets whether it's shown (per the filter), and — for an incoming
-    /// message on a hidden target — bumps that target's unread count. Returns whether the row is shown.</summary>
+    /// <summary>Stamps a chat row's RX target, sets its visibility (shown only when its target is visible AND it
+    /// matches the active chat search), and — for an incoming message on a hidden target — bumps that target's
+    /// unread count. Returns whether the row's TARGET is visible (the basis for notifications), independent of the
+    /// search: a new message on a shown channel that the search happens to hide still counts as a new message.</summary>
     private bool RouteRx(LogEntry e, bool isDm, uint peer, bool incoming)
     {
         e.DmPeer = isDm ? peer : 0;
         var key = isDm ? (true, peer) : (false, e.Channel);
-        bool shown = IsRxVisible(key.Item1, key.Item2);
-        e.Visible = shown;
-        if (incoming && !shown)
+        bool targetShown = IsRxVisible(key.Item1, key.Item2);
+        e.Visible = targetShown && MatchesSearch(e.Text, _chatSearch);
+        if (incoming && !targetShown)
         {
             _unread[key] = _unread.GetValueOrDefault(key) + 1;
             RefreshRxButton();
         }
-        return shown;
+        return targetShown;
     }
 
     private void RecomputeChatVisibility()
     {
+        bool searching = _chatSearch.Length > 0;
         foreach (var item in ChatList.Items)
-            if (item is LogEntry e && e.Channel != uint.MaxValue)   // dividers/system rows always show
-            { var k = RxKey(e); e.Visible = IsRxVisible(k.IsDm, k.Id); }
+            if (item is LogEntry e)
+            {
+                // Dividers (Channel == MaxValue) have no message text; show them only when not searching.
+                if (e.Channel == uint.MaxValue) { e.Visible = !searching; continue; }
+                var k = RxKey(e);
+                e.Visible = IsRxVisible(k.IsDm, k.Id) && MatchesSearch(e.Text, _chatSearch);
+            }
     }
+
+    /// <summary>Case-insensitive substring test used by both search fields. An empty needle matches everything.</summary>
+    private static bool MatchesSearch(string haystack, string needle)
+        => needle.Length == 0 || haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
+
+    // ---- Search fields (System / Chat) -----------------------------------------------
+
+    private void SystemSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _systemSearch = SystemSearchBox.Text.Trim();
+        RecomputeSystemVisibility();
+    }
+
+    private void SystemSearchClear_Click(object sender, RoutedEventArgs e) => SystemSearchBox.Clear();   // fires TextChanged
+
+    private void ChatSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _chatSearch = ChatSearchBox.Text.Trim();
+        RecomputeChatVisibility();
+    }
+
+    private void ChatSearchClear_Click(object sender, RoutedEventArgs e) => ChatSearchBox.Clear();   // fires TextChanged
 
     // Hides/shows a DM in the RX dropdown. A hidden DM is also dropped as a TX target, so the TX combo is rebuilt.
     private void SetRxHidden(bool isDm, uint id, bool hidden)
@@ -1559,7 +1593,7 @@ public partial class MainWindow : Window
     {
         if (shown) _chatListen.Add(channel);
         else { _chatListen.Remove(channel); _unread.Remove((false, channel)); }
-        if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
+        if (!_chatListen.Contains(_chatTxChannel)) SetChatTxChannel(_chatListen.FirstOrDefault());
         SaveChatSelection();
         RecomputeChatVisibility();
         RebuildChatTxCombo();
@@ -1570,6 +1604,45 @@ public partial class MainWindow : Window
     {
         if (_currentHost.Length > 0 && _mesh != null)
             DeviceCache.SaveChannelPrefs(_currentHost, _mesh.ChannelIndex, _chatListen, _chatTxChannel);
+    }
+
+    /// <summary>Sets the chat TX channel. When it actually moves to a DIFFERENT channel, any chat message still
+    /// awaiting retransmit on the old channel is cancelled: a queued retransmit fires on a timer, and we must never
+    /// re-send a message the user composed on one channel onto another (a privacy leak). All channel-change paths
+    /// route through here so the guarantee can't be bypassed.</summary>
+    private void SetChatTxChannel(uint newChannel)
+    {
+        if (_chatTxChannel == newChannel) return;
+        _chatTxChannel = newChannel;
+        CancelPendingChatSends(exceptChannel: newChannel, reason: "channel changed");
+    }
+
+    /// <summary>Drops every pending chat send (and its ack/relay tracking) whose channel differs from
+    /// <paramref name="exceptChannel"/>, so a scheduled retransmit can't leak it onto the current channel. The
+    /// rows are marked "not sent" and the in-flight send lock is released. DMs are firmware-retransmitted (never
+    /// re-sent by us onto a channel), so they're left alone. Also clears any queued headers-off split chunks, which
+    /// would otherwise go out on the new channel.</summary>
+    private void CancelPendingChatSends(uint exceptChannel, string reason)
+    {
+        int cancelled = _chatSplitQueue.Count;   // queued split chunks are sent on the current TX channel — drop them too
+        _chatSplitQueue.Clear();
+
+        var stale = _pending.Values.Where(p => p.IsChat && !p.IsDm && p.Channel != exceptChannel).ToList();
+        foreach (var p in stale)
+        {
+            _pending.Remove(p.Id);
+            _chatAckers.Remove(p.Id);
+            if (p.Entry != null)
+            {
+                p.Entry.Detail = p.BaseText + MarkFailed + $" (not sent — {reason})";
+                p.Entry.Foreground = WarningText;
+            }
+        }
+        cancelled += stale.Count;
+        if (cancelled == 0) return;
+
+        Status($"Cancelled {cancelled} unsent chat message{(cancelled == 1 ? "" : "s")} — {reason}.");
+        ApplyConnectionState();   // a cancelled in-flight message no longer holds the send lock
     }
 
     private void RefreshRxButton()
@@ -3681,7 +3754,7 @@ public partial class MainWindow : Window
             {
                 // Group message: switch the TX channel to the one it arrived on.
                 _chatTxDest = null;
-                _chatTxChannel = rx.Channel;
+                SetChatTxChannel(rx.Channel);   // cancels any chat still awaiting retransmit on the old channel
                 RebuildChatTxCombo();
             }
         }
@@ -4385,14 +4458,24 @@ public partial class MainWindow : Window
     /// rows that later show ack status override their own colour afterward, so status still wins there.</summary>
     private LogEntry AddSystemWarning(string line, SysCategory cat = SysCategory.Warnings, uint nodeId = 0) => TagSystem(Append(SystemList, line, SysCategoryBrush(cat)), cat, nodeId);
 
-    // Stamps a system row's category, associated node (0 = none), and initial visibility (hidden if its category is filtered out).
+    // Stamps a system row's category, associated node (0 = none), and initial visibility (shown only if its category
+    // isn't filtered out AND it matches the active system search).
     private LogEntry TagSystem(LogEntry entry, SysCategory cat, uint nodeId = 0)
     {
         entry.Category = cat;
         entry.SysNode = nodeId;
-        entry.Visible = !_hiddenSysCats.Contains(cat);
+        entry.Visible = SystemRowShown(entry);
         TrimSystemMessages();
         return entry;
+    }
+
+    // Whether a system row passes both its category filter and the active search.
+    private bool SystemRowShown(LogEntry e) => !_hiddenSysCats.Contains(e.Category) && MatchesSearch(e.Text, _systemSearch);
+
+    // Re-applies the category filter + search to every system row on screen.
+    private void RecomputeSystemVisibility()
+    {
+        foreach (LogEntry e in SystemList.Items) e.Visible = SystemRowShown(e);
     }
 
     /// <summary>Trims the System list to <see cref="AppSettings.SystemMessageLimit"/> rows (oldest removed first).</summary>
@@ -4513,7 +4596,7 @@ public partial class MainWindow : Window
     private void SetSystemCategoryHidden(SysCategory cat, bool hidden)
     {
         if (hidden) _hiddenSysCats.Add(cat); else _hiddenSysCats.Remove(cat);
-        foreach (LogEntry e in SystemList.Items) e.Visible = !_hiddenSysCats.Contains(e.Category);
+        RecomputeSystemVisibility();   // re-apply category filter + active search
         AppSettings.SystemFilterHidden = string.Join(",", _hiddenSysCats);
         // The verbose packet log has its own opt-in flag; keep it and the client's per-packet gate in sync.
         if (cat == SysCategory.MeshTraffic)
@@ -5027,10 +5110,13 @@ public partial class MainWindow : Window
         try
         {
             uint oldId = p.Id;
-            // Chat resends go on the chat TX channel (marked so the receiver knows it's a resend); everything
-            // else (moves/control) on the chess channel. A fresh id avoids mesh dedupe either way.
+            // Chat resends go on the channel the message was ORIGINALLY sent on (p.Channel), NOT the current
+            // TX channel — the user may have switched channels since, and a retransmit must never leak the
+            // message onto a different channel. (Changing the TX channel also cancels mismatched pending chats,
+            // so in practice p.Channel == the current channel here; using p.Channel guarantees it regardless.)
+            // The resend is marked so the receiver knows it's a resend; a fresh id avoids mesh dedupe.
             uint newId;
-            if (p.IsChat) { p.Channel = _chatTxChannel; newId = await _mesh.SendTextAsync(ProtocolMessage.ChatResendPrefix + p.Payload, _chatTxChannel, replyId: p.ReplyId); }
+            if (p.IsChat) { newId = await _mesh.SendTextAsync(ProtocolMessage.ChatResendPrefix + p.Payload, p.Channel, replyId: p.ReplyId); }
             else newId = await _mesh.SendTextAsync(p.Payload);
             if (newId == oldId) return;
             if (_pending.Remove(oldId)) { p.Id = newId; _pending[newId] = p; }

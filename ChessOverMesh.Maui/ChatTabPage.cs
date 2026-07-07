@@ -10,6 +10,7 @@ public sealed class ChatTabPage : ContentPage
 {
     readonly MainPage _main;
     readonly CollectionView _list;
+    readonly SearchBar _search;
     readonly Editor _input;
     readonly Button _sendBtn;
     readonly Picker _txPicker;
@@ -187,12 +188,23 @@ public sealed class ChatTabPage : ContentPage
 
         var border = new Border { BackgroundColor = Color.FromArgb("#1A1A1A"), StrokeThickness = 0, Padding = 2, Content = _list };
 
+        // Search over the chat list; shows only messages containing the text. Built-in clear (✕) button.
+        _search = new SearchBar
+        {
+            Placeholder = "Search chat…",
+            TextColor = Color.FromArgb("#E0E0E0"),
+            PlaceholderColor = Color.FromArgb("#808080"),
+            CancelButtonColor = Color.FromArgb("#E0E0E0"),
+        };
+        _search.TextChanged += (_, e) => _main.SetChatSearch(e.NewTextValue);
+
         var root = new Grid
         {
             Padding = 8,
             RowSpacing = 6,
             RowDefinitions =
             {
+                new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Star),
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Auto),
@@ -205,11 +217,12 @@ public sealed class ChatTabPage : ContentPage
         counterRow.Add(_selfDestruct, 0, 0);
         counterRow.Add(_charCounter, 1, 0);
 
-        root.Add(border, 0, 0);
-        root.Add(txRow, 0, 1);
-        root.Add(_replyBanner, 0, 2);
-        root.Add(composer, 0, 3);
-        root.Add(counterRow, 0, 4);
+        root.Add(_search, 0, 0);
+        root.Add(border, 0, 1);
+        root.Add(txRow, 0, 2);
+        root.Add(_replyBanner, 0, 3);
+        root.Add(composer, 0, 4);
+        root.Add(counterRow, 0, 5);
         Content = root;
         UpdateCharCounter();
     }

@@ -143,6 +143,7 @@
                 <Grid Grid.Row="2">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -157,7 +158,16 @@
                         </Border>
                     </Popup>
                 </Grid>
-                <ListBox x:Name="SystemList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
+                <DockPanel Grid.Row="1" Margin="0,0,0,4">
+                    <TextBlock Text="Search:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <Button DockPanel.Dock="Right" x:Name="SystemSearchClear" Content="✕" MinHeight="22" MinWidth="24"
+                            Margin="4,0,0,0" Click="SystemSearchClear_Click" ToolTip="Clear search"/>
+                    <TextBox x:Name="SystemSearchBox" MinHeight="22" Background="#FF2D2D30" Foreground="#FFE0E0E0"
+                             BorderBrush="#FF3F3F46" CaretBrush="#FFE0E0E0" VerticalContentAlignment="Center"
+                             TextChanged="SystemSearchBox_TextChanged"
+                             ToolTip="Show only system messages containing this text (case-insensitive)"/>
+                </DockPanel>
+                <ListBox x:Name="SystemList" Grid.Row="2" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
                          BorderThickness="0" FontFamily="Consolas" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
                          SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
@@ -221,6 +231,15 @@
                                   VerticalAlignment="Center" Margin="12,0,0,0" Click="ShowSignalCheck_Click"
                                   ToolTip="Show RSSI / SNR / hop count on received chat messages"/>
                     </WrapPanel>
+                    <DockPanel Margin="0,4,0,0">
+                        <TextBlock Text="Search:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <Button DockPanel.Dock="Right" x:Name="ChatSearchClear" Content="✕" MinHeight="22" MinWidth="24"
+                                Margin="4,0,0,0" Click="ChatSearchClear_Click" ToolTip="Clear search"/>
+                        <TextBox x:Name="ChatSearchBox" MinHeight="22" Background="#FF2D2D30" Foreground="#FFE0E0E0"
+                                 BorderBrush="#FF3F3F46" CaretBrush="#FFE0E0E0" VerticalContentAlignment="Center"
+                                 TextChanged="ChatSearchBox_TextChanged"
+                                 ToolTip="Show only chat messages containing this text (case-insensitive)"/>
+                    </DockPanel>
                 </StackPanel>
                 <ListBox x:Name="ChatList" Grid.Row="1" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
                          BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"

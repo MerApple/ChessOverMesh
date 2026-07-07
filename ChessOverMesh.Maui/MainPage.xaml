@@ -26,7 +26,7 @@
         </Grid>
 
         <!-- Moves / System panel (chat has its own bottom tab) -->
-        <Grid Grid.Row="2" RowDefinitions="Auto,*">
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto,*">
             <Grid x:Name="TabButtons" Grid.Row="0" ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="4" Margin="0,2,0,4">
                 <!-- Shown only when the chessboard is hidden (system-messages-only mode), where the Moves/System toggle makes no sense but Filter/Copy still do. -->
                 <Label x:Name="SystemOnlyTitle" Grid.Column="0" Grid.ColumnSpan="2" Text="System messages" TextColor="#C8C8C8" FontAttributes="Bold" VerticalOptions="Center" IsVisible="False"/>
@@ -36,7 +36,12 @@
                 <Button x:Name="CopyLogBtn" Grid.Column="3" Text="Copy" Clicked="OnCopyLogClicked" MinimumHeightRequest="34" Padding="12,0"/>
             </Grid>
 
-            <Border Grid.Row="1" BackgroundColor="#1A1A1A" StrokeThickness="0" Padding="2">
+            <!-- Search over the System list (only shown while the System tab is active; has a built-in clear button). -->
+            <SearchBar x:Name="SystemSearchBar" Grid.Row="1" Placeholder="Search system messages…"
+                       TextColor="#E0E0E0" PlaceholderColor="#808080" CancelButtonColor="#E0E0E0"
+                       IsVisible="False" TextChanged="OnSystemSearchChanged" Margin="0,0,0,4"/>
+
+            <Border Grid.Row="2" BackgroundColor="#1A1A1A" StrokeThickness="0" Padding="2">
                 <Grid>
                     <CollectionView x:Name="MovesView">
                         <CollectionView.ItemTemplate>
