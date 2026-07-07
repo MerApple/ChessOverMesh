@@ -277,6 +277,10 @@ public partial class MainWindow : Window
         // full signal/relay breakdown. Null for sent/system/move rows.
         public MeshTextMessage? Rx;
 
+        // The sender node for node-addressed actions (request node info / DM), unified across live and reloaded
+        // rows. Set from Rx (live received) or from the cache (reloaded). 0 = no known sender.
+        public uint SenderNode;
+
         // For sent chat rows: the raw message body we typed (without the "You:"/recipient prefix), so
         // "More information" can report its character/byte length. Null for received/system/move rows.
         public string? SentBody;
@@ -1365,16 +1369,17 @@ public partial class MainWindow : Window
     {
         if (host.Length == 0 || ChatList.Items.Count > 0) return;
         var chat = DeviceCache.GetChat(host);
-        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt, uint DmPeer)>();
+        var msgs = new List<(DateTime Time, string Text, string Detail, uint Channel, string? Id, DateTime ExpiresAt, uint DmPeer, uint FromNode)>();
         foreach (var ch in ReceiveChannels())   // all enabled channels (RX shows everything; the filter hides)
             if (chat.TryGetValue(ch, out var list))
-                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt, m.DmPeer));
+                foreach (var m in list) msgs.Add((m.Time, m.Text, m.Detail, ch, m.Id, m.ExpiresAt, m.DmPeer, m.FromNode));
         if (msgs.Count == 0) return;
         foreach (var m in msgs.OrderBy(m => m.Time))
         {
             var e = AddChatLine(m.Text, m.Detail, CachedText);   // grey — saved history from a previous session
             e.Channel = m.Channel;
             e.DmPeer = m.DmPeer;   // restore DM attribution so the row reloads under its DM thread (RxKey), not as a channel row
+            e.SenderNode = m.FromNode;   // restore the sender so a reloaded row can still request node info / DM
             e.CacheId = m.Id;
             e.Time = m.Time;   // preserve original time for age-based auto-delete
             if (m.ExpiresAt != default)   // resume the self-destruct countdown for a still-pending message
@@ -1391,11 +1396,11 @@ public partial class MainWindow : Window
     /// <summary>Caches a chat line (latest 100 per channel) for the current device. Returns the stable id given
     /// to the cached copy (or null when not cached), so the caller can stamp it on the displayed row for later
     /// per-message removal.</summary>
-    private string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default, uint dmPeer = 0)
+    private string? CacheChat(uint channel, string text, string detail, uint rxTime = 0, DateTime expiresAt = default, uint dmPeer = 0, uint fromNode = 0)
     {
         if (_currentHost.Length == 0 || !AppSettings.CacheMessages) return null;   // caching disabled in System settings
         string id = Guid.NewGuid().ToString("N");
-        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt, DmPeer = dmPeer });
+        DeviceCache.AppendChat(_currentHost, channel, new DeviceCache.ChatMessage { Text = text, Detail = detail, Time = DateTime.Now, Id = id, RxTime = rxTime, ExpiresAt = expiresAt, DmPeer = dmPeer, FromNode = fromNode });
         return id;
     }
 
@@ -1938,7 +1943,7 @@ public partial class MainWindow : Window
 
         BeginGame(color, game.GameId, pm.Fen);
         AddSystem(Stamp() + $"— Joined {_mesh?.DescribeNode(game.CreatorNode)}'s game '{game.GameId}' as {color} " +
-                "(board received from host). —");
+                "(board received from host). —", nodeId: game.CreatorNode);
         Status($"Joined game '{game.GameId}' — you are {color}.");
     }
 
@@ -2249,7 +2254,7 @@ public partial class MainWindow : Window
         {
             string resumes = string.IsNullOrEmpty(saveName) ? "" : $" (resuming '{saveName}')";
             AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} started game '{pm.GameId}'{resumes} (they're {creatorColor}). " +
-                $"Click Join… to play as {creatorColor.Opposite()} — the board comes to you.");
+                $"Click Join… to play as {creatorColor.Opposite()} — the board comes to you.", nodeId: msg.FromNode);
         }
         ApplyConnectionState();
     }
@@ -2263,7 +2268,7 @@ public partial class MainWindow : Window
             // BOARD doubles as the join acknowledgement; the joiner plays the opposite colour.
             SendControl(ProtocolMessage.EncodeBoard(_gameId, _myColor.Opposite(), _board.ToFen()), encrypt: false);
             _awaitingOpponent = false;   // opponent is here — the game is on, no longer cancellable
-            AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} joined as {_myColor.Opposite()} — sent them the board. Game on!");
+            AddSystem(Stamp() + $"{_mesh?.DescribeNode(msg.FromNode)} joined as {_myColor.Opposite()} — sent them the board. Game on!", nodeId: msg.FromNode);
             UpdateTurnStatus();
         }
         ApplyConnectionState();
@@ -3360,10 +3365,10 @@ public partial class MainWindow : Window
             _chatEntryById[msg.PacketId] = entry;                // so reactions can attach to this row
             if (_reactions.TryGetValue(msg.PacketId, out var early)) entry.Reactions = FormatReactions(early);
             if (!msg.DecryptFailed)
-            {
-                _chatById[msg.PacketId] = body;                  // remember its text for reply quoting
-                entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt, isDm ? dmPeer : 0);   // persist (latest 100 per channel; DM tagged with its peer)
-            }
+                _chatById[msg.PacketId] = body;                  // remember its text for reply quoting (decrypt-failed has none)
+            // Cache decrypt-failed rows too (their header carries the sender node), so an encrypted message survives a
+            // restart and its sender can still be asked for node info. They have no expiry (expiresAt == default).
+            entry.CacheId = CacheChat(msg.Channel, entry.Text, entry.Detail, msg.RxTime, expiresAt, isDm ? dmPeer : 0, msg.FromNode);   // persist (latest 100 per channel; DM tagged with its peer)
             // Apply the RX filter: hide the row if its channel/DM is hidden, and count it as unread there instead
             // of notifying (so a hidden conversation just shows a badge in the RX list).
             bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
@@ -3395,7 +3400,7 @@ public partial class MainWindow : Window
                 SendChatAck(msg.PacketId, msg.Channel, ackSignal);   // tell the sender we received it (on its channel)
                 if (keywordAck)   // log keyword-triggered acks so range-test pings are visible even with channel acks off
                     AddSystem(Stamp() + $"Keyword auto-ack sent to {_mesh?.DescribeNode(msg.FromNode)} on channel {msg.Channel}" +
-                        (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".", SysCategory.Warnings);
+                        (ackSignal.Length > 0 ? $" — heard {ackSignal}" : "") + ".", SysCategory.Warnings, nodeId: msg.FromNode);
                 _chatSendAllowedUtc = DateTime.UtcNow + ChatSendDelay;   // let that ack send before we chat
                 if (_chatHoldTimer != null)   // grey out Send now; re-enable when the hold ends
                 {
@@ -3756,16 +3761,22 @@ public partial class MainWindow : Window
     private async void RequestNodeInfo_Click(object sender, RoutedEventArgs e)
     {
         if (_mesh == null) return;
-        if (ChatList.SelectedItem is not LogEntry entry || entry.Rx is not { } msg || msg.FromNode == 0)
+        if (ChatList.SelectedItem is not LogEntry entry) { Status("Select a message to request its sender's node info."); return; }
+        if (entry.SenderNode == 0)
         {
-            Status("Select a received message to request its sender's node info.");
+            AddSystem(NoSenderForNodeInfoText, SysCategory.Requests);   // visible feedback so it never fails silently
+            Status("This message isn't tied to a known node — can't request node info.");
             return;
         }
-        string who = _mesh.DescribeNode(msg.FromNode);
-        Status($"Requesting node info from {who} (!{msg.FromNode:x8})…");
-        try { await _mesh.RequestNodeInfoAsync(msg.FromNode); }
+        string who = _mesh.DescribeNode(entry.SenderNode);
+        Status($"Requesting node info from {who} (!{entry.SenderNode:x8})…");
+        try { await _mesh.RequestNodeInfoAsync(entry.SenderNode); }
         catch (Exception ex) { Status($"Request failed: {ex.Message}"); }
     }
+
+    // Shown (system message + status) when the user asks for node info on a row with no sender node number — an old
+    // cached row saved before senders were persisted, or a system row not tied to a specific node.
+    private const string NoSenderForNodeInfoText = "Can't request node info: this message isn't tied to a known node (an old cached row or an encrypted/unknown-sender row).";
 
     /// <summary>Right-click on a system message → Request node info: asks the mesh for the node that message concerns
     /// (node heard/info/position/noise/traceroute). Mirrors the chat <see cref="RequestNodeInfo_Click"/>, but sources
@@ -3774,9 +3785,11 @@ public partial class MainWindow : Window
     private async void RequestSystemNodeInfo_Click(object sender, RoutedEventArgs e)
     {
         if (_mesh == null) return;
-        if (SystemList.SelectedItem is not LogEntry entry || entry.SysNode == 0)
+        if (SystemList.SelectedItem is not LogEntry entry) { Status("Select a system message to request its node info."); return; }
+        if (entry.SysNode == 0)
         {
-            Status("Select a node-related system message to request its node info.");
+            AddSystem(NoSenderForNodeInfoText, SysCategory.Requests);   // visible feedback so it never fails silently
+            Status("This system message isn't tied to a known node — can't request node info.");
             return;
         }
         string who = _mesh.DescribeNode(entry.SysNode);
@@ -4327,11 +4340,10 @@ public partial class MainWindow : Window
         if (expiresAt != default) { entry.ExpiresAt = expiresAt; entry.Expiry = "🕓 " + ExpiryCountdown(expiresAt - DateTime.Now); }
         TrimChatChannel(ch);
         if (entry.PacketId != 0) _chatEntryById[entry.PacketId] = entry;
-        if (!decryptFailed)
-        {
-            if (entry.PacketId != 0) _chatById[entry.PacketId] = text;
-            entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt, isDm ? dmPeer : 0);
-        }
+        if (!decryptFailed && entry.PacketId != 0) _chatById[entry.PacketId] = text;
+        // Cache decrypt-failed rows too (their header carries the sender node), so an encrypted message survives a
+        // restart and its sender can still be asked for node info. They have no expiry (expiresAt == default).
+        entry.CacheId = CacheChat(ch, entry.Text, entry.Detail, msg0.RxTime, expiresAt, isDm ? dmPeer : 0, msg0.FromNode);
         bool shown = RouteRx(entry, isDm, dmPeer, incoming: !sentDmFromUs);
         if (shown && !sentDmFromUs && DateTime.UtcNow >= _suppressAcksUntil) { FlashNotify(); PlayChatSound(); }
         if (wasDm) EnsureDmEnabled(msg0.FromNode);
@@ -4358,7 +4370,7 @@ public partial class MainWindow : Window
     private LogEntry AddChatLine(string message, string detail, Brush color, MeshTextMessage? rx = null)
     {
         bool stick = IsScrolledToBottom(ChatList);
-        var entry = new LogEntry { Text = message, Detail = detail, Foreground = color, Rx = rx, Time = DateTime.Now };
+        var entry = new LogEntry { Text = message, Detail = detail, Foreground = color, Rx = rx, SenderNode = rx?.FromNode ?? 0, Time = DateTime.Now };
         ChatList.Items.Add(entry);
         StickToBottom(ChatList, stick);
         return entry;

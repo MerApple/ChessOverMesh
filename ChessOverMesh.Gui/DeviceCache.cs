@@ -52,6 +52,7 @@ internal static class DeviceCache
         public uint RxTime { get; set; }  // the message's device rx_time (epoch s, 0 if unknown), for proxy catch-up
         public DateTime ExpiresAt { get; set; }   // sender-set self-destruct time (local); default = never expires
         public uint DmPeer { get; set; }  // conversation peer node num for a DM (0 = channel message), so it reloads under its DM thread
+        public uint FromNode { get; set; }  // sender node num (0 = unknown/sent/system), so a reloaded row can still request node info
     }
 
     /// <summary>A cached node position (decimal degrees), persisted so the map shows last-known locations.</summary>

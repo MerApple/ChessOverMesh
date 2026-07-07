@@ -388,12 +388,14 @@ public sealed class ChatTabPage : ContentPage
     // Long-press menu on a chat message — mirrors the desktop right-click options.
     async Task ShowMessageMenuAsync(LogEntry le)
     {
-        bool hasSender = le.Rx is { } rx && rx.FromNode != 0;   // only received messages have a sender
+        uint sender = le.SenderNode;   // sender node for node-addressed actions (set on live AND reloaded rows); 0 = none
+        bool hasSender = sender != 0;
         bool canReply = (le.Rx?.PacketId ?? le.PacketId) != 0;
         var opts = new List<string>();
         if (canReply) opts.Add("Reply");
         if (canReply) opts.Add("React");
-        if (hasSender) { opts.Add("DM"); opts.Add("Request node info"); opts.Add("Node info"); opts.Add("Open location in Google Maps"); }
+        if (hasSender) { opts.Add("DM"); opts.Add("Node info"); opts.Add("Open location in Google Maps"); }
+        opts.Add("Request node info");   // always offered; if the row has no known sender we explain why on tap
         opts.Add("Message details");   // received: signal/relay; sent: who acked + RSSI/SNR/hops both ways
         opts.Add("Copy message");
         opts.Add("Remove message");
@@ -415,22 +417,28 @@ public sealed class ChatTabPage : ContentPage
                 if (!string.IsNullOrWhiteSpace(emoji) && emoji != "Cancel" && emoji != "More…")
                     await _main.ReactToAsync(le, emoji.Trim());
                 break;
-            case "DM" when le.Rx is { } dm:
-                await ThemedDialogs.Alert(this, "Direct message", _main.StartDmWith(dm.FromNode), "OK");
+            case "DM" when sender != 0:
+                await ThemedDialogs.Alert(this, "Direct message", _main.StartDmWith(sender), "OK");
                 break;
-            case "Request node info" when le.Rx is { } r:
-                await ThemedDialogs.Alert(this, "Node info", await _main.RequestNodeInfoForAsync(r.FromNode), "OK");
+            case "Request node info":
+                if (sender != 0)
+                    await ThemedDialogs.Alert(this, "Node info", await _main.RequestNodeInfoForAsync(sender), "OK");
+                else
+                {
+                    _main.NoteNoSenderForNodeInfo();   // log a visible system message so it never fails silently
+                    await ThemedDialogs.Alert(this, "Node info", MainPage.NoSenderForNodeInfoText, "OK");
+                }
                 break;
-            case "Node info" when le.Rx is { } ni:
+            case "Node info" when sender != 0:
                 // Same full "all info" view as the Nodes list's "Show all info" button.
-                var node = _main.GetNodes().FirstOrDefault(n => n.Num == ni.FromNode);
+                var node = _main.GetNodes().FirstOrDefault(n => n.Num == sender);
                 if (node == null)
-                    await ThemedDialogs.Alert(this, "Node info", $"No node entry yet for !{ni.FromNode:x8} — use \"Request node info\" first, then try again.", "OK");
+                    await ThemedDialogs.Alert(this, "Node info", $"No node entry yet for !{sender:x8} — use \"Request node info\" first, then try again.", "OK");
                 else
                     await Navigation.PushModalAsync(new TelemetryPage(_main, node));
                 break;
-            case "Open location in Google Maps" when le.Rx is { } loc:
-                var url = _main.NodeMapsUrl(loc.FromNode);
+            case "Open location in Google Maps" when sender != 0:
+                var url = _main.NodeMapsUrl(sender);
                 if (url == null)
                     await ThemedDialogs.Alert(this, "No location",
                         "No position data found for this node.\n\nIt hasn't shared its location yet. Use \"Request position\" to ask for it, then try again.", "OK");
