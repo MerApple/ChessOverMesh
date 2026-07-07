@@ -2330,17 +2330,27 @@ public sealed class MeshtasticHttpClient : IDisposable
     private async Task ReloadChannelsAsync(CancellationToken ct)
     {
         _seededChannels = null;            // cached channels must not mask a fresh read
+
+        // Flush anything still queued in /fromradio from an earlier, early-broken dump BEFORE asking for a
+        // fresh one. A previous fetch that stopped at "all 8 channels seen" left that dump's node DB and its
+        // config_complete_id sitting in the queue (the poll loop is paused while the channel manager is open,
+        // so nothing else drains them). Without this flush, the read below would hit that STALE
+        // config_complete_id first and stop having collected no channels — which is exactly what made repeated
+        // "Fetch from device" taps alternate between all channels and one channel. Folded into device state
+        // (not surfaced) so the node list stays warm.
+        _suppressDumpNodeInfo = true;
+        await DrainQueuedFramesAsync(ct).ConfigureAwait(false);
+
         _state.Channels.Clear();
 
-        // Ask for a full config dump and drain it, TOLERATING transient empty reads (FetchConfigAsync bails
-        // on the first empty /fromradio body, which on a device in live-packet mode often happens before the
-        // dump starts — so it returns no channels). Channels (slots 0–7) arrive before the node DB, so we
-        // stop as soon as all 8 are seen instead of draining hundreds of nodes to config_complete.
-        // The dump re-streams the whole node DB as NodeInfo frames; suppress surfacing them as "received".
-        // Cleared on config_complete_id below; if we break on channels-complete or time out, the leftover
-        // DB + completion are deferred to the poll loop, which clears the flag on config_complete_id.
-        _suppressDumpNodeInfo = true;
-        await WriteToRadioAsync(new ToRadioMessageFactory().CreateWantConfigMessage(), ct).ConfigureAwait(false);
+        // Ask for a full config dump and drain it. Channels (slots 0–7) arrive before the node DB, so we stop
+        // as soon as all 8 are seen instead of draining hundreds of nodes to config_complete. Capture the
+        // want_config id we send and treat ONLY a config_complete_id that echoes it as "done": a stale
+        // completion from an earlier want_config is consumed and ignored so it can't cut this drain short (the
+        // pre-flush above usually removes it already; id-matching is the guarantee).
+        var wantConfig = new ToRadioMessageFactory().CreateWantConfigMessage();
+        uint wantId = wantConfig.WantConfigId;
+        await WriteToRadioAsync(wantConfig, ct).ConfigureAwait(false);
         var seen = new HashSet<int>();
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(12);
         while (DateTime.UtcNow < deadline)
@@ -2357,12 +2367,30 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (seen.Count >= ChannelSlotCount) break;     // all channel slots collected
             if (fromRadio.PayloadVariantCase == FromRadio.PayloadVariantOneofCase.ConfigCompleteId)
             {
-                _lastChannelReadOk = true;   // a complete config dump counts as a successful read
+                if (fromRadio.ConfigCompleteId != wantId) continue;   // stale completion from an earlier dump — ignore
+                _lastChannelReadOk = true;   // our complete config dump counts as a successful read
                 _suppressDumpNodeInfo = false;   // full dump drained here; re-enable live surfacing
                 break;
             }
         }
         if (MyNodeNum == 0) MyNodeNum = _state.MyNodeInfo?.MyNodeNum ?? 0;
+    }
+
+    /// <summary>
+    /// Best-effort flush of frames already sitting in /fromradio, folding each into device state without
+    /// surfacing it. Called before a fresh want_config so a stale config_complete_id / leftover node DB from
+    /// an earlier early-broken dump can't terminate the new read prematurely. Stops at the first empty read
+    /// (already-queued leftovers arrive back-to-back, with no new dump in flight) or a safety cap.
+    /// </summary>
+    private async Task DrainQueuedFramesAsync(CancellationToken ct)
+    {
+        for (int i = 0; i < 4096; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var fr = await ReadFromRadioAsync(all: false, ct).ConfigureAwait(false);
+            if (fr == null) break;              // queue drained
+            _state.AddFromRadio(fr);
+        }
     }
 
     private IReadOnlyList<MeshChannel> ProjectAllChannels()
@@ -2563,17 +2591,20 @@ public sealed class MeshtasticHttpClient : IDisposable
         var admin = new AdminMessageFactory(_state, dest);
         var toRadio = new ToRadioMessageFactory();
 
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateBeginEditSettingsMessage()), ct).ConfigureAwait(false);
-
+        // Send set_channel STANDALONE — no begin/commit_edit_settings transaction. Firmware handles a bare
+        // set_channel with saveChanges(SEGMENT_CHANNELS, shouldReboot: false): it persists and applies the
+        // channel live WITHOUT rebooting. Wrapping it in a transaction makes commit_edit_settings run
+        // saveChanges(..., shouldReboot: true) → the device reboots, drops the link, and the reconnect on top
+        // of the leftover config_complete frames drives the channel-fetch oscillation/crash. The official
+        // clients (e.g. python node.writeChannel) also send set_channel standalone for exactly this reason.
         var setPkt = admin.CreateSetChannelMessage(channel);
         await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(setPkt), ct).ConfigureAwait(false);
 
-        // Best-effort ack: an explicit error stops us; otherwise commit and report success.
+        // Best-effort ack: an explicit error means the radio rejected it; otherwise report success.
         var error = await AwaitRoutingAckAsync(setPkt.Id, TimeSpan.FromSeconds(4), ct).ConfigureAwait(false);
         if (error is { } e && e != Routing.Types.Error.None)
             return new ChannelOpResult(false, idx, $"The radio rejected the change: {e}.");
 
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateCommitEditSettingsMessage()), ct).ConfigureAwait(false);
         return new ChannelOpResult(true, idx, null);
     }
 
@@ -2624,13 +2655,13 @@ public sealed class MeshtasticHttpClient : IDisposable
             return await RunRawChannelAdminAsync(index, admin.ToArray(), token).ConfigureAwait(false);
         });
 
-    // Begin → (raw set_channel admin) → commit, mirroring RunChannelAdminAsync but with a hand-built payload.
+    // Standalone raw set_channel admin (hand-built payload), mirroring RunChannelAdminAsync. No begin/commit
+    // transaction: a bare set_channel is saved live with shouldReboot:false, so the device doesn't reboot —
+    // see the detailed note in RunChannelAdminAsync.
     private async Task<ChannelOpResult> RunRawChannelAdminAsync(uint index, byte[] setChannelAdmin, CancellationToken ct)
     {
         var dest = _destination ?? (MyNodeNum != 0 ? MyNodeNum : (uint?)null);
-        var admin = new AdminMessageFactory(_state, dest);
         var toRadio = new ToRadioMessageFactory();
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateBeginEditSettingsMessage()), ct).ConfigureAwait(false);
 
         var setPkt = new MeshPacket
         {
@@ -2647,7 +2678,6 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (error is { } e && e != Routing.Types.Error.None)
             return new ChannelOpResult(false, index, $"The radio rejected the change: {e}.");
 
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateCommitEditSettingsMessage()), ct).ConfigureAwait(false);
         return new ChannelOpResult(true, index, null);
     }
 
