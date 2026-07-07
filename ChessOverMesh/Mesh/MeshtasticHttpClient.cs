@@ -1032,6 +1032,9 @@ public sealed class MeshtasticHttpClient : IDisposable
             },
         };
         await WriteToRadioAsync(new ToRadioMessageFactory().CreateMeshPacketMessage(packet), ct).ConfigureAwait(false);
+        // Log this user-initiated request (Outgoing) — the request packet carries our own node info to the target and
+        // asks for theirs. The reply loops back later as a "Node info received" line; this confirms the send itself.
+        OwnBroadcast?.Invoke($"You requested node info from {DescribeNode(dest)} (sent yours in return).");
         return packet.Id;
     }
 
