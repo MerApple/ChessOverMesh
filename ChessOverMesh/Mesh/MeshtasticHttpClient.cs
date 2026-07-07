@@ -2563,17 +2563,20 @@ public sealed class MeshtasticHttpClient : IDisposable
         var admin = new AdminMessageFactory(_state, dest);
         var toRadio = new ToRadioMessageFactory();
 
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateBeginEditSettingsMessage()), ct).ConfigureAwait(false);
-
+        // Send set_channel STANDALONE — no begin/commit_edit_settings transaction. Firmware handles a bare
+        // set_channel with saveChanges(SEGMENT_CHANNELS, shouldReboot: false): it persists and applies the
+        // channel live WITHOUT rebooting. Wrapping it in a transaction makes commit_edit_settings run
+        // saveChanges(..., shouldReboot: true) → the device reboots, drops the link, and the reconnect on top
+        // of the leftover config_complete frames drives the channel-fetch oscillation/crash. The official
+        // clients (e.g. python node.writeChannel) also send set_channel standalone for exactly this reason.
         var setPkt = admin.CreateSetChannelMessage(channel);
         await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(setPkt), ct).ConfigureAwait(false);
 
-        // Best-effort ack: an explicit error stops us; otherwise commit and report success.
+        // Best-effort ack: an explicit error means the radio rejected it; otherwise report success.
         var error = await AwaitRoutingAckAsync(setPkt.Id, TimeSpan.FromSeconds(4), ct).ConfigureAwait(false);
         if (error is { } e && e != Routing.Types.Error.None)
             return new ChannelOpResult(false, idx, $"The radio rejected the change: {e}.");
 
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateCommitEditSettingsMessage()), ct).ConfigureAwait(false);
         return new ChannelOpResult(true, idx, null);
     }
 
@@ -2624,13 +2627,13 @@ public sealed class MeshtasticHttpClient : IDisposable
             return await RunRawChannelAdminAsync(index, admin.ToArray(), token).ConfigureAwait(false);
         });
 
-    // Begin → (raw set_channel admin) → commit, mirroring RunChannelAdminAsync but with a hand-built payload.
+    // Standalone raw set_channel admin (hand-built payload), mirroring RunChannelAdminAsync. No begin/commit
+    // transaction: a bare set_channel is saved live with shouldReboot:false, so the device doesn't reboot —
+    // see the detailed note in RunChannelAdminAsync.
     private async Task<ChannelOpResult> RunRawChannelAdminAsync(uint index, byte[] setChannelAdmin, CancellationToken ct)
     {
         var dest = _destination ?? (MyNodeNum != 0 ? MyNodeNum : (uint?)null);
-        var admin = new AdminMessageFactory(_state, dest);
         var toRadio = new ToRadioMessageFactory();
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateBeginEditSettingsMessage()), ct).ConfigureAwait(false);
 
         var setPkt = new MeshPacket
         {
@@ -2647,7 +2650,6 @@ public sealed class MeshtasticHttpClient : IDisposable
         if (error is { } e && e != Routing.Types.Error.None)
             return new ChannelOpResult(false, index, $"The radio rejected the change: {e}.");
 
-        await WriteToRadioAsync(toRadio.CreateMeshPacketMessage(admin.CreateCommitEditSettingsMessage()), ct).ConfigureAwait(false);
         return new ChannelOpResult(true, index, null);
     }
 
