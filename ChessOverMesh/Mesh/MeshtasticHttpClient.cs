@@ -2076,9 +2076,15 @@ public sealed class MeshtasticHttpClient : IDisposable
         string from = DescribeNode(pkt.From) + (tx ? " (our device)" : "");
         string to = pkt.To == 0xffffffff ? "all" : DescribeNode(pkt.To);
         string route = DescribeRoute(pkt, tx);
-        // Summarise a telemetry payload inline so the log shows what was reported (battery/util/uptime, temp/…), not
-        // just the port name — most useful for our own device's phone-local metrics the firmware pushes every minute.
-        string detail = decoded?.Portnum == PortNum.TelemetryApp ? DescribeTelemetryPayload(decoded) : "";
+        // Summarise the payload inline so the log shows what was carried, not just the port name: telemetry metrics
+        // (battery/util/uptime, temp/…) most useful for our own device's phone-local push, and — for a text message —
+        // the channel it arrived on plus its content, so an unencrypted message from a channel this device isn't
+        // configured for (and so never reaches the chat view) is still readable here.
+        string detail = "";
+        if (decoded != null)
+            detail = decoded.Portnum == PortNum.TelemetryApp ? DescribeTelemetryPayload(decoded)
+                   : decoded.Portnum == PortNum.TextMessageApp ? DescribeTextPayload(pkt, decoded)
+                   : "";
         return $"{(tx ? "TX" : "RX")} {port}  {from} → {to}" +
                (route.Length > 0 ? "  · " + route : "") +
                (detail.Length > 0 ? "  · " + detail : "");
@@ -2112,6 +2118,30 @@ public sealed class MeshtasticHttpClient : IDisposable
                 break;
         }
         return string.Join(" · ", parts);
+    }
+
+    // A compact inline summary of a TEXT_MESSAGE payload for the mesh-traffic log: the channel it arrived on and the
+    // message content. The firmware-decoded payload is plaintext for foreign/unencrypted traffic; for our own channels
+    // that carry an extra app-level layer we try that channel's key so our chat/protocol text is readable too, and fall
+    // back to the raw payload when it doesn't decrypt. Newlines are flattened and long bodies clipped to keep one line.
+    private string DescribeTextPayload(MeshPacket pkt, Data decoded)
+    {
+        string body = decoded.Payload.ToStringUtf8();
+        string key = GetChannelKey(pkt.Channel);
+        if (key.Length > 0 && AesText.TryDecrypt(body, key, out var decrypted)) body = decrypted;
+        body = body.Replace("\r", " ").Replace("\n", " ").Trim();
+        if (body.Length > 120) body = body[..120] + "…";
+        return $"{DescribeChannel(pkt.Channel)}: “{body}”";
+    }
+
+    // A human label for a channel index for the mesh-traffic log: the configured channel name if this device has one,
+    // else "Primary" for index 0, else "ch N" for a channel this device isn't configured for (e.g. foreign traffic).
+    private string DescribeChannel(uint index)
+    {
+        foreach (var c in GetAvailableChannels())
+            if (c.Index == index)
+                return c.Name.Length > 0 ? c.Name : (index == 0 ? "Primary" : $"ch {index}");
+        return $"ch {index}";
     }
 
     // "PositionApp" → "Position"; other/unknown ports fall back to the enum name.
