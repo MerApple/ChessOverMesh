@@ -45,6 +45,7 @@ internal sealed class DeviceSettingsWindow : Window
     // Device tab controls
     private readonly TextBox _longName = Text(180), _shortName = Text(60), _nodeInfoSecs = Text(90), _screenOnSecs = Text(90);
     private readonly CheckBox _ledDisabled = Check("LED heartbeat disabled (turn the status LED off)");
+    private readonly CheckBox _licensed = Check("Licensed (ham) operator");
     private readonly ComboBox _role = Combo(180), _rebroadcast = Combo(180);
     // LoRa tab controls
     private readonly ComboBox _region = Combo(160), _preset = Combo(160);
@@ -127,6 +128,8 @@ internal sealed class DeviceSettingsWindow : Window
         p.Children.Add(Row("Screen on time (s):", _screenOnSecs));
         p.Children.Add(new TextBlock { Text = "Seconds the device screen stays on after activity (0 = always on, as the native app's display timeout).", Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 2) });
         p.Children.Add(Row("", _ledDisabled));
+        p.Children.Add(Row("", _licensed));
+        p.Children.Add(new TextBlock { Text = "Marks this node as a licensed amateur radio operator (sets the User.is_licensed flag).", Foreground = Dim, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 2) });
         p.Children.Add(SaveButton("Save device", async () =>
         {
             if (_device == null) return null;
@@ -136,10 +139,12 @@ internal sealed class DeviceSettingsWindow : Window
             if (_display != null) _display.ScreenOnSecs = ParseU(_screenOnSecs, _display.ScreenOnSecs);   // screen-on lives in DisplayConfig
             // Only write the owner if it actually changed.
             User? ownerToWrite = null;
-            if (_owner != null && (_owner.LongName != _longName.Text.Trim() || _owner.ShortName != _shortName.Text.Trim()))
+            if (_owner != null && (_owner.LongName != _longName.Text.Trim() || _owner.ShortName != _shortName.Text.Trim()
+                                   || _owner.IsLicensed != (_licensed.IsChecked == true)))
             {
                 _owner.LongName = _longName.Text.Trim();
                 _owner.ShortName = _shortName.Text.Trim();
+                _owner.IsLicensed = _licensed.IsChecked == true;
                 ownerToWrite = _owner;
             }
             // One transaction → one reboot, so the device + display (screen-on) changes both persist. (Writing them
@@ -385,6 +390,7 @@ internal sealed class DeviceSettingsWindow : Window
         _nodeInfoSecs.Text = _device.NodeInfoBroadcastSecs.ToString();
         _screenOnSecs.Text = (_display?.ScreenOnSecs ?? 0).ToString();
         _ledDisabled.IsChecked = _mesh.GetLedHeartbeatDisabled();
+        _licensed.IsChecked = _owner!.IsLicensed;
 
         _region.SelectedItem = _lora!.Region;
         _usePreset.IsChecked = _lora.UsePreset;

@@ -60,6 +60,7 @@ public sealed class DeviceConfigPage : ContentPage
     readonly Entry _longName = TextEntry(), _shortName = TextEntry(), _nodeInfoSecs = NumEntry(), _screenOnSecs = NumEntry();
     readonly Picker _role = MakePicker(), _rebroadcast = MakePicker();
     readonly Switch _ledDisabled = new();
+    readonly Switch _licensed = new();
     // LoRa
     readonly Picker _region = MakePicker(), _preset = MakePicker();
     readonly Switch _usePreset = new(), _txEnabled = new();
@@ -106,6 +107,8 @@ public sealed class DeviceConfigPage : ContentPage
         _body.Add(Field("Screen on time (s)", _screenOnSecs));
         _body.Add(new Label { Text = "Seconds the screen stays on after activity (0 = always on).", TextColor = Dim, FontSize = 12 });
         _body.Add(SwitchRow("LED heartbeat disabled (turn the status LED off)", _ledDisabled));
+        _body.Add(SwitchRow("Licensed (ham) operator", _licensed));
+        _body.Add(new Label { Text = "Marks this node as a licensed amateur radio operator (sets the User.is_licensed flag).", TextColor = Dim, FontSize = 12 });
         _body.Add(SaveButton("Save device", SaveDeviceAsync));
 
         _body.Add(Divider());
@@ -255,6 +258,7 @@ public sealed class DeviceConfigPage : ContentPage
         _nodeInfoSecs.Text = _device.NodeInfoBroadcastSecs.ToString();
         _screenOnSecs.Text = (_display?.ScreenOnSecs ?? 0).ToString();
         _ledDisabled.IsToggled = _mesh.GetLedHeartbeatDisabled();
+        _licensed.IsToggled = _owner!.IsLicensed;
 
         _region.SelectedIndex = Math.Max(0, Array.IndexOf(Regions, _lora!.Region));
         _usePreset.IsToggled = _lora.UsePreset;
@@ -320,10 +324,12 @@ public sealed class DeviceConfigPage : ContentPage
         if (_display != null) _display.ScreenOnSecs = ParseU(_screenOnSecs, _display.ScreenOnSecs);   // screen-on lives in DisplayConfig
         // Only write the owner if it actually changed.
         User? ownerToWrite = null;
-        if (_owner != null && (_owner.LongName != _longName.Text?.Trim() || _owner.ShortName != _shortName.Text?.Trim()))
+        if (_owner != null && (_owner.LongName != _longName.Text?.Trim() || _owner.ShortName != _shortName.Text?.Trim()
+                               || _owner.IsLicensed != _licensed.IsToggled))
         {
             _owner.LongName = _longName.Text?.Trim() ?? "";
             _owner.ShortName = _shortName.Text?.Trim() ?? "";
+            _owner.IsLicensed = _licensed.IsToggled;
             ownerToWrite = _owner;
         }
         // One transaction → one reboot, so the device + display (screen-on) changes both persist. (Writing them
