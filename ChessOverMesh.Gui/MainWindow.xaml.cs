@@ -1352,10 +1352,10 @@ public partial class MainWindow : Window
         // so don't drop a valid selection just because it isn't in `available`).
         // The selected channels = what's shown in chat AND what you can send to (chosen via the chat RX dropdown).
         _chatListen.Clear();
-        if (prefs?.ChatListen is { } saved)
-            foreach (var i in saved) _chatListen.Add(i);             // a previously-saved selection (may be empty)
+        if (prefs?.ChatListen is { Count: > 0 } saved)
+            foreach (var i in saved) _chatListen.Add(i);             // a previously-saved non-empty selection
         else
-            foreach (var i in ReceiveChannels()) _chatListen.Add(i);  // first connect: show + TX every enabled channel
+            foreach (var i in ReceiveChannels()) _chatListen.Add(i);  // default: show + TX every enabled channel
 
         _chatTxChannel = prefs?.ChatTxChannel ?? chess;
         if (!_chatListen.Contains(_chatTxChannel)) _chatTxChannel = _chatListen.FirstOrDefault();
