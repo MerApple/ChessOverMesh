@@ -322,6 +322,14 @@ public partial class MainWindow : Window
         // right-click → "Request node info" can ask the mesh for it. 0 = not tied to a node (menu no-ops).
         public uint SysNode;
 
+        // The node whose name is displayed in this row (may differ from SenderNode: e.g. an outgoing DM
+        // mirrored from us has SenderNode = us but shows the recipient's name). 0 = no name to refresh.
+        public uint NameNode;
+
+        // Rebuilds this row's Text from the *current* live node name, preserving everything else (timestamp,
+        // body, marks). Set only on rows that embed a node name; null leaves the row untouched on refresh.
+        public Func<string>? RebuildText;
+
         // Whether this row is shown (the RX filter can hide a channel/DM's rows). Notifies so the list updates live.
         private bool _visible = true;
         public bool Visible
@@ -3149,28 +3157,42 @@ public partial class MainWindow : Window
 
         foreach (var ni in r.NodeInfos)
         {
+            string stamp = Stamp();
+            bool isReq = ni.IsRequest;   // want_response = the other node is ASKING us for our info (device auto-replies)
             string name = ni.Name.Length > 0 ? ni.Name : $"!{ni.Node:x8}";
-            // want_response set = the other node is ASKING us for our info (the device auto-replies); otherwise it's
-            // an answer/announcement carrying that node's info.
-            string line = ni.IsRequest
-                ? $"Node info request received from {name} — replying with ours."
-                : $"Node info received from {name}.";
-            AddSystem(Stamp() + line, SysCategory.Nodes, ni.Node);   // shown/hidden via the System-messages filter (Nodes)
-            _nodeDiagHandler?.Invoke(line);
+            // Rebuilt on later NodeInfo so the row upgrades !hexid → real name in place; keep the original stamp.
+            string Line(string n) => isReq
+                ? $"Node info request received from {n} — replying with ours."
+                : $"Node info received from {n}.";
+            var row = AddSystem(stamp + Line(name), SysCategory.Nodes, ni.Node);   // shown/hidden via the System filter (Nodes)
+            row.NameNode = ni.Node;
+            row.RebuildText = () => stamp + Line(_mesh.DescribeNode(ni.Node));
+            _nodeDiagHandler?.Invoke(Line(name));
         }
 
         // Announce nodes heard for the first time (their live broadcast was just merged into the DB).
         foreach (var nn in r.NewNodes)
         {
+            string stamp = Stamp();
             string name = nn.Name.Length > 0 ? nn.Name : $"!{nn.Node:x8}";
-            string line = $"New node heard: {name}.";
-            AddSystem(Stamp() + line, SysCategory.Nodes, nn.Node);   // shown/hidden via the System-messages filter (Nodes)
-            _nodeDiagHandler?.Invoke(line);
+            string Line(string n) => $"New node heard: {n}.";
+            var row = AddSystem(stamp + Line(name), SysCategory.Nodes, nn.Node);   // shown/hidden via the System filter (Nodes)
+            row.NameNode = nn.Node;
+            row.RebuildText = () => stamp + Line(_mesh.DescribeNode(nn.Node));
+            _nodeDiagHandler?.Invoke(Line(name));
         }
 
         // A node-info reply updates the device's node DB; persist the refreshed names so they survive reconnect.
         if (r.NodeInfos.Count > 0 && _currentHost.Length > 0)
             DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
+
+        // The names we just learned may appear on already-displayed chat/system rows — repaint them in place.
+        if (r.NodeInfos.Count > 0 || r.NewNodes.Count > 0)
+        {
+            var changed = new HashSet<uint>(r.NodeInfos.Select(ni => ni.Node));
+            changed.UnionWith(r.NewNodes.Select(nn => nn.Node));
+            RefreshRowNames(changed);
+        }
 
         // Position heard from another node (broadcast or a reply to our request): note it in the system log, and
         // refresh the Nodes dialog/map since the node DB position just changed. Shown/hidden via the
@@ -3302,6 +3324,7 @@ public partial class MainWindow : Window
         {
             DeviceCache.Save(_currentHost, _mesh.GetAvailableChannels(), _mesh.MyNodeNum, _mesh.GetNodeNameMap(), _mesh.GetNodeRoleMap(), _mesh.GetNodeHwMap(), _mesh.GetNodeShortNameMap(), _mesh.GetNodeFavoriteMap(), _mesh.GetNodeIgnoredMap(), _mesh.GetNodeSignalMap(), _mesh.GetNodeLastHeardMap());
             RefreshChatAckerNames();
+            RefreshRowNames(null);      // node list just populated — repaint any !hexid names on existing rows
             SyncDeviceClockIfAhead();   // correct a radio whose clock is set in the future (bad "last heard" stamps)
             // On a proxy link, ask it to replay any received messages we missed while away (newer than our newest
             // cached one). Suppress acks briefly so we don't re-ack the replayed (old) burst back onto the mesh.
@@ -3423,6 +3446,11 @@ public partial class MainWindow : Window
                 // Channel has an app key set, but this didn't decrypt — show the raw payload in red.
                 ? AddChatLine($"{who}: {msg.Text}  ⚠ decryption failed (wrong/missing key)", detail, WarningText, msg)
                 : AddChatLine($"{who}: {body}", detail, wasDm ? DmText : NormalText, msg);
+            // Let a later NodeInfo repaint this row's shown name in place (unknown !hexid → real name).
+            entry.NameNode = dmPeer;                             // node whose name is shown (recipient for outgoing DMs)
+            entry.RebuildText = msg.DecryptFailed
+                ? () => $"{_mesh?.DescribeNode(dmPeer)}: {msg.Text}  ⚠ decryption failed (wrong/missing key)"
+                : () => $"{_mesh?.DescribeNode(dmPeer)}: {body}";
             entry.PacketId = msg.PacketId;                       // so it can be replied to
             entry.Channel = msg.Channel;
             // Honour the sender's self-destruct: expiry is counted from the radio's receive time (falls back to now),
@@ -5070,6 +5098,18 @@ public partial class MainWindow : Window
                 UpdateChatAckerText(info);
     }
 
+    // Re-render the shown node name on any live chat/system row whose node just changed name (unknown
+    // !hexid → real name, or a short/long-name update). changed == null refreshes every named row.
+    private void RefreshRowNames(HashSet<uint>? changed)
+    {
+        foreach (LogEntry e in ChatList.Items)
+            if (e.RebuildText != null && (changed == null || changed.Contains(e.NameNode)))
+                e.Text = e.RebuildText();
+        foreach (LogEntry e in SystemList.Items)
+            if (e.RebuildText != null && (changed == null || changed.Contains(e.NameNode)))
+                e.Text = e.RebuildText();
+    }
+
     private void UpdateChatAckerText(ChatAckInfo info)
     {
         bool stick = IsScrolledToBottom(ChatList);
@@ -6277,6 +6317,7 @@ public partial class MainWindow : Window
             DeviceCache.SaveNodePositions(_currentHost, _mesh.GetNodePositionMap());   // cache positions for the map
             DeviceCache.SavePositionHistory(_currentHost, _mesh.GetPositionHistoryMap());   // + their recent-position tracks
             RefreshChatAckerNames();   // resolve any acker numbers to names now that nodes are loaded
+            RefreshRowNames(null);     // + repaint node names on existing chat/system rows
             report($"Done — {_mesh.GetNodes().Count} nodes known.");
         }
         catch (Exception ex)
