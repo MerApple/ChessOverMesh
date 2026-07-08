@@ -1586,6 +1586,17 @@ public partial class MainWindow : Window
 
     private void ChatSearchClear_Click(object sender, RoutedEventArgs e) => ChatSearchBox.Clear();   // fires TextChanged
 
+    // Chat search is hidden by default so the message list gets the space; this toggle reveals it.
+    // Hiding it also clears the box (fires TextChanged -> _chatSearch="" -> RecomputeChatVisibility)
+    // so a hidden search never keeps silently filtering the list.
+    private void ChatSearchToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = ChatSearchPanel.Visibility != Visibility.Visible;
+        ChatSearchPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) ChatSearchBox.Focus();
+        else ChatSearchBox.Clear();
+    }
+
     // Hides/shows a DM in the RX dropdown. A hidden DM is also dropped as a TX target, so the TX combo is rebuilt.
     private void SetRxHidden(bool isDm, uint id, bool hidden)
     {
