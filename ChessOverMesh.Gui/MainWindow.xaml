@@ -230,8 +230,10 @@
                         <CheckBox x:Name="ShowSignalCheck" Content="RSSI" Foreground="#FFB0B0B0" IsChecked="True"
                                   VerticalAlignment="Center" Margin="12,0,0,0" Click="ShowSignalCheck_Click"
                                   ToolTip="Show RSSI / SNR / hop count on received chat messages"/>
+                        <Button x:Name="ChatSearchToggle" Content="🔍 Search" MinHeight="22" Margin="12,0,0,0"
+                                Click="ChatSearchToggle_Click" ToolTip="Show or hide the chat search box"/>
                     </WrapPanel>
-                    <DockPanel Margin="0,4,0,0">
+                    <DockPanel x:Name="ChatSearchPanel" Margin="0,4,0,0" Visibility="Collapsed">
                         <TextBlock Text="Search:" Foreground="#FFB0B0B0" VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <Button DockPanel.Dock="Right" x:Name="ChatSearchClear" Content="✕" MinHeight="22" MinWidth="24"
                                 Margin="4,0,0,0" Click="ChatSearchClear_Click" ToolTip="Clear search"/>

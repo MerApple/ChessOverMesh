@@ -168,11 +168,23 @@ public sealed class ChatTabPage : ContentPage
         _settingsBtn = new Button { Text = "⚙", Padding = new Thickness(10, 0), MinimumHeightRequest = 36 };
         _settingsBtn.Clicked += (_, _) => _main.OpenChatSettings();
 
-        var txRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
+        // Toggle for the chat search bar (hidden by default so the list gets the space). Hiding it clears
+        // the text, which fires SearchBar.TextChanged -> SetChatSearch("") so the full list returns.
+        var searchBtn = new Button { Text = "🔍", Padding = new Thickness(10, 0), MinimumHeightRequest = 36 };
+        searchBtn.Clicked += (_, _) =>
+        {
+            bool show = !_search.IsVisible;
+            _search.IsVisible = show;
+            if (show) _search.Focus();
+            else _search.Text = "";
+        };
+
+        var txRow = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
         txRow.Add(new Label { Text = "TX", TextColor = Color.FromArgb("#B0B0B0"), VerticalOptions = LayoutOptions.Center }, 0, 0);
         txRow.Add(_txPicker, 1, 0);
         txRow.Add(_rxBtn, 2, 0);
         txRow.Add(_settingsBtn, 3, 0);
+        txRow.Add(searchBtn, 4, 0);
 
         var composer = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 6 };
         composer.Add(_input, 0, 0);
@@ -189,12 +201,14 @@ public sealed class ChatTabPage : ContentPage
         var border = new Border { BackgroundColor = Color.FromArgb("#1A1A1A"), StrokeThickness = 0, Padding = 2, Content = _list };
 
         // Search over the chat list; shows only messages containing the text. Built-in clear (✕) button.
+        // Hidden by default (the 🔍 button in txRow reveals it) so the chat list gets the space.
         _search = new SearchBar
         {
             Placeholder = "Search chat…",
             TextColor = Color.FromArgb("#E0E0E0"),
             PlaceholderColor = Color.FromArgb("#808080"),
             CancelButtonColor = Color.FromArgb("#E0E0E0"),
+            IsVisible = false,
         };
         _search.TextChanged += (_, e) => _main.SetChatSearch(e.NewTextValue);
 
