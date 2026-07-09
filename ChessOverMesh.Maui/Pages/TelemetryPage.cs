@@ -74,7 +74,8 @@ public sealed class TelemetryPage : ContentPage
         var mapBtn = new Button { Text = "Show on map", Margin = new Thickness(0, 0, 8, 8) };
         mapBtn.Clicked += async (_, _) =>
         {
-            try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions(), _main.GetPositionHistoryMap(), _target.Num)); }
+            try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions(), _main.GetPositionHistoryMap(), _target.Num,
+                liveSnapshot: () => ChessOverMesh.Mesh.NodeMap.SerializeNodes(_main.GetNodePositions(), _main.GetPositionHistoryMap()))); }
             catch (Exception ex) { _status.Text = $"Could not open the map: {ex.Message}"; }
         };
         var actions = new FlexLayout { Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, Direction = Microsoft.Maui.Layouts.FlexDirection.Row };

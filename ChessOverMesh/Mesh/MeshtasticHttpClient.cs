@@ -183,7 +183,6 @@ public sealed class MeshtasticHttpClient : IDisposable
     private readonly Dictionary<uint, (double Lat, double Lon, long LastHeard, long PosTime)> _positionCache = new();   // node num -> position + times, seeded from disk
     private readonly Dictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>> _positionHistory = new();   // node num -> recent positions (oldest first)
     private int _maxPositionHistory = 20;   // keep only the latest N positions per node (oldest dropped past this)
-    private const double MinPositionMoveMeters = 15.0;   // only record a new track point once the node has moved this far from the last one
 
     /// <summary>Max position track points kept per node (oldest dropped past this), configurable via the
     /// "positions per node" Map setting. Clamped to 1–500. Lowering it immediately trims every node's existing
@@ -946,16 +945,18 @@ public sealed class MeshtasticHttpClient : IDisposable
         return match.Num == num ? match : null;   // FirstOrDefault yields Num==0 when there's no fix; real nodes are non-zero
     }
 
-    /// <summary>Appends a fix to a node's position track, dropping any point within <see cref="MinPositionMoveMeters"/>
-    /// of the last stored one (a rebroadcast or a near-stationary node — no meaningful movement) and keeping only the
-    /// latest <see cref="MaxPositionHistory"/>.</summary>
+    /// <summary>Appends a fix to a node's position track. Every distinct reported position is kept — there is no
+    /// distance threshold — so all recent positions show on the map, however small the move. The only point dropped
+    /// is an exact re-read of the same reported fix (identical coordinates <b>and</b> position timestamp): a
+    /// rebroadcast, or the node-DB position folded in again each receive cycle. Keeps the latest
+    /// <see cref="MaxPositionHistory"/>.</summary>
     private void AppendPositionHistory(uint num, double lat, double lon, long lastHeard, long posTime)
     {
         if (!_positionHistory.TryGetValue(num, out var hist)) _positionHistory[num] = hist = new();
         if (hist.Count > 0)
         {
             var last = hist[^1];
-            if (DistanceMeters(last.Lat, last.Lon, lat, lon) < MinPositionMoveMeters) return;   // hasn't moved far enough
+            if (last.Lat == lat && last.Lon == lon && last.PosTime == posTime) return;   // same fix re-read — skip the duplicate
         }
         hist.Add((lat, lon, lastHeard, posTime));
         if (hist.Count > MaxPositionHistory) hist.RemoveRange(0, hist.Count - MaxPositionHistory);
@@ -964,8 +965,8 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// <summary>Folds every node's current node-DB position into its track. Most nodes' locations reach us inside the
     /// node DB (the config dump on connect and NodeInfo) rather than as standalone POSITION_APP packets, and only the
     /// latter were being recorded — so a node's "Show last positions" track stayed a single point no matter how far it
-    /// had moved. Called each receive cycle; <see cref="AppendPositionHistory"/>'s distance filter keeps a stationary
-    /// node at one point and only extends the track once it has actually moved.</summary>
+    /// had moved. Called each receive cycle; <see cref="AppendPositionHistory"/> skips an exact re-read of the same
+    /// fix, so a stationary node stays one point while every genuinely new reported position extends the track.</summary>
     private void CaptureNodeDbPositionsToHistory()
     {
         foreach (var n in _state.Nodes)
@@ -974,17 +975,6 @@ public sealed class MeshtasticHttpClient : IDisposable
             if (p == null || (p.LatitudeI == 0 && p.LongitudeI == 0)) continue;   // no fix
             AppendPositionHistory(n.Num, p.LatitudeI / 1e7, p.LongitudeI / 1e7, n.LastHeard, p.Time);
         }
-    }
-
-    /// <summary>Great-circle (haversine) distance in metres between two lat/lon points.</summary>
-    private static double DistanceMeters(double lat1, double lon1, double lat2, double lon2)
-    {
-        const double r = 6371000.0;                 // Earth radius in metres
-        const double d2r = Math.PI / 180.0;
-        double dLat = (lat2 - lat1) * d2r, dLon = (lon2 - lon1) * d2r;
-        double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
-            + Math.Cos(lat1 * d2r) * Math.Cos(lat2 * d2r) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-        return r * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
     }
 
     /// <summary>The recent positions tracked for a node this session (oldest first), up to the latest

@@ -23,6 +23,16 @@ public sealed class MapTileServer : IDisposable
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
 
+    // The latest node-positions JSON (the shape NodeMap.SerializeNodes produces), served from GET /positions.json so
+    // the open map can poll for fresh positions and update live. The app pushes a new snapshot here from its UI
+    // thread via SetPositions; a plain reference write/read is atomic, so no lock is needed on this hot path.
+    private volatile string _positionsJson = "[]";
+
+    /// <summary>Replaces the node-positions snapshot returned by <c>GET /positions.json</c>. Call it whenever the
+    /// positions change (or on a short timer while the map is open) with the output of
+    /// <see cref="ChessOverMesh.Mesh.NodeMap.SerializeNodes"/>, so the live map reflects new fixes.</summary>
+    public void SetPositions(string positionsJson) => _positionsJson = positionsJson ?? "[]";
+
     // A 1×1 transparent PNG returned for a tile that isn't cached (and can't be fetched) — the map shows a blank
     // square there instead of a broken-image icon.
     private static readonly byte[] BlankTile = Convert.FromBase64String(
@@ -134,6 +144,15 @@ public sealed class MapTileServer : IDisposable
         // Strip any query string and normalise.
         string path = target.Split('?')[0];
 
+        if (path == "/positions.json")
+        {
+            // The map page (in the system browser it is a file:// page; in the WebView an html source) fetches this
+            // cross-origin, so it needs CORS; and it must never be cached or the first poll would freeze the map.
+            var body = Encoding.UTF8.GetBytes(_positionsJson);
+            await WriteResponseAsync(stream, 200, "application/json; charset=utf-8", body, ct, cache: false, cors: true).ConfigureAwait(false);
+            return true;
+        }
+
         if (path.StartsWith("/tiles/", StringComparison.Ordinal))
         {
             var bytes = await ServeTileAsync(path, ct).ConfigureAwait(false);
@@ -204,14 +223,16 @@ public sealed class MapTileServer : IDisposable
 
     // ---- Response writing --------------------------------------------------------------------------------
 
-    private static async Task WriteResponseAsync(NetworkStream stream, int status, string contentType, byte[] body, CancellationToken ct)
+    private static async Task WriteResponseAsync(NetworkStream stream, int status, string contentType, byte[] body,
+        CancellationToken ct, bool cache = true, bool cors = false)
     {
         string reason = status switch { 200 => "OK", 404 => "Not Found", _ => "OK" };
         var header = new StringBuilder();
         header.Append($"HTTP/1.1 {status} {reason}\r\n");
         header.Append($"Content-Type: {contentType}\r\n");
         header.Append($"Content-Length: {body.Length}\r\n");
-        header.Append("Cache-Control: max-age=86400\r\n");
+        header.Append(cache ? "Cache-Control: max-age=86400\r\n" : "Cache-Control: no-store\r\n");
+        if (cors) header.Append("Access-Control-Allow-Origin: *\r\n");   // the map page fetches this cross-origin
         header.Append("Connection: keep-alive\r\n");
         header.Append("\r\n");
         var headerBytes = Encoding.ASCII.GetBytes(header.ToString());

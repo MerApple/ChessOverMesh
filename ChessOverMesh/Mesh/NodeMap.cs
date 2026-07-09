@@ -28,9 +28,12 @@ public static class NodeMap
     /// <param name="onlineTileUrl">The <c>{z}/{x}/{y}</c> tile URL for the online base layer (build it via
     /// <see cref="ChessOverMesh.Map.MapTileProvider.TileUrl"/>). Null/blank uses the plain online OpenStreetMap
     /// layer, as before.</param>
-    public static string Html(IEnumerable<MeshNodePosition> positions,
-        IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null,
-        uint? focusNum = null, string? assetBase = null, string? onlineTileUrl = null)
+    /// <summary>Serializes the node positions (each with its recent-position track) to the JSON array the map page
+    /// consumes — both baked in as the initial <c>nodes</c> and returned from the live <c>/positions.json</c> poll
+    /// endpoint, so the two always share one shape. Each entry is
+    /// <c>{num, name, lat, lon, heard, ptime, hist:[[lat,lon,posTime], …]}</c> (track oldest first).</summary>
+    public static string SerializeNodes(IEnumerable<MeshNodePosition> positions,
+        IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null)
     {
         var data = positions.Select(p => new
         {
@@ -45,6 +48,18 @@ public static class NodeMap
                 ? h.Select(x => new[] { x.Lat, x.Lon, x.PosTime }).ToArray()
                 : Array.Empty<double[]>(),
         });
+        return JsonSerializer.Serialize(data);
+    }
+
+    /// <param name="liveUrl">The loopback URL the page polls for fresh positions (e.g.
+    /// <c>http://127.0.0.1:PORT/positions.json</c>). When set, the map updates in place every few seconds — new
+    /// nodes appear, moved nodes' pins follow, and an open single-node track extends — without reopening the page.
+    /// Null (the server couldn't bind) leaves the page a one-shot snapshot, as before.</param>
+    public static string Html(IEnumerable<MeshNodePosition> positions,
+        IReadOnlyDictionary<uint, List<(double Lat, double Lon, long LastHeard, long PosTime)>>? history = null,
+        uint? focusNum = null, string? assetBase = null, string? onlineTileUrl = null, string? liveUrl = null)
+    {
+        string nodesJson = SerializeNodes(positions, history);
         var focus = focusNum is { } f ? "'" + f.ToString("x8") + "'" : "null";
 
         // The online base layer: the configured provider's URL (may carry an API key), else plain online OSM.
@@ -71,7 +86,8 @@ public static class NodeMap
             .Replace("__LEAFLET_JS__", leafletJs)
             .Replace("__TILE_SETUP__", tileSetup)
             .Replace("__ICON_FIX__", iconFix)
-            .Replace("__NODES__", JsonSerializer.Serialize(data))
+            .Replace("__NODES__", nodesJson)
+            .Replace("__LIVE_URL__", liveUrl ?? "")
             .Replace("__FOCUS__", focus);
     }
 
@@ -105,6 +121,7 @@ map.on('mouseout', function(){ coordsBox.textContent = '—'; });
 var markers = {};      // node num -> main marker
 var group = [];        // all main markers
 var track = null;      // the layer group for a single node's track (polyline + point markers), or null
+var shownNum = null;   // hex num of the node whose track is currently shown, or null in the all-nodes view
 function fmt(t){ return t > 0 ? new Date(t * 1000).toLocaleString() : '—'; }
 function ago(t){ if(!t) return ''; var s = Math.floor(Date.now()/1000) - t; if(s < 0) return ''; if(s < 60) return ' ('+s+'s ago)'; if(s < 3600) return ' ('+Math.floor(s/60)+'m ago)'; if(s < 86400) return ' ('+Math.floor(s/3600)+'h ago)'; return ' ('+Math.floor(s/86400)+'d ago)'; }
 // Track colour along a newest(blue) -> oldest(red) gradient. f: 0 = oldest, 1 = newest.
@@ -123,6 +140,7 @@ nodes.forEach(function(n){
 });
 // Show every node's pin (latest position each) and fit the view to all of them (the default / the ""back"" action).
 function showAll(){
+  shownNum = null;
   if (track){ map.removeLayer(track); track = null; }
   group.forEach(function(m){ map.addLayer(m); });
   document.getElementById('back').style.display = 'none';
@@ -133,7 +151,8 @@ function showAll(){
 function showTrackByNum(num){ var n = nodes.find(function(x){ return x.num === num; }); if (n) showTrack(n); }
 // Show only this node's recent positions: line segments through them and a circle at each point, coloured
 // newest(blue) -> oldest(red) so the direction of travel is clear.
-function showTrack(n){
+function showTrack(n, fit){
+  shownNum = n.num;
   group.forEach(function(m){ map.removeLayer(m); });   // hide all pins
   if (track){ map.removeLayer(track); track = null; }
   var pts = (n.hist && n.hist.length) ? n.hist : [[n.lat, n.lon, n.ptime]];
@@ -157,7 +176,8 @@ function showTrack(n){
   track = L.featureGroup(layers).addTo(map);
   document.getElementById('back').style.display = 'block';
   document.getElementById('legend').style.display = 'block';
-  try { map.fitBounds(track.getBounds().pad(0.2)); } catch(e){}
+  // Only recentre on an explicit open; a live redraw (fit === false) leaves the user's pan/zoom untouched.
+  if (fit !== false){ try { map.fitBounds(track.getBounds().pad(0.2)); } catch(e){} }
 }
 showAll();
 if (focus){ showTrackByNum(focus); }   // ""Show on map"": open straight into this node's track
@@ -167,6 +187,36 @@ function doSearch(){
   if (track) showAll();   // leave a single-node track view before searching the full set
   var f = nodes.find(function(n){ return (n.name||'').toLowerCase().indexOf(q) >= 0 || n.num.indexOf(q) >= 0; });
   if (f) { map.setView([f.lat, f.lon], 13); markers[f.num].openPopup(); }
+}
+// ---- Live updates: poll the app's loopback endpoint and fold fresh positions into the open map ----
+var liveUrl = '__LIVE_URL__';
+// Merge a fresh node array (same shape as `nodes`) into the map without disturbing the user's pan/zoom: add pins
+// for new nodes, move existing pins to their latest position, refresh popups, and extend an open track live.
+function applyUpdate(fresh){
+  if (!fresh || !fresh.length) return;
+  var trackGrew = false;
+  fresh.forEach(function(fn){
+    var ex = nodes.find(function(x){ return x.num === fn.num; });
+    if (!ex){
+      nodes.push(fn);
+      var nm = L.marker([fn.lat, fn.lon]).bindPopup(popupHtml(fn));
+      markers[fn.num] = nm; group.push(nm);
+      if (!track) map.addLayer(nm);   // new pins show in the all-nodes view; a track view stays focused on its node
+    } else {
+      var grew = (fn.hist ? fn.hist.length : 0) > (ex.hist ? ex.hist.length : 0);
+      ex.name = fn.name; ex.lat = fn.lat; ex.lon = fn.lon; ex.heard = fn.heard; ex.ptime = fn.ptime; ex.hist = fn.hist;
+      var m = markers[fn.num];
+      if (m){ m.setLatLng([fn.lat, fn.lon]); m.setPopupContent(popupHtml(ex)); }
+      if (fn.num === shownNum && grew) trackGrew = true;
+    }
+  });
+  // Redraw the open single-node track in place (fit=false keeps the current view) once it has gained points.
+  if (track && shownNum && trackGrew){ var n = nodes.find(function(x){ return x.num === shownNum; }); if (n) showTrack(n, false); }
+}
+if (liveUrl){
+  setInterval(function(){
+    fetch(liveUrl, {cache:'no-store'}).then(function(r){ return r.json(); }).then(applyUpdate).catch(function(){});
+  }, 3000);
 }
 </script></body></html>";
 }

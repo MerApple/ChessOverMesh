@@ -175,7 +175,8 @@ public sealed class NodesPage : ContentPage
 
     async void OnMap(object? sender, EventArgs e)
     {
-        try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions(), _main.GetPositionHistoryMap())); }
+        try { await Navigation.PushModalAsync(new MapPage(_main.GetNodePositions(), _main.GetPositionHistoryMap(),
+            liveSnapshot: () => ChessOverMesh.Mesh.NodeMap.SerializeNodes(_main.GetNodePositions(), _main.GetPositionHistoryMap()))); }
         catch (Exception ex) { _status.Text = $"Could not open the map: {ex.Message}"; }
     }
 

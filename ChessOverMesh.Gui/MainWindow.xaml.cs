@@ -74,6 +74,7 @@ public partial class MainWindow : Window
     // map so it works with no internet. Created lazily the first time the map is opened or an area is cached.
     private MapTileCache? _mapCache;
     private MapTileServer? _mapServer;
+    private DispatcherTimer? _mapLiveTimer;   // refreshes the served /positions.json snapshot so an open map updates live
     private Board _board = Board.CreateStartingPosition();
     private GameColor _myColor = GameColor.White;
     private string _gameId = "";
@@ -522,7 +523,7 @@ public partial class MainWindow : Window
         LoadFonts();
         _rainbowEffect = AppSettings.RainbowEffect;
 
-        Closed += (_, _) => { StopMoveWave(); _pollTimer.Stop(); _ackTimer.Stop(); _probeTimer.Stop(); _autoReconnectTimer.Stop(); _chatHoldTimer.Stop(); _mesh?.Dispose(); _mapServer?.Dispose(); };
+        Closed += (_, _) => { StopMoveWave(); _pollTimer.Stop(); _ackTimer.Stop(); _probeTimer.Stop(); _autoReconnectTimer.Stop(); _chatHoldTimer.Stop(); _mapLiveTimer?.Stop(); _mesh?.Dispose(); _mapServer?.Dispose(); };
 
         ApplyConnectionState();
     }
@@ -5742,6 +5743,23 @@ public partial class MainWindow : Window
         return _mapServer.BaseUrl;
     }
 
+    /// <summary>Starts (once) a timer that re-serializes the current node positions into the loopback server's
+    /// <c>/positions.json</c> snapshot every few seconds, so a map page already open in the browser shows new fixes
+    /// live. Runs on the UI thread (safe to read the mesh state there) for the app's lifetime; a tick is a no-op
+    /// when disconnected or before the server is up.</summary>
+    private void StartMapLiveUpdates()
+    {
+        if (_mapLiveTimer != null) return;
+        _mapLiveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _mapLiveTimer.Tick += (_, _) =>
+        {
+            if (_mesh == null || _mapServer == null) return;
+            try { _mapServer.SetPositions(NodeMap.SerializeNodes(_mesh.GetNodePositions(), _mesh.GetPositionHistoryMap())); }
+            catch { /* transient serialization race — the next tick retries */ }
+        };
+        _mapLiveTimer.Start();
+    }
+
     /// <summary>Generates an OpenStreetMap/Leaflet page of all known node positions (with a search box,
     /// centred on Stockholm by default) and opens it in the default browser. With no offline cache the map is
     /// online-only exactly as before; once an area has been cached (via "Cache map area…") the page gains a
@@ -5757,13 +5775,19 @@ public partial class MainWindow : Window
         }
         try
         {
-            // Only stand up the local tile server (and offer the offline/online choice) once something is cached;
-            // otherwise the map is the original online-only page. Null asset base = load Leaflet + tiles online.
-            string? assetBase = MapCache.HasAnyTiles() ? EnsureMapServer() : null;
+            // Stand up the loopback server whenever the map opens so the page can poll /positions.json and update
+            // live. It also serves offline Leaflet/tiles, but the offline/online base-layer choice is only offered
+            // once an area is cached; with no cache the asset base stays null and Leaflet + tiles load online, as
+            // before. If the socket couldn't bind, liveUrl is null and the page is a one-shot snapshot (as before).
+            string? liveBase = EnsureMapServer();
+            string? assetBase = (liveBase != null && MapCache.HasAnyTiles()) ? liveBase : null;
+            string? liveUrl = liveBase != null ? liveBase + "/positions.json" : null;
             string onlineTileUrl = MapTileProvider.TileUrl(AppSettings.MapProvider, AppSettings.MapApiKey);
+            _mapServer?.SetPositions(NodeMap.SerializeNodes(positions, _mesh.GetPositionHistoryMap()));   // seed the first poll
+            StartMapLiveUpdates();   // keep the served snapshot fresh while the map stays open
             string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chessmesh-nodes-map.html");
             // focusNum opens the map straight into that node's recent-position track (the "Show on map" button).
-            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum, assetBase, onlineTileUrl));
+            System.IO.File.WriteAllText(path, NodeMap.Html(positions, _mesh.GetPositionHistoryMap(), focusNum, assetBase, onlineTileUrl, liveUrl));
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
             Status(positions.Count == 0
                 ? "Opened the map (no nodes have a known position yet — right-click a node → Request position)."

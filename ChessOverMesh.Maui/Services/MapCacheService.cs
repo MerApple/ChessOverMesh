@@ -55,4 +55,12 @@ internal static class MapCacheService
             return _server.BaseUrl;
         }
     }
+
+    /// <summary>Pushes a fresh node-positions snapshot (from <see cref="ChessOverMesh.Mesh.NodeMap.SerializeNodes"/>)
+    /// into the running server so the open map's <c>/positions.json</c> poll returns it. No-op if the server isn't
+    /// up. Call from the UI thread, where reading the mesh state is safe.</summary>
+    public static void SetMapPositions(string positionsJson)
+    {
+        lock (Gate) _server?.SetPositions(positionsJson);
+    }
 }
