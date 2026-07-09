@@ -2752,8 +2752,10 @@ public partial class MainPage : ContentPage
     /// <summary>Logs device/environment metrics received from another node to system messages, tagged Telemetry.</summary>
     void OnTelemetryReceived(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Telemetry));
 
-    /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category.</summary>
-    void OnPacketLogged(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.MeshTraffic));
+    /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category. <paramref
+    /// name="node"/> is the remote node the row is about (0 = none), tagged onto the row so "Request node info" /
+    /// "Node info" work even on encrypted/undecryptable rows.</summary>
+    void OnPacketLogged(string text, uint node) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.MeshTraffic, nodeId: node));
 
     /// <summary>Logs a TCP keep-alive heartbeat (sent / link-alive / failed) to the "Heartbeat" category.</summary>
     void OnHeartbeatLogged(string text) => MainThread.BeginInvokeOnMainThread(() => AddSystem(Stamp() + text, cat: SysCategory.Heartbeat));

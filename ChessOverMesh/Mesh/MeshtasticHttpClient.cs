@@ -1668,7 +1668,10 @@ public sealed class MeshtasticHttpClient : IDisposable
             // Verbose mesh-traffic log: one compact line per packet (transmitted + received). Gated on LogAllPackets
             // so we don't build the string when the app's "Mesh traffic" view is hidden. Emitted before the
             // decoded==null skip below so packets we couldn't decrypt still show (as "Encrypted").
-            if (LogAllPackets) PacketLogged?.Invoke(FormatTrafficLine(pkt, decoded));
+            // Node the row is about: the sender of a received packet (so "Request node info" works even on an
+            // encrypted/undecryptable row, whose From is still in clear), or 0 for our own device's looped-back echo.
+            if (LogAllPackets)
+                PacketLogged?.Invoke(FormatTrafficLine(pkt, decoded), (MyNodeNum != 0 && pkt.From == MyNodeNum) ? 0u : pkt.From);
             if (decoded == null) continue;
 
             // For packets from other nodes (our own echoes excluded): remember the channel index we decoded
@@ -2732,9 +2735,12 @@ public sealed class MeshtasticHttpClient : IDisposable
     public bool LogAllPackets { get; set; }
 
     /// <summary>Raised once per mesh packet — transmitted or received — when <see cref="LogAllPackets"/> is on,
-    /// with a compact one-line description, so the app can show a raw traffic log. May fire off the UI thread —
-    /// subscribers should marshal to the UI thread.</summary>
-    public event Action<string>? PacketLogged;
+    /// with a compact one-line description, so the app can show a raw traffic log. The second argument is the node
+    /// the row is "about" (the remote node: the sender of a received packet, the destination of one we sent), so
+    /// the app can wire "Request node info" / "Node info" onto the row even for encrypted/unknown senders. It is 0
+    /// when there's no single remote node (our own device's phone-local echo, or a broadcast we sent). May fire off
+    /// the UI thread — subscribers should marshal to the UI thread.</summary>
+    public event Action<string, uint>? PacketLogged;
 
     /// <summary>Raised when ANOTHER node's telemetry reading reaches us — device metrics (battery/voltage/
     /// utilization/uptime) or environment metrics (temperature/humidity/pressure), whether solicited by our
@@ -2773,7 +2779,9 @@ public sealed class MeshtasticHttpClient : IDisposable
         // a Routing ack addressed to ourselves), so without this a node-info / position / other request never shows which
         // node it went to. Gated on LogAllPackets so it respects the "Mesh traffic" filter, same as the RX side.
         if (LogAllPackets && toRadio.Packet?.Decoded is { } dtx)
-            PacketLogged?.Invoke(FormatOutgoingTrafficLine(toRadio.Packet, dtx));
+            // For an outgoing packet the remote node is the destination (0 for a broadcast — no single node to ask).
+            PacketLogged?.Invoke(FormatOutgoingTrafficLine(toRadio.Packet, dtx),
+                                 toRadio.Packet.To == 0xffffffff ? 0u : toRadio.Packet.To);
         _state.AddToRadio(toRadio);
         await _transport.WriteAsync(toRadio.ToByteArray(), ct).ConfigureAwait(false);
     }

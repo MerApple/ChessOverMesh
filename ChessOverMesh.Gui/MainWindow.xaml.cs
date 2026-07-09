@@ -2526,8 +2526,10 @@ public partial class MainWindow : Window
     /// <summary>Logs our own device's autonomous broadcast (position/nodeinfo/telemetry) to system messages, tagged Outgoing.</summary>
     private void OnOwnBroadcast(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Outgoing));
 
-    /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category.</summary>
-    private void OnPacketLogged(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.MeshTraffic));
+    /// <summary>Logs one line for every mesh packet (TX + RX) to the verbose "Mesh traffic" category. <paramref
+    /// name="node"/> is the remote node the row is about (0 = none), tagged onto the row so "Request node info" /
+    /// "Node info" work even on encrypted/undecryptable rows.</summary>
+    private void OnPacketLogged(string text, uint node) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.MeshTraffic, nodeId: node));
 
     /// <summary>Logs a TCP keep-alive heartbeat (sent / link-alive / failed) to system messages, tagged Heartbeat.</summary>
     private void OnHeartbeatLogged(string text) => Dispatcher.BeginInvoke(() => AddSystem(Stamp() + text, SysCategory.Heartbeat));
