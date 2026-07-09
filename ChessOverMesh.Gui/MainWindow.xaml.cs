@@ -3922,6 +3922,33 @@ public partial class MainWindow : Window
         catch (Exception ex) { Status($"Request failed: {ex.Message}"); }
     }
 
+    // Shown (system message + status) when the user picks "Node info" on a system row with no node number — a row
+    // not tied to a specific node (a general status line), or an old cached row saved before nodes were persisted.
+    private const string NoNodeForNodeInfoText = "Can't show node info: this system message isn't tied to a known node (a general status line, or an old cached row).";
+
+    /// <summary>Right-click on a system message → Node info: opens the full "all info" window (node details +
+    /// telemetry history) for the node that message concerns. Mirrors the chat <see cref="NodeInfo_Click"/>, but
+    /// sources the node id from the row's <see cref="LogEntry.SysNode"/> (set when the row was logged). Shows a
+    /// visible message for system rows not tied to a node, and a status when the node isn't in the DB yet.</summary>
+    private void SystemNodeInfo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_mesh == null) return;
+        if (SystemList.SelectedItem is not LogEntry entry) { Status("Select a system message to see its node info."); return; }
+        if (entry.SysNode == 0)
+        {
+            AddSystem(NoNodeForNodeInfoText, SysCategory.Requests);   // visible feedback so it never fails silently
+            Status("This system message isn't tied to a known node — can't show node info.");
+            return;
+        }
+        var node = _mesh.GetNodes().FirstOrDefault(n => n.Num == entry.SysNode);
+        if (node == null)
+        {
+            Status($"No node entry yet for !{entry.SysNode:x8} — use \"Request node info\" first, then try again.");
+            return;
+        }
+        ShowTelemetryHistory(node, this);
+    }
+
     /// <summary>Right-click → Node info: opens the full "all info" window for the selected message's sender —
     /// the same node-details + telemetry-history view as the Nodes list's "Show all info" button. For a message
     /// WE sent, this shows our own node's info.</summary>

@@ -2846,6 +2846,10 @@ public partial class MainPage : ContentPage
     // an old cached row saved before senders were persisted, or a system row not tied to a specific node.
     public const string NoSenderForNodeInfoText = "Can't request node info: this message isn't tied to a known node (an old cached row or an encrypted/unknown-sender row).";
 
+    // Shown when the user picks "Node info" (open the details page) on a system row with no node number — a row not
+    // tied to a specific node (a general status line), or an old cached row saved before nodes were persisted.
+    public const string NoNodeForNodeInfoText = "Can't show node info: this system message isn't tied to a known node (a general status line, or an old cached row).";
+
     /// <summary>Logs a visible system message explaining why a node-info request couldn't be sent, so the action
     /// never fails silently.</summary>
     public void NoteNoSenderForNodeInfo() => AddSystem(NoSenderForNodeInfoText, cat: SysCategory.Requests);
@@ -3623,6 +3627,7 @@ public partial class MainPage : ContentPage
     {
         var opts = new List<string>();
         opts.Add("Request node info");   // always offered; if the row isn't tied to a node we explain why on tap
+        opts.Add("Node info");           // always offered; opens the node-details page, or explains why on tap
         opts.Add("Copy message");
         string choice = await ThemedDialogs.ActionSheet(this, "System message", "Cancel", null, opts.ToArray());
         switch (choice)
@@ -3634,6 +3639,19 @@ public partial class MainPage : ContentPage
                 {
                     NoteNoSenderForNodeInfo();
                     await ThemedDialogs.Alert(this, "Node info", NoSenderForNodeInfoText, "OK");
+                }
+                break;
+            case "Node info":
+                // Same full "all info" view as the chat menu's "Node info" and the Nodes list's "Show all info".
+                if (le.NodeId == 0)
+                    await ThemedDialogs.Alert(this, "Node info", NoNodeForNodeInfoText, "OK");
+                else
+                {
+                    var node = GetNodes().FirstOrDefault(n => n.Num == le.NodeId);
+                    if (node == null)
+                        await ThemedDialogs.Alert(this, "Node info", $"No node entry yet for !{le.NodeId:x8} — use \"Request node info\" first, then try again.", "OK");
+                    else
+                        await Navigation.PushModalAsync(new TelemetryPage(this, node));
                 }
                 break;
             case "Copy message":

@@ -178,6 +178,7 @@
                     <ListBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Request node info" Click="RequestSystemNodeInfo_Click"/>
+                            <MenuItem Header="Node info" Click="SystemNodeInfo_Click"/>
                             <MenuItem Header="Copy" Click="CopySelected_Click"/>
                             <MenuItem Header="Copy all" Click="CopyAll_Click"/>
                         </ContextMenu>
