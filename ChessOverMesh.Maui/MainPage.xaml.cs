@@ -1133,12 +1133,26 @@ public partial class MainPage : ContentPage
     async void OnSystemFilterClicked(object? sender, EventArgs e)
         => await Navigation.PushModalAsync(new SystemFilterPage(this));
 
+    // Toggle for the system search bar (hidden by default so the list gets the space). Hiding it clears
+    // the text, which fires SearchBar.TextChanged -> SetSystemSearch("") so the full list returns.
+    void OnSystemSearchToggleClicked(object? sender, EventArgs e)
+    {
+        bool show = !SystemSearchBar.IsVisible;
+        SystemSearchBar.IsVisible = show;
+        if (show) SystemSearchBar.Focus();
+        else SystemSearchBar.Text = "";
+    }
+
     void SelectTab(Button tab, CollectionView view)
     {
         MovesView.IsVisible = view == MovesView;
         SystemView.IsVisible = view == SystemView;
-        SystemFilterBtn.IsVisible = view == SystemView;   // the filter only applies to the System list
-        SystemSearchBar.IsVisible = view == SystemView;   // ditto the search box
+        SystemFilterBtn.IsVisible = view == SystemView;         // the filter only applies to the System list
+        SystemSearchToggleBtn.IsVisible = view == SystemView;   // ditto the 🔍 search toggle
+        // The search bar itself is hidden by default and only revealed by the toggle (mirrors the chat search).
+        // Switching tabs collapses it and clears the text so a hidden search never keeps filtering the list.
+        SystemSearchBar.Text = "";
+        SystemSearchBar.IsVisible = false;
         foreach (var t in new[] { TabMoves, TabSystem })
         {
             bool selected = t == tab;

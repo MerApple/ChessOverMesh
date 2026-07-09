@@ -1578,6 +1578,17 @@ public partial class MainWindow : Window
 
     private void SystemSearchClear_Click(object sender, RoutedEventArgs e) => SystemSearchBox.Clear();   // fires TextChanged
 
+    // System search is hidden by default (mirrors the chat search toggle); this reveals it.
+    // Hiding it also clears the box (fires TextChanged -> _systemSearch="" -> RecomputeSystemVisibility)
+    // so a hidden search never keeps silently filtering the list.
+    private void SystemSearchToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = SystemSearchPanel.Visibility != Visibility.Visible;
+        SystemSearchPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) SystemSearchBox.Focus();
+        else SystemSearchBox.Clear();
+    }
+
     private void ChatSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         _chatSearch = ChatSearchBox.Text.Trim();
