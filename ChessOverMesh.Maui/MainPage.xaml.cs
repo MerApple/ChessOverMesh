@@ -2821,6 +2821,26 @@ public partial class MainPage : ContentPage
     /// <summary>True when the node has reported environment telemetry this session (for the "Environment" sort).</summary>
     public bool NodeHasEnvironment(uint num) => _mesh?.GetEnvironment(num) != null;
 
+    /// <summary>Compact signal text for the Nodes table's Signal column ("-100 dBm · -14,3 dB · 1 hop"),
+    /// or null if the node has never been heard. The full labelled summary stays in "Show all info".</summary>
+    public string? NodeSignalCell(uint num)
+    {
+        if (_mesh?.GetSignal(num) is not { } s) return null;
+        string hops = s.Hops switch { 0 => " · direct", null => "", 1 => " · 1 hop", var h => $" · {h} hops" };
+        return $"{s.Rssi} dBm · {s.Snr:0.#} dB{hops}";
+    }
+
+    /// <summary>The node's latest environment reading for the Nodes table ("21,5°C · 45%RH · @ 09:30:12"),
+    /// or null if it has sent no environment telemetry this session.</summary>
+    public string? NodeEnvironmentCell(uint num)
+    {
+        if (_mesh?.GetEnvironment(num) is not { } e) return null;
+        var parts = new List<string> { $"{e.TemperatureC:0.#}°C" };
+        if (e.RelativeHumidity > 0) parts.Add($"{e.RelativeHumidity:0}%RH");
+        if (e.DewPointC is double dp) parts.Add($"dp {dp:0.#}°C");
+        return $"{string.Join(" · ", parts)} · @ {e.Timestamp:HH:mm:ss}";
+    }
+
     /// <summary>Requests a position broadcast from a node (so it appears on the map).</summary>
     public Task RequestNodePositionAsync(uint num) => _mesh?.RequestPositionAsync(num) ?? Task.CompletedTask;
 

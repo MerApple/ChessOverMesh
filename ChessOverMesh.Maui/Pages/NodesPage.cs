@@ -6,10 +6,12 @@ using ChessOverMesh.Mesh;
 namespace ChessOverMesh.Maui;
 
 /// <summary>
-/// The Nodes page — the MAUI port of the desktop nodes window. Lists every known node with its name, hardware
-/// model, role, signal and last-heard time, and a DM / Block toggle per node (persisted via DeviceCache and
-/// wired into chat: DM lists the node as a chat TX target; Block ignores its incoming DMs). An "Update nodes"
-/// button refreshes the list from the device, and "Map" opens the node map. Shares MainPage's live node state.
+/// The Nodes page — the MAUI port of the desktop nodes window. A horizontally-scrolling table with one
+/// column per attribute (★/name/type/hardware/heard/signal/environment/DM/block); tapping a column title
+/// sorts by it (tapping again reverses), and a Type picker filters to one device role (e.g. only Routers)
+/// alongside the search box. DM / Block toggles per node persist via DeviceCache and wire into chat (DM
+/// lists the node as a chat TX target; Block ignores its incoming DMs). An "Update nodes" button refreshes
+/// the list from the device, and "Map" opens the node map. Shares MainPage's live node state.
 ///
 /// The list is a virtualizing <see cref="CollectionView"/> bound to a stable set of <see cref="NodeRowVM"/>
 /// instances: only the visible rows are realized (fast even with hundreds of nodes), and incoming data updates a
@@ -29,8 +31,9 @@ public sealed class NodesPage : ContentPage
     public Task Completion => _tcs.Task;
 
     readonly Entry _search;
-    readonly Picker _sort;
+    readonly Picker _type;
     readonly Label _status, _header;
+    readonly Label[] _headerCells;
     readonly CollectionView _cv;
     readonly ObservableCollection<NodeRowVM> _items = new();
     readonly Dictionary<uint, NodeRowVM> _byNum = new();
@@ -43,8 +46,31 @@ public sealed class NodesPage : ContentPage
     string _nodeFontFamily = "monospace";   // from the Colour/Fonts "Nodes" setting
     double _nodeFontSize = 13;
 
-    // The sort modes, matching the desktop nodes window.
-    static readonly string[] SortModes = { "Name", "Favorite", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" };
+    const string AllTypes = "All types";
+    const string NoType = "(no type)";
+
+    // The columns, matching the desktop nodes window: caption, sort key, the direction a first tap sorts
+    // in, and the column width (dp). Tapping a column title sorts by it; tapping it again reverses. The
+    // table is wider than the screen and scrolls horizontally (header + rows together).
+    static readonly (string Caption, string Key, bool DefaultAsc, double W)[] Columns =
+    {
+        ("★", "Fav", false, 34),
+        ("Name", "Name", true, 240),
+        ("Type", "Type", true, 92),
+        ("Hardware", "Hardware", true, 116),
+        ("Heard", "Heard", false, 84),
+        ("Signal", "Signal", false, 150),
+        ("Environment", "Env", false, 170),
+        ("DM", "DM", false, 70),
+        ("Block", "Block", false, 70),
+    };
+    static double TableWidth => Columns.Sum(c => c.W);
+
+    // Column-sort state: tapping a column title selects it (with its natural first direction); tapping
+    // the same title again reverses.
+    string _sortKey = "Name";
+    bool _sortAsc = true;
+    bool _rebuildingTypes;   // suppresses SelectedIndexChanged while the Type filter's items are rebuilt
 
     public NodesPage(MainPage main)
     {
@@ -59,13 +85,13 @@ public sealed class NodesPage : ContentPage
         _search = new Entry { Placeholder = "Search name or !hex…", TextColor = Fg, BackgroundColor = Bg };
         _search.TextChanged += (_, _) => Rebuild();   // filtering is cheap now (only visible rows render)
 
-        _sort = new Picker { Title = "Sort", TextColor = Fg, BackgroundColor = Bg };
-        foreach (var s in SortModes) _sort.Items.Add(s);
-        _sort.SelectedIndex = 0;   // Name
-        _sort.SelectedIndexChanged += (_, _) => Rebuild();
-        var sortRow = new Grid { ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) } };
-        sortRow.Add(new Label { Text = "Sort", TextColor = Dim, VerticalOptions = LayoutOptions.Center }, 0, 0);
-        sortRow.Add(_sort, 1, 0);
+        _type = new Picker { Title = "Type", TextColor = Fg, BackgroundColor = Bg };
+        _type.Items.Add(AllTypes);
+        _type.SelectedIndex = 0;
+        _type.SelectedIndexChanged += (_, _) => { if (!_rebuildingTypes) Rebuild(); };
+        var typeRow = new Grid { ColumnSpacing = 8, ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) } };
+        typeRow.Add(new Label { Text = "Type", TextColor = Dim, VerticalOptions = LayoutOptions.Center }, 0, 0);
+        typeRow.Add(_type, 1, 0);
 
         _updateBtn = new Button { Text = "Update nodes", MinimumHeightRequest = 40, Padding = new Thickness(12, 0) };
         _updateBtn.Clicked += OnUpdate;
@@ -89,7 +115,7 @@ public sealed class NodesPage : ContentPage
         controls.Add(_header);
         controls.Add(_status);
         controls.Add(_search);
-        controls.Add(sortRow);
+        controls.Add(typeRow);
         controls.Add(btnRow);
         controls.Add(reqIdBtn);
         controls.Add(new BoxView { HeightRequest = 1, Color = Rule });
@@ -102,6 +128,52 @@ public sealed class NodesPage : ContentPage
             VerticalOptions = LayoutOptions.Fill,
         };
 
+        // Header row of tappable column titles (the active one shows ▲/▼), sharing the table's column
+        // widths so the titles stay aligned with the cells below.
+        var headerGrid = new Grid { ColumnSpacing = 0 };
+        _headerCells = new Label[Columns.Length];
+        for (int i = 0; i < Columns.Length; i++)
+        {
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(Columns[i].W)));
+            var col = Columns[i];
+            var lbl = new Label
+            {
+                Text = col.Caption, TextColor = Dim, FontAttributes = FontAttributes.Bold, FontSize = 13,
+                VerticalOptions = LayoutOptions.Center, LineBreakMode = LineBreakMode.NoWrap, Padding = new Thickness(2, 6),
+            };
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += (_, _) =>
+            {
+                if (_sortKey == col.Key) _sortAsc = !_sortAsc;
+                else { _sortKey = col.Key; _sortAsc = col.DefaultAsc; }
+                UpdateHeaderArrows();
+                Rebuild();
+            };
+            lbl.GestureRecognizers.Add(tap);
+            _headerCells[i] = lbl;
+            headerGrid.Add(lbl, i, 0);
+        }
+        UpdateHeaderArrows();
+
+        // Header + list live in one fixed-width table inside a horizontal ScrollView, so the wide rows
+        // scroll sideways together with their titles while the list itself still scrolls (and virtualizes)
+        // vertically.
+        var table = new Grid
+        {
+            WidthRequest = TableWidth,
+            RowDefinitions =
+            {
+                new RowDefinition(GridLength.Auto),   // column titles
+                new RowDefinition(GridLength.Auto),   // rule under the titles
+                new RowDefinition(GridLength.Star),   // scrolling node list (virtualized)
+            },
+        };
+        table.Add(headerGrid, 0, 0);
+        table.Add(new BoxView { HeightRequest = 1, Color = Rule }, 0, 1);
+        table.Add(_cv, 0, 2);
+
+        var hScroll = new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = table, VerticalOptions = LayoutOptions.Fill };
+
         var root = new Grid
         {
             Padding = 12,
@@ -109,14 +181,26 @@ public sealed class NodesPage : ContentPage
             RowDefinitions =
             {
                 new RowDefinition(GridLength.Auto),   // controls
-                new RowDefinition(GridLength.Star),   // scrolling node list (virtualized)
+                new RowDefinition(GridLength.Star),   // the table (titles + virtualized list)
                 new RowDefinition(GridLength.Auto),   // close button
             },
         };
         root.Add(controls, 0, 0);
-        root.Add(_cv, 0, 1);
+        root.Add(hScroll, 0, 1);
         root.Add(close, 0, 2);
         Content = root;
+    }
+
+    // The active column title carries the sort direction (▲/▼) and brightens; the rest show plain captions.
+    void UpdateHeaderArrows()
+    {
+        for (int i = 0; i < Columns.Length; i++)
+        {
+            var c = Columns[i];
+            bool active = c.Key == _sortKey;
+            _headerCells[i].Text = active ? $"{c.Caption} {(_sortAsc ? "▲" : "▼")}" : c.Caption;
+            _headerCells[i].TextColor = active ? Fg : Dim;
+        }
     }
 
     /// <summary>Restyles the node rows live when the "Nodes" font/size setting changes.</summary>
@@ -286,22 +370,32 @@ public sealed class NodesPage : ContentPage
             if (!known.Contains(num) && num != _main.MyNodeNum)
                 nodes.Add(new MeshNode(num, string.Empty, string.Empty, false));
 
-        var filtered = nodes.Where(n => query.Length == 0 || n.Display.Contains(query, StringComparison.OrdinalIgnoreCase));
+        RefreshTypeFilter(nodes);
+        string typeFilter = _type.SelectedItem as string ?? AllTypes;
 
-        // Self always pins to the top; then the chosen sort, with name as the tiebreaker — matching the desktop.
-        string mode = _sort.SelectedItem as string ?? "Name";
+        IEnumerable<MeshNode> filtered = nodes;
+        if (typeFilter == NoType) filtered = filtered.Where(n => string.IsNullOrEmpty(n.Role));
+        else if (typeFilter != AllTypes) filtered = filtered.Where(n => string.Equals(n.Role, typeFilter, StringComparison.OrdinalIgnoreCase));
+        if (query.Length > 0)
+            filtered = filtered.Where(n => n.Display.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+        // Applies the tapped direction to the given column key.
+        IOrderedEnumerable<MeshNode> Then<TKey>(IOrderedEnumerable<MeshNode> src, Func<MeshNode, TKey> k, IComparer<TKey>? c = null) =>
+            _sortAsc ? src.ThenBy(k, c) : src.ThenByDescending(k, c);
+
+        // Self always pins to the top; then the tapped column, with name as the tiebreaker — matching the desktop.
         var ordered = filtered.OrderByDescending(n => n.IsSelf);
-        ordered = mode switch
+        ordered = _sortKey switch
         {
-            "Favorite"    => ordered.ThenByDescending(n => n.IsFavorite),   // favorites first (after self)
-            "Type"        => ordered.ThenBy(n => string.IsNullOrEmpty(n.Role) ? "￿" : n.Role, StringComparer.OrdinalIgnoreCase),
-            "Hardware"    => ordered.ThenBy(n => string.IsNullOrEmpty(n.HwModel) ? "￿" : n.HwModel, StringComparer.OrdinalIgnoreCase),
-            "Heard"       => ordered.ThenByDescending(n => n.LastHeard),                       // most recently heard first
-            "Signal"      => ordered.ThenByDescending(n => _main.NodeSignalSortKey(n.Num)),    // best link first
-            "DM"          => ordered.ThenByDescending(n => _main.NodePrefFor(n.Num).Dm),
-            "Blocked"     => ordered.ThenByDescending(n => _main.NodePrefFor(n.Num).Block),
-            "Environment" => ordered.ThenByDescending(n => _main.NodeHasEnvironment(n.Num)),
-            _             => ordered,
+            "Fav"      => Then(ordered, n => n.IsFavorite),
+            "Type"     => Then(ordered, n => string.IsNullOrEmpty(n.Role) ? "￿" : n.Role, StringComparer.OrdinalIgnoreCase),
+            "Hardware" => Then(ordered, n => string.IsNullOrEmpty(n.HwModel) ? "￿" : n.HwModel, StringComparer.OrdinalIgnoreCase),
+            "Heard"    => Then(ordered, n => n.LastHeard),                       // descending = most recently heard first
+            "Signal"   => Then(ordered, n => _main.NodeSignalSortKey(n.Num)),    // descending = best link first
+            "Env"      => Then(ordered, n => _main.NodeHasEnvironment(n.Num)),
+            "DM"       => Then(ordered, n => _main.NodePrefFor(n.Num).Dm),
+            "Block"    => Then(ordered, n => _main.NodePrefFor(n.Num).Block),
+            _          => Then(ordered, SortName, StringComparer.OrdinalIgnoreCase),
         };
 
         var sorted = ordered.ThenBy(SortName, StringComparer.OrdinalIgnoreCase).ToList();
@@ -315,7 +409,16 @@ public sealed class NodesPage : ContentPage
                 vm.FontFamily = _nodeFontFamily; vm.FontSize = _nodeFontSize;
             }
             var (dm, block) = _main.NodePrefFor(n.Num);
-            vm.Update(n, NameText(n), n.IsSelf ? Accent : Fg, Detail(n), dm, block);
+            vm.Update(n,
+                marks: (n.IsSelf ? "★" : "") + (n.IsFavorite ? "⭐" : "") + (n.IsIgnored ? "🚫" : ""),
+                name: n.Display,
+                nameColor: n.IsSelf ? Accent : Fg,
+                type: n.Role,
+                hw: !string.IsNullOrEmpty(n.HwModel) ? n.HwModel : (n.IsSelf ? _main.OwnHardwareModel ?? "" : ""),
+                heard: HeardCell(n),
+                signal: _main.NodeSignalCell(n.Num) ?? "",
+                env: _main.NodeEnvironmentCell(n.Num) ?? "",
+                dm: dm, block: block);
             desired.Add(vm);
         }
 
@@ -328,9 +431,31 @@ public sealed class NodesPage : ContentPage
 
         Sync(desired);
 
-        _header.Text = $"Known nodes: {sorted.Count}";
-        if (sorted.Count == 0 && !_busy)
-            _status.Text = "No nodes loaded yet. Tap \"Update nodes\" to fetch them from the device.";
+        bool isFiltered = query.Length > 0 || typeFilter != AllTypes;
+        _header.Text = isFiltered ? $"Nodes: {desired.Count} of {nodes.Count}" : $"Known nodes: {nodes.Count}";
+        if (!_busy)
+        {
+            if (nodes.Count == 0)
+                _status.Text = "No nodes loaded yet. Tap \"Update nodes\" to fetch them from the device.";
+            else if (desired.Count == 0)
+                _status.Text = query.Length > 0 ? $"No nodes match \"{query}\"." : $"No nodes of type {typeFilter}.";
+        }
+    }
+
+    // Keeps the Type filter's choices in sync with the roles actually present, preserving the selection.
+    void RefreshTypeFilter(List<MeshNode> all)
+    {
+        var wanted = new List<string> { AllTypes };
+        wanted.AddRange(all.Select(n => n.Role).Where(r => !string.IsNullOrEmpty(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r, StringComparer.OrdinalIgnoreCase));
+        if (all.Any(n => string.IsNullOrEmpty(n.Role))) wanted.Add(NoType);
+        if (wanted.SequenceEqual(_type.Items)) return;
+        string selected = _type.SelectedItem as string ?? AllTypes;
+        _rebuildingTypes = true;
+        _type.Items.Clear();
+        foreach (var w in wanted) _type.Items.Add(w);
+        _type.SelectedIndex = Math.Max(0, wanted.IndexOf(selected));
+        _rebuildingTypes = false;
     }
 
     // Reconciles _items to match `desired` in order, using granular add/move/remove so unchanged rows are left
@@ -348,95 +473,86 @@ public sealed class NodesPage : ContentPage
         }
     }
 
-    string NameText(MeshNode n) => (n.IsSelf ? "★ " : "") + (n.IsFavorite ? "⭐ " : "") + (n.IsIgnored ? "🚫 " : "") + n.Display;
+    // Compact last-heard cell. Last-heard is stamped with the radio's own clock; if that clock is set
+    // ahead of real time the stamp lands in the future — flag that with the actual date instead of a
+    // confusing blank/future "ago".
+    static string HeardCell(MeshNode n) =>
+        n.LastHeard <= 0 ? "" :
+        DateTimeOffset.FromUnixTimeSeconds(n.LastHeard) > DateTimeOffset.UtcNow.AddMinutes(1)
+            ? $"{HeardAt(n.LastHeard)} (ahead)"
+            : Ago(n.LastHeard);
 
-    string Detail(MeshNode n)
-    {
-        var bits = new List<string>();
-        string hw = !string.IsNullOrEmpty(n.HwModel) ? n.HwModel : (n.IsSelf ? _main.OwnHardwareModel ?? "" : "");
-        if (hw.Length > 0) bits.Add(hw);
-        if (!string.IsNullOrEmpty(n.Role)) bits.Add($"[{n.Role}]");
-        if (_main.NodeSignal(n.Num) is { } sig) bits.Add(sig);
-        if (n.LastHeard > 0)
-        {
-            // Last-heard is stamped with the radio's own clock; if that clock is set ahead of real time the stamp
-            // lands in the future. Flag that explicitly instead of showing a confusing blank/future "ago".
-            if (DateTimeOffset.FromUnixTimeSeconds(n.LastHeard) > DateTimeOffset.UtcNow.AddMinutes(1))
-                bits.Add($"heard {HeardAt(n.LastHeard)} (device clock ahead)");
-            else
-                bits.Add($"heard {Ago(n.LastHeard)} ({HeardAt(n.LastHeard)})");
-        }
-        return string.Join("  ·  ", bits);
-    }
-
-    // The recycled row template. Fields bind to the row's NodeRowVM, so a cell scrolled into view (or rebound to a
-    // different node) just picks up that node's current values.
+    // The recycled row template: one cell per column, matching the header widths. Fields bind to the row's
+    // NodeRowVM, so a cell scrolled into view (or rebound to a different node) just picks up that node's
+    // current values.
     DataTemplate NodeTemplate() => new(() =>
     {
-        var nameLbl = new Label { FontAttributes = FontAttributes.Bold };
-        nameLbl.SetBinding(Label.TextProperty, nameof(NodeRowVM.NameText));
+        var grid = new Grid { ColumnSpacing = 0, Padding = new Thickness(0, 6) };
+        foreach (var c in Columns) grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(c.W)));
+
+        Label Cell(string textPath, int col, Color? color = null, bool bold = false)
+        {
+            var lbl = new Label
+            {
+                TextColor = color ?? Fg,
+                FontAttributes = bold ? FontAttributes.Bold : FontAttributes.None,
+                VerticalOptions = LayoutOptions.Center,
+                LineBreakMode = LineBreakMode.TailTruncation,
+                Padding = new Thickness(2, 0),
+            };
+            lbl.SetBinding(Label.TextProperty, textPath);
+            lbl.SetBinding(Label.FontFamilyProperty, nameof(NodeRowVM.FontFamily));
+            lbl.SetBinding(Label.FontSizeProperty, nameof(NodeRowVM.FontSize));
+            grid.Add(lbl, col, 0);
+            return lbl;
+        }
+
+        Cell(nameof(NodeRowVM.Marks), 0);
+        var nameLbl = Cell(nameof(NodeRowVM.NameText), 1, bold: true);
         nameLbl.SetBinding(Label.TextColorProperty, nameof(NodeRowVM.NameColor));
-        nameLbl.SetBinding(Label.FontFamilyProperty, nameof(NodeRowVM.FontFamily));
-        nameLbl.SetBinding(Label.FontSizeProperty, nameof(NodeRowVM.FontSize));
+        Cell(nameof(NodeRowVM.TypeText), 2, Dim);
+        Cell(nameof(NodeRowVM.HwText), 3, Dim);
+        Cell(nameof(NodeRowVM.HeardText), 4, Dim);
+        Cell(nameof(NodeRowVM.SignalText), 5, Dim);
+        Cell(nameof(NodeRowVM.EnvText), 6, Dim);
 
-        var detailLbl = new Label { TextColor = Dim, FontSize = 12 };
-        detailLbl.SetBinding(Label.TextProperty, nameof(NodeRowVM.DetailText));
-        detailLbl.SetBinding(VisualElement.IsVisibleProperty, nameof(NodeRowVM.HasDetail));
+        var dmSwitch = new Switch { VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center };
+        dmSwitch.SetBinding(Switch.IsToggledProperty, new Binding(nameof(NodeRowVM.Dm), BindingMode.TwoWay));
+        dmSwitch.SetBinding(Switch.IsEnabledProperty, nameof(NodeRowVM.DmEnabled));
+        dmSwitch.SetBinding(VisualElement.IsVisibleProperty, nameof(NodeRowVM.ShowToggles));   // own node has no toggles
+        grid.Add(dmSwitch, 7, 0);
 
-        var info = new VerticalStackLayout { Spacing = 2 };
-        info.Add(nameLbl);
-        info.Add(detailLbl);
+        var blkSwitch = new Switch { VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center };
+        blkSwitch.SetBinding(Switch.IsToggledProperty, new Binding(nameof(NodeRowVM.Block), BindingMode.TwoWay));
+        blkSwitch.SetBinding(VisualElement.IsVisibleProperty, nameof(NodeRowVM.ShowToggles));
+        grid.Add(blkSwitch, 8, 0);
 
-        // Long-press the node info → the same menu as the desktop right-click. The native Android LongClick reads
-        // the row's current BindingContext, so it works correctly even as the cell is recycled to other nodes.
+        // Long-press anywhere on the row (the switches keep their own touch handling) → the same menu as the
+        // desktop right-click. The native Android LongClick reads the row's current BindingContext, so it works
+        // correctly even as the cell is recycled to other nodes.
 #if ANDROID
-        void OnInfoLongClick(object? s, Android.Views.View.LongClickEventArgs e)
+        void OnRowLongClick(object? s, Android.Views.View.LongClickEventArgs e)
         {
             e.Handled = true;
-            if (info.BindingContext is NodeRowVM vm)
+            if (grid.BindingContext is NodeRowVM vm)
                 MainThread.BeginInvokeOnMainThread(() => _ = ShowNodeMenuAsync(vm.Node));
         }
-        info.HandlerChanged += (_, _) =>
+        grid.HandlerChanged += (_, _) =>
         {
-            if (info.Handler?.PlatformView is Android.Views.View av)
+            if (grid.Handler?.PlatformView is Android.Views.View av)
             {
                 av.LongClickable = true;
-                av.LongClick -= OnInfoLongClick;
-                av.LongClick += OnInfoLongClick;
+                av.LongClick -= OnRowLongClick;
+                av.LongClick += OnRowLongClick;
             }
         };
 #endif
-
-        var dmSwitch = new Switch { VerticalOptions = LayoutOptions.Center };
-        dmSwitch.SetBinding(Switch.IsToggledProperty, new Binding(nameof(NodeRowVM.Dm), BindingMode.TwoWay));
-        dmSwitch.SetBinding(Switch.IsEnabledProperty, nameof(NodeRowVM.DmEnabled));
-
-        var blkSwitch = new Switch { VerticalOptions = LayoutOptions.Center };
-        blkSwitch.SetBinding(Switch.IsToggledProperty, new Binding(nameof(NodeRowVM.Block), BindingMode.TwoWay));
-
-        var right = new HorizontalStackLayout { Spacing = 12, VerticalOptions = LayoutOptions.Center };
-        right.Add(MiniToggle("DM", dmSwitch));
-        right.Add(MiniToggle("Block", blkSwitch));
-        right.SetBinding(VisualElement.IsVisibleProperty, nameof(NodeRowVM.ShowToggles));   // own node has no toggles
-
-        var grid = new Grid { ColumnSpacing = 8, Padding = new Thickness(0, 8),
-            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) } };
-        grid.Add(info, 0, 0);
-        grid.Add(right, 1, 0);
 
         var cell = new VerticalStackLayout { Spacing = 0 };
         cell.Add(grid);
         cell.Add(new BoxView { HeightRequest = 1, Color = Rule });
         return cell;
     });
-
-    static View MiniToggle(string label, Switch sw)
-    {
-        var col = new VerticalStackLayout { Spacing = 0, HorizontalOptions = LayoutOptions.Center };
-        col.Add(new Label { Text = label, TextColor = Dim, FontSize = 10, HorizontalOptions = LayoutOptions.Center });
-        col.Add(sw);
-        return col;
-    }
 
     async Task CloseAsync()
     {
@@ -486,23 +602,35 @@ public sealed class NodesPage : ContentPage
         public bool ShowToggles => !IsSelf;
         public MeshNode Node { get; private set; }   // set on first Update, before the row is ever shown
 
+        string _marks = "";
+        public string Marks { get => _marks; private set => Set(ref _marks, value); }
+
         string _nameText = "";
         public string NameText { get => _nameText; private set => Set(ref _nameText, value); }
 
         Color _nameColor = Fg;
         public Color NameColor { get => _nameColor; private set => Set(ref _nameColor, value); }
 
-        string _detailText = "";
-        public string DetailText { get => _detailText; private set => Set(ref _detailText, value); }
+        string _typeText = "";
+        public string TypeText { get => _typeText; private set => Set(ref _typeText, value); }
+
+        string _hwText = "";
+        public string HwText { get => _hwText; private set => Set(ref _hwText, value); }
+
+        string _heardText = "";
+        public string HeardText { get => _heardText; private set => Set(ref _heardText, value); }
+
+        string _signalText = "";
+        public string SignalText { get => _signalText; private set => Set(ref _signalText, value); }
+
+        string _envText = "";
+        public string EnvText { get => _envText; private set => Set(ref _envText, value); }
 
         string _fontFamily = "monospace";
         public string FontFamily { get => _fontFamily; set => Set(ref _fontFamily, value); }
 
         double _fontSize = 13;
         public double FontSize { get => _fontSize; set => Set(ref _fontSize, value); }
-
-        bool _hasDetail;
-        public bool HasDetail { get => _hasDetail; private set => Set(ref _hasDetail, value); }
 
         bool _dm;
         public bool Dm
@@ -528,13 +656,18 @@ public sealed class NodesPage : ContentPage
         public bool DmEnabled => !_block;
 
         // Refresh the row from the latest node + persisted prefs without triggering a write-back.
-        public void Update(MeshNode node, string name, Color nameColor, string detail, bool dm, bool block)
+        public void Update(MeshNode node, string marks, string name, Color nameColor, string type, string hw,
+                           string heard, string signal, string env, bool dm, bool block)
         {
             Node = node;
+            Marks = marks;
             NameText = name;
             NameColor = nameColor;
-            DetailText = detail;
-            HasDetail = detail.Length > 0;
+            TypeText = type;
+            HwText = hw;
+            HeardText = heard;
+            SignalText = signal;
+            EnvText = env;
             _suppress = true;
             Block = block;
             Dm = dm;
