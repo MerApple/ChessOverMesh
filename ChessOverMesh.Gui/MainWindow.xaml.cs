@@ -3,6 +3,8 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -5345,7 +5347,7 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Background = new SolidColorBrush(MediaColor.FromRgb(0x25, 0x25, 0x26)),
         };
-        dialog.RememberSize("Nodes", 520, 500);
+        dialog.RememberSize("Nodes", 1060, 540);
 
         var root = new DockPanel { Margin = new Thickness(10) };
 
@@ -5400,22 +5402,29 @@ public partial class MainWindow : Window
         var nameBrush = new SolidColorBrush(MediaColor.FromRgb(0xE0, 0xE0, 0xE0));
         var consolas = new System.Windows.Media.FontFamily(_nodesFont);   // Nodes-list font (from Colour/Fonts settings)
 
-        // node num → (row text cell, node), rebuilt by Populate; lets telemetry refresh rows without a rebuild.
-        var envCells = new Dictionary<uint, (TextBlock Cell, MeshNode Node)>();
+        // node num → its row object, rebuilt by Populate; lets live telemetry refresh cells without a rebuild.
+        var rowByNum = new Dictionary<uint, NodeRow>();
 
+        // Column-sort state: which column orders the list and in which direction. Clicking a column title
+        // selects it (with that column's natural first direction); clicking the same title again reverses.
+        string sortKey = "Name";
+        bool sortAsc = true;
 
-        // Toolbar: a search box (filters by name/short name/!hex) and a sort selector (Name / DM / Blocked).
+        // Toolbar: a search box (filters by name/short name/!hex) and a Type filter (e.g. only Routers).
         var controls = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
         DockPanel.SetDock(controls, Dock.Top);
 
-        var sortCombo = new ComboBox { MinWidth = 110, MinHeight = 22, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-        foreach (var s in new[] { "Name", "Favorite", "Type", "Hardware", "Heard", "Signal", "DM", "Blocked", "Environment" }) sortCombo.Items.Add(s);
-        sortCombo.SelectedIndex = 0;
-        var sortLabel = new TextBlock { Text = "Sort:", Foreground = greyBrush, VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(sortCombo, Dock.Right);
-        DockPanel.SetDock(sortLabel, Dock.Right);
-        controls.Children.Add(sortCombo);
-        controls.Children.Add(sortLabel);
+        const string AllTypes = "All types";
+        const string NoType = "(no type)";
+        var typeCombo = new ComboBox { MinWidth = 110, MinHeight = 22, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        typeCombo.Items.Add(AllTypes);
+        typeCombo.SelectedIndex = 0;
+        bool rebuildingTypes = false;   // suppresses SelectionChanged while the filter's items are rebuilt
+        var typeLabel = new TextBlock { Text = "Type:", Foreground = greyBrush, VerticalAlignment = VerticalAlignment.Center };
+        DockPanel.SetDock(typeCombo, Dock.Right);
+        DockPanel.SetDock(typeLabel, Dock.Right);
+        controls.Children.Add(typeCombo);
+        controls.Children.Add(typeLabel);
 
         var searchLabel = new TextBlock { Text = "Search:", Foreground = greyBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
         var searchBox = new TextBox
@@ -5430,64 +5439,162 @@ public partial class MainWindow : Window
         controls.Children.Add(searchLabel);
         controls.Children.Add(searchBox);   // last child fills the remaining width
 
-        var list = new ListBox
+        // The node list: one column per attribute. Column titles sort (▲/▼), the Type filter above narrows.
+        var list = new ListView
         {
             Background = new SolidColorBrush(MediaColor.FromRgb(0x1E, 0x1E, 0x1E)),
             BorderThickness = new Thickness(0),
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Foreground = nameBrush,
+            FontFamily = consolas,
+            FontSize = _nodesSize,
         };
-        // No horizontal scroll: rows fit the width, so the right-docked DM/Block checkboxes are always visible
-        // and the (now longer) node info truncates with an ellipsis instead of pushing them off-screen.
-        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        var itemStyle = new Style(typeof(ListViewItem));
+        itemStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, new Binding(nameof(NodeRow.Tip))));
+        itemStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        list.ItemContainerStyle = itemStyle;
 
-        // One row per node: the name, plus DM and Block checkboxes (own node has neither). Block wins over DM
-        // (checking Block clears+disables DM), matching the persisted rule in DeviceCache.SetNodePref.
-        FrameworkElement BuildNodeRow(MeshNode n)
+        // Dark header chrome: the default GridView header is light. The re-template keeps the resize
+        // thumb (it must be named PART_HeaderGripper) so the columns stay drag-resizable.
+        var gripTemplate = new ControlTemplate(typeof(Thumb));
+        var gripVisual = new FrameworkElementFactory(typeof(Border));
+        gripVisual.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        gripTemplate.VisualTree = gripVisual;
+        var headerTemplate = new ControlTemplate(typeof(GridViewColumnHeader));
+        var headerRoot = new FrameworkElementFactory(typeof(Grid));
+        var headerBorder = new FrameworkElementFactory(typeof(Border));
+        headerBorder.SetValue(Border.BackgroundProperty, new SolidColorBrush(MediaColor.FromRgb(0x2D, 0x2D, 0x30)));
+        headerBorder.SetValue(Border.BorderBrushProperty, new SolidColorBrush(MediaColor.FromRgb(0x3F, 0x3F, 0x46)));
+        headerBorder.SetValue(Border.BorderThicknessProperty, new Thickness(0, 0, 1, 1));
+        var headerContent = new FrameworkElementFactory(typeof(ContentPresenter));
+        headerContent.SetValue(FrameworkElement.MarginProperty, new Thickness(6, 4, 6, 4));
+        headerContent.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        headerBorder.AppendChild(headerContent);
+        var gripper = new FrameworkElementFactory(typeof(Thumb), "PART_HeaderGripper");
+        gripper.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right);
+        gripper.SetValue(FrameworkElement.WidthProperty, 8.0);
+        gripper.SetValue(FrameworkElement.CursorProperty, Cursors.SizeWE);
+        gripper.SetValue(Control.TemplateProperty, gripTemplate);
+        headerRoot.AppendChild(headerBorder);
+        headerRoot.AppendChild(gripper);
+        headerTemplate.VisualTree = headerRoot;
+        var headerStyle = new Style(typeof(GridViewColumnHeader));
+        headerStyle.Setters.Add(new Setter(Control.TemplateProperty, headerTemplate));
+        headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, nameBrush));
+
+        var gridView = new GridView { ColumnHeaderContainerStyle = headerStyle };
+        list.View = gridView;
+
+        // column → (title, sort key, natural first-click direction); the active title gets the ▲/▼ suffix.
+        var colInfo = new Dictionary<GridViewColumn, (string Caption, string Key, bool DefaultAsc)>();
+
+        void TextCol(string caption, string path, double width, string key, bool defaultAsc)
         {
-            var row = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 1, 0, 1) };
-            if (!n.IsSelf)
+            var cell = new FrameworkElementFactory(typeof(TextBlock));
+            cell.SetBinding(TextBlock.TextProperty, new Binding(path));
+            cell.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+            cell.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            var col = new GridViewColumn { Header = caption, Width = width, CellTemplate = new DataTemplate { VisualTree = cell } };
+            colInfo[col] = (caption, key, defaultAsc);
+            gridView.Columns.Add(col);
+        }
+
+        void CheckCol(string caption, string path, double width, string key, string tooltip, bool bindEnabled)
+        {
+            var cell = new FrameworkElementFactory(typeof(CheckBox));
+            cell.SetBinding(ToggleButton.IsCheckedProperty, new Binding(path) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+            if (bindEnabled) cell.SetBinding(UIElement.IsEnabledProperty, new Binding(nameof(NodeRow.DmEnabled)));
+            cell.SetBinding(UIElement.VisibilityProperty, new Binding(nameof(NodeRow.PrefsVisibility)));
+            cell.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cell.SetValue(FrameworkElement.ToolTipProperty, tooltip);
+            cell.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler((s, _) =>
             {
-                var pref = _nodePrefs.GetValueOrDefault(n.Num);
-                bool dmOn = pref?.Dm == true;
-                bool blockOn = pref?.Block == true;
+                if ((s as FrameworkElement)?.DataContext is NodeRow r) ApplyRowPrefs(r);
+            }));
+            var col = new GridViewColumn { Header = caption, Width = width, CellTemplate = new DataTemplate { VisualTree = cell } };
+            colInfo[col] = (caption, key, false);
+            gridView.Columns.Add(col);
+        }
 
-                var dmCb = new CheckBox
-                {
-                    Content = "DM", IsChecked = dmOn, IsEnabled = !blockOn, Foreground = greyBrush,
-                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), MinWidth = 46,
-                    ToolTip = "List this node as a TX target so you can send it direct messages.",
-                };
-                var blkCb = new CheckBox
-                {
-                    Content = "Block", IsChecked = blockOn, Foreground = greyBrush,
-                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0), MinWidth = 62,
-                    ToolTip = "Ignore incoming direct messages from this node.",
-                };
+        TextCol("★", nameof(NodeRow.Marks), 42, "Fav", defaultAsc: false);
+        TextCol("Name", nameof(NodeRow.Name), 240, "Name", defaultAsc: true);
+        TextCol("Type", nameof(NodeRow.Type), 95, "Type", defaultAsc: true);
+        TextCol("Hardware", nameof(NodeRow.Hardware), 120, "Hardware", defaultAsc: true);
+        TextCol("Heard", nameof(NodeRow.Heard), 110, "Heard", defaultAsc: false);
+        TextCol("Signal", nameof(NodeRow.Signal), 160, "Signal", defaultAsc: false);
+        TextCol("Environment", nameof(NodeRow.Environment), 170, "Env", defaultAsc: false);
+        CheckCol("DM", nameof(NodeRow.Dm), 46, "DM", "List this node as a TX target so you can send it direct messages.", bindEnabled: true);
+        CheckCol("Block", nameof(NodeRow.Block), 56, "Block", "Ignore incoming direct messages from this node.", bindEnabled: false);
 
-                bool updating = false;
-                void Apply()
-                {
-                    if (updating) return;
-                    bool b = blkCb.IsChecked == true;
-                    bool d = !b && dmCb.IsChecked == true;
-                    if (!d && !b) _nodePrefs.Remove(n.Num);
-                    else _nodePrefs[n.Num] = new DeviceCache.NodePrefs { Dm = d, Block = b };
-                    if (_currentHost.Length > 0) DeviceCache.SetNodePref(_currentHost, n.Num, d, b);
-                    RebuildChatTxCombo();   // reflect the change in the chat TX dropdown immediately
-                }
-                blkCb.Checked += (_, _) => { updating = true; dmCb.IsChecked = false; dmCb.IsEnabled = false; updating = false; Apply(); };
-                blkCb.Unchecked += (_, _) => { dmCb.IsEnabled = true; Apply(); };
-                dmCb.Checked += (_, _) => Apply();
-                dmCb.Unchecked += (_, _) => Apply();
+        void UpdateHeaderArrows()
+        {
+            foreach (var kv in colInfo)
+                kv.Key.Header = kv.Value.Key == sortKey ? $"{kv.Value.Caption} {(sortAsc ? "▲" : "▼")}" : kv.Value.Caption;
+        }
+        UpdateHeaderArrows();
+        list.AddHandler(GridViewColumnHeader.ClickEvent, new RoutedEventHandler((_, e) =>
+        {
+            if (e.OriginalSource is not GridViewColumnHeader h || h.Column == null || !colInfo.TryGetValue(h.Column, out var info)) return;
+            if (sortKey == info.Key) sortAsc = !sortAsc;
+            else (sortKey, sortAsc) = (info.Key, info.DefaultAsc);
+            UpdateHeaderArrows();
+            Populate();
+        }));
 
-                DockPanel.SetDock(blkCb, Dock.Right);
-                DockPanel.SetDock(dmCb, Dock.Right);
-                row.Children.Add(blkCb);
-                row.Children.Add(dmCb);
+        // Persist a row's DM/Block prefs. Block wins over DM (checking Block clears DM and the binding
+        // greys the DM box), matching the persisted rule in DeviceCache.SetNodePref.
+        void ApplyRowPrefs(NodeRow r)
+        {
+            if (r.Block && r.Dm) r.Dm = false;
+            bool d = r.Dm, b = r.Block;
+            if (!d && !b) _nodePrefs.Remove(r.Node.Num);
+            else _nodePrefs[r.Node.Num] = new DeviceCache.NodePrefs { Dm = d, Block = b };
+            if (_currentHost.Length > 0) DeviceCache.SetNodePref(_currentHost, r.Node.Num, d, b);
+            RebuildChatTxCombo();   // reflect the change in the chat TX dropdown immediately
+        }
+
+        // One row object per node; the columns bind to it (own node shows no DM/Block boxes).
+        NodeRow BuildRow(MeshNode n)
+        {
+            var pref = _nodePrefs.GetValueOrDefault(n.Num);
+            return new NodeRow(n)
+            {
+                Marks = (n.IsSelf ? "★" : "") + (n.IsFavorite ? "⭐" : "") + (n.IsIgnored ? "🚫" : ""),
+                Name = n.Display,
+                Type = n.Role,
+                // Per-node hardware comes from its User broadcast; for our own node fall back to the device metadata.
+                Hardware = !string.IsNullOrEmpty(n.HwModel) ? n.HwModel : (n.IsSelf ? _mesh!.HardwareModel ?? "" : ""),
+                Heard = HeardText(n),
+                Signal = SignalCell(n),
+                Environment = EnvCell(n),
+                Tip = TipText(n),
+                Dm = pref?.Dm == true,
+                Block = pref?.Block == true,
+            };
+        }
+
+        // Right-click selects the row under the cursor (ListView doesn't do that by itself), and the
+        // selection keeps the list's context menu built for that node.
+        list.PreviewMouseRightButtonDown += (_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject d && ItemsControl.ContainerFromElement(list, d) is ListViewItem item)
+                item.IsSelected = true;
+        };
+        list.SelectionChanged += (_, _) => list.ContextMenu = list.SelectedItem is NodeRow r ? BuildNodeMenu(r.Node) : null;
+        // Double-click a node row to open its full info window (same as the "Show all info" menu item).
+        list.MouseDoubleClick += (_, e) =>
+        {
+            for (var v = e.OriginalSource as DependencyObject; v is Visual; v = VisualTreeHelper.GetParent(v))
+            {
+                if (v is CheckBox or GridViewColumnHeader) return;   // a checkbox toggle / header click isn't "open node"
+                if (v is ListViewItem) break;
             }
+            if (list.SelectedItem is NodeRow r) ShowTelemetryHistory(r.Node, dialog);
+        };
 
-            // Right-click menu for EVERY node — including our own ★ node, which has no DM/Block boxes. Opens the full
-            // info window or the node's last location on a map; our own node also gets the manual broadcasts.
+        // Right-click menu for EVERY node — including our own ★ node, which has no DM/Block boxes. Opens the full
+        // info window or the node's last location on a map; our own node also gets the manual broadcasts.
+        ContextMenu BuildNodeMenu(MeshNode n)
+        {
             var menu = new ContextMenu();
             var showTelemItem = new MenuItem { Header = "Show all info" };
             showTelemItem.Click += (_, _) => ShowTelemetryHistory(n, dialog);
@@ -5595,42 +5702,38 @@ public partial class MainWindow : Window
                 remoteMenu.Items.Add(rFactory);
                 menu.Items.Add(remoteMenu);
             }
-            row.ContextMenu = menu;
-            // Double-click a node row to open its full info window (same as the "Show all info" menu item).
-            // DockPanel isn't a Control, so there's no MouseDoubleClick — detect it on the bubbling mouse-down.
-            row.MouseLeftButtonDown += (_, e) => { if (e.ClickCount == 2) ShowTelemetryHistory(n, dialog); };
-
-            string rowText = NodeRowText(n);
-            var name = new TextBlock
-            {
-                Text = rowText,
-                ToolTip = rowText,   // full text on hover (the row truncates with an ellipsis)
-                Foreground = nameBrush,
-                FontFamily = consolas,
-                FontSize = _nodesSize,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            };
-            envCells[n.Num] = (name, n);   // so live telemetry can update this row's text in place
-            row.Children.Add(name);   // last child fills the remaining width
-            return row;
+            return menu;
         }
 
-        // The row text: name (+ ★ for self), with an environment summary appended for nodes that send
-        // telemetry — e.g. "… — !a1b2c3d4   21.5°C · 45%RH · dp 9.3°C".
-        string NodeRowText(MeshNode n)
+        // Cell texts. Last-heard uses the radio's clock; a radio set ahead of real time stamps it in the
+        // future. Show the actual date and flag it instead of the misleading "just now" AgoText gives it.
+        string HeardText(MeshNode n) =>
+            n.LastHeard <= 0 ? "" :
+            DateTimeOffset.FromUnixTimeSeconds(n.LastHeard) > DateTimeOffset.UtcNow.AddMinutes(1)
+                ? $"{DateTimeOffset.FromUnixTimeSeconds(n.LastHeard).LocalDateTime:yyyy-MM-dd HH:mm} (clock ahead)"
+                : AgoText(n.LastHeard);
+
+        // Compact per-column signal text; the row tooltip carries the full labelled summary.
+        string SignalCell(MeshNode n)
+        {
+            if (n.IsSelf || _mesh!.GetSignal(n.Num) is not { } s) return "";
+            string hops = s.Hops switch { 0 => " · direct", null => "", 1 => " · 1 hop", var h => $" · {h} hops" };
+            return $"{s.Rssi} dBm · {s.Snr:0.#} dB{hops}";
+        }
+
+        string EnvCell(MeshNode n) =>
+            _mesh!.GetEnvironment(n.Num) is { } e ? $"{EnvSummary(e)} · @ {e.Timestamp:HH:mm:ss}" : "";
+
+        // The row tooltip: the full one-line node summary (nothing truncated), like the old single-column
+        // list showed — e.g. "… — !a1b2c3d4   21.5°C · 45%RH · dp 9.3°C".
+        string TipText(MeshNode n)
         {
             string text = (n.IsSelf ? "★ " : "") + (n.IsFavorite ? "⭐ " : "") + (n.IsIgnored ? "🚫 " : "") + n.Display;
             // Per-node hardware comes from its User broadcast; for our own node fall back to the device metadata.
             string hw = !string.IsNullOrEmpty(n.HwModel) ? n.HwModel : (n.IsSelf ? _mesh!.HardwareModel ?? "" : "");
             if (hw.Length > 0) text += $"   {hw}";
             if (!string.IsNullOrEmpty(n.Role)) text += $"   [{n.Role}]";
-            // Last-heard uses the radio's clock; a radio set ahead of real time stamps it in the future. Show the
-            // actual date and flag it instead of the misleading "just now" AgoText gives a future stamp.
-            if (n.LastHeard > 0)
-                text += DateTimeOffset.FromUnixTimeSeconds(n.LastHeard) > DateTimeOffset.UtcNow.AddMinutes(1)
-                    ? $"   heard {DateTimeOffset.FromUnixTimeSeconds(n.LastHeard).LocalDateTime:yyyy-MM-dd HH:mm} (device clock ahead)"
-                    : $"   heard {AgoText(n.LastHeard)}";
+            if (n.LastHeard > 0) text += $"   heard {HeardText(n)}";
             if (!n.IsSelf && _mesh!.GetSignal(n.Num) is { } sig)
                 text += $"   {SignalSummary(sig)}";
             if (_mesh!.GetEnvironment(n.Num) is { } e)
@@ -5658,15 +5761,29 @@ public partial class MainWindow : Window
             : !string.IsNullOrWhiteSpace(n.ShortName) ? n.ShortName
             : $"~{n.Num:x8}";   // unnamed nodes sort after named ones
 
-        const string DefaultHint = "DM: list a node as a chat TX target for direct messages.  Block: ignore its DMs.  " +
-                                    "\"Update nodes\" refreshes the list from the device.";
+        const string DefaultHint = "Click a column title to sort (again to reverse).  DM: list a node as a chat TX target " +
+                                    "for direct messages.  Block: ignore its DMs.  \"Update nodes\" refreshes the list from the device.";
+
+        // Keeps the Type filter's choices in sync with the roles actually present, preserving the selection.
+        void RefreshTypeFilter(List<MeshNode> all)
+        {
+            var wanted = new List<string> { AllTypes };
+            wanted.AddRange(all.Select(n => n.Role).Where(r => !string.IsNullOrEmpty(r))
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(r => r, StringComparer.OrdinalIgnoreCase));
+            if (all.Any(n => string.IsNullOrEmpty(n.Role))) wanted.Add(NoType);
+            if (wanted.SequenceEqual(typeCombo.Items.Cast<string>())) return;
+            string selected = typeCombo.SelectedItem as string ?? AllTypes;
+            rebuildingTypes = true;
+            typeCombo.Items.Clear();
+            foreach (var w in wanted) typeCombo.Items.Add(w);
+            typeCombo.SelectedIndex = Math.Max(0, wanted.IndexOf(selected));
+            rebuildingTypes = false;
+        }
 
         void Populate()
         {
-            list.Items.Clear();
-            envCells.Clear();
+            rowByNum.Clear();
             string query = (searchBox.Text ?? "").Trim();
-            string mode = sortCombo.SelectedItem as string ?? "Name";
 
             var allNodes = _mesh!.GetNodes();
             // Include nodes we hold DM/Block prefs for that the device's node DB doesn't know — e.g. a DM
@@ -5674,50 +5791,80 @@ public partial class MainWindow : Window
             // cached pref outlived the node. Without a row here such a node is listed as a TX target
             // ("DM → !hex") yet impossible to un-check; a placeholder row makes its prefs toggleable.
             var known = new HashSet<uint>(allNodes.Select(n => n.Num));
-            var orphans = _nodePrefs.Keys
+            var all = allNodes.Concat(_nodePrefs.Keys
                 .Where(num => !known.Contains(num) && num != _mesh.MyNodeNum)
-                .Select(num => new MeshNode(num, string.Empty, string.Empty, false));
-            var nodes = allNodes.Concat(orphans);
+                .Select(num => new MeshNode(num, string.Empty, string.Empty, false))).ToList();
+
+            RefreshTypeFilter(all);
+            string typeFilter = typeCombo.SelectedItem as string ?? AllTypes;
+
+            IEnumerable<MeshNode> nodes = all;
+            if (typeFilter == NoType) nodes = nodes.Where(n => string.IsNullOrEmpty(n.Role));
+            else if (typeFilter != AllTypes) nodes = nodes.Where(n => string.Equals(n.Role, typeFilter, StringComparison.OrdinalIgnoreCase));
             if (query.Length > 0)
                 nodes = nodes.Where(n => n.Display.Contains(query, StringComparison.OrdinalIgnoreCase));
 
-            // Own node always pins to the top; then the chosen sort, with name as the tiebreaker.
-            var ordered = nodes.OrderByDescending(n => n.IsSelf);
-            ordered = mode switch
-            {
-                "Favorite"    => ordered.ThenByDescending(n => n.IsFavorite),   // favorites first (after self)
-                "Type"        => ordered.ThenBy(n => string.IsNullOrEmpty(n.Role) ? "￿" : n.Role, StringComparer.OrdinalIgnoreCase),
-                "Hardware"    => ordered.ThenBy(n => string.IsNullOrEmpty(n.HwModel) ? "￿" : n.HwModel, StringComparer.OrdinalIgnoreCase),
-                "Heard"       => ordered.ThenByDescending(n => n.LastHeard),   // most recently heard first; unknown (0) last
-                // Best link first: fewer hops dominate (direct above relayed), then stronger RSSI; no reading sinks last.
-                "Signal"      => ordered.ThenByDescending(n => _mesh!.GetSignal(n.Num) is { } s ? -(double)(s.Hops ?? 50) * 1000 + s.Rssi : double.NegativeInfinity),
-                "DM"          => ordered.ThenByDescending(n => _nodePrefs.GetValueOrDefault(n.Num)?.Dm == true),
-                "Blocked"     => ordered.ThenByDescending(n => _nodePrefs.GetValueOrDefault(n.Num)?.Block == true),
-                "Environment" => ordered.ThenByDescending(n => _mesh!.GetEnvironment(n.Num) != null),
-                _             => ordered,
-            };
-            foreach (var n in ordered.ThenBy(SortName, StringComparer.OrdinalIgnoreCase))
-                list.Items.Add(BuildNodeRow(n));
+            // Applies the clicked direction to the given column key.
+            IOrderedEnumerable<MeshNode> Then<TKey>(IOrderedEnumerable<MeshNode> src, Func<MeshNode, TKey> k, IComparer<TKey>? c = null) =>
+                sortAsc ? src.ThenBy(k, c) : src.ThenByDescending(k, c);
 
-            int total = known.Count + orphans.Count();
-            header.Text = query.Length > 0 ? $"Nodes: {list.Items.Count} of {total}" : $"Known nodes: {total}";
+            // Own node always pins to the top; then the clicked column, with name as the tiebreaker.
+            var ordered = nodes.OrderByDescending(n => n.IsSelf);
+            ordered = sortKey switch
+            {
+                "Fav"      => Then(ordered, n => n.IsFavorite),
+                "Type"     => Then(ordered, n => string.IsNullOrEmpty(n.Role) ? "￿" : n.Role, StringComparer.OrdinalIgnoreCase),
+                "Hardware" => Then(ordered, n => string.IsNullOrEmpty(n.HwModel) ? "￿" : n.HwModel, StringComparer.OrdinalIgnoreCase),
+                "Heard"    => Then(ordered, n => n.LastHeard),   // descending = most recently heard first; unknown (0) last
+                // Best link first (descending): fewer hops dominate (direct above relayed), then stronger RSSI; no reading sinks last.
+                "Signal"   => Then(ordered, n => _mesh!.GetSignal(n.Num) is { } s ? -(double)(s.Hops ?? 50) * 1000 + s.Rssi : double.NegativeInfinity),
+                "Env"      => Then(ordered, n => _mesh!.GetEnvironment(n.Num) is { } e ? e.Timestamp : DateTime.MinValue),
+                "DM"       => Then(ordered, n => _nodePrefs.GetValueOrDefault(n.Num)?.Dm == true),
+                "Block"    => Then(ordered, n => _nodePrefs.GetValueOrDefault(n.Num)?.Block == true),
+                _          => Then(ordered, SortName, StringComparer.OrdinalIgnoreCase),
+            };
+
+            var rows = new List<NodeRow>();
+            foreach (var n in ordered.ThenBy(SortName, StringComparer.OrdinalIgnoreCase))
+            {
+                var r = BuildRow(n);
+                rows.Add(r);
+                rowByNum[n.Num] = r;
+            }
+            list.ItemsSource = rows;
+
+            int total = all.Count;
+            bool filtered = query.Length > 0 || typeFilter != AllTypes;
+            header.Text = filtered ? $"Nodes: {rows.Count} of {total}" : $"Known nodes: {total}";
             status.Text = total == 0
                 ? "No nodes loaded yet. Click \"Update nodes\" to fetch them from the device."
-                : list.Items.Count == 0 ? $"No nodes match \"{query}\"." : DefaultHint;
+                : rows.Count == 0
+                    ? (query.Length > 0 ? $"No nodes match \"{query}\"." : $"No nodes of type {typeFilter}.")
+                    : DefaultHint;
         }
         Populate();
 
         // Route traceroute / node-info replies to this dialog's status line while it's open. Populate() runs
         // first (it refreshes names + resets the hint), then we overwrite the hint with the result line.
         _nodeDiagHandler = line => { Populate(); status.Text = line; };
-        // Live telemetry updates the env text on existing rows in place (no rebuild → no scroll jump / reorder).
-        _nodesRefresh = () => { foreach (var kv in envCells) { var t = NodeRowText(kv.Value.Node); kv.Value.Cell.Text = t; kv.Value.Cell.ToolTip = t; } };
+        // Live telemetry updates the heard/signal/environment cells on existing rows in place
+        // (no rebuild → no scroll jump / reorder).
+        _nodesRefresh = () =>
+        {
+            foreach (var r in rowByNum.Values)
+            {
+                r.Heard = HeardText(r.Node);
+                r.Signal = SignalCell(r.Node);
+                r.Environment = EnvCell(r.Node);
+                r.Tip = TipText(r.Node);
+            }
+        };
         _nodesRepopulate = Populate;   // full rebuild when newly heard nodes need rows added
         _nodeStatusHandler = s => status.Text = s;
         dialog.Closed += (_, _) => { _nodeDiagHandler = null; _nodesRefresh = null; _nodesRepopulate = null; _nodeStatusHandler = null; };
 
         searchBox.TextChanged += (_, _) => Populate();
-        sortCombo.SelectionChanged += (_, _) => Populate();
+        typeCombo.SelectionChanged += (_, _) => { if (!rebuildingTypes) Populate(); };
 
         updateBtn.Click += async (_, _) =>
         {
@@ -5737,6 +5884,39 @@ public partial class MainWindow : Window
         root.Children.Add(list);   // fills remaining space
         dialog.Content = root;
         dialog.ShowDialog();
+    }
+
+    /// <summary>One row of the Nodes window's column view. The live cells (heard/signal/environment) and the
+    /// DM/Block boxes raise change notifications so telemetry and pref updates refresh a row in place
+    /// (no rebuild → no scroll jump / reorder).</summary>
+    private sealed class NodeRow : INotifyPropertyChanged
+    {
+        public NodeRow(MeshNode node) => Node = node;
+        public MeshNode Node { get; }
+        public string Marks { get; init; } = "";
+        public string Name { get; init; } = "";
+        public string Type { get; init; } = "";
+        public string Hardware { get; init; } = "";
+        private string _heard = "", _signal = "", _environment = "", _tip = "";
+        private bool _dm, _block;
+        public string Heard { get => _heard; set => Set(ref _heard, value); }
+        public string Signal { get => _signal; set => Set(ref _signal, value); }
+        public string Environment { get => _environment; set => Set(ref _environment, value); }
+        public string Tip { get => _tip; set => Set(ref _tip, value); }
+        public bool Dm { get => _dm; set => Set(ref _dm, value); }
+        public bool Block { get => _block; set { if (Set(ref _block, value)) Raise(nameof(DmEnabled)); } }
+        public bool DmEnabled => !_block;   // Block wins over DM: a blocked node's DM box is greyed out
+        public Visibility PrefsVisibility => Node.IsSelf ? Visibility.Hidden : Visibility.Visible;   // own node has no DM/Block
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+            field = value;
+            Raise(name!);
+            return true;
+        }
+        private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
     /// <summary>The folder holding the offline map tile cache (under the app's LocalAppData).</summary>
