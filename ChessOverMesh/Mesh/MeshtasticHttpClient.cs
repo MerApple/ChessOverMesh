@@ -201,7 +201,7 @@ public sealed class MeshtasticHttpClient : IDisposable
     private const int MaxEnvironmentHistory = 100;   // keep only the latest N per node (oldest dropped past this)
     private readonly HashSet<uint> _sentTraceroutes = new();   // ids of traceroute requests awaiting a reply (matched by request_id)
     private readonly Dictionary<uint, uint> _lastHeardChannel = new();   // node num -> channel index we last decoded its packets on
-    private readonly Dictionary<uint, (int Rssi, float Snr, int? Hops, long When)> _signalCache = new();   // node num -> latest radio metrics from a packet we heard directly/relayed
+    private readonly Dictionary<uint, (int Rssi, float Snr, int? Hops, long When, byte Relay)> _signalCache = new();   // node num -> latest radio metrics from a packet we heard directly/relayed
 
     /// <summary>This device's node number, populated by <see cref="InitializeAsync"/> or seeding.</summary>
     public uint MyNodeNum { get; private set; }
@@ -349,7 +349,7 @@ public sealed class MeshtasticHttpClient : IDisposable
                           IReadOnlyDictionary<uint, string>? nodeShortNames = null,
                           IReadOnlyDictionary<uint, bool>? nodeFavorites = null,
                           IReadOnlyDictionary<uint, bool>? nodeIgnored = null,
-                          IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When)>? nodeSignals = null,
+                          IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When, byte Relay)>? nodeSignals = null,
                           IReadOnlyDictionary<uint, long>? nodeLastHeard = null)
     {
         if (nodeNames != null) foreach (var kv in nodeNames) _nameCache[kv.Key] = kv.Value;
@@ -404,9 +404,9 @@ public sealed class MeshtasticHttpClient : IDisposable
         return map.Where(kv => kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
     }
 
-    /// <summary>node-num → latest radio signal (RSSI/SNR/hops/when), for caching so it survives a restart.</summary>
-    public IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When)> GetNodeSignalMap() =>
-        new Dictionary<uint, (int Rssi, float Snr, int? Hops, long When)>(_signalCache);
+    /// <summary>node-num → latest radio signal (RSSI/SNR/hops/when/relay), for caching so it survives a restart.</summary>
+    public IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When, byte Relay)> GetNodeSignalMap() =>
+        new Dictionary<uint, (int Rssi, float Snr, int? Hops, long When, byte Relay)>(_signalCache);
 
     /// <summary>node-num → last-heard epoch seconds (cached + live), for caching a standalone last-heard.</summary>
     public IReadOnlyDictionary<uint, long> GetNodeLastHeardMap()
@@ -512,9 +512,11 @@ public sealed class MeshtasticHttpClient : IDisposable
     /// and Snr in dB as the device's radio read the packet. Hops is the distance it travelled (0 = heard
     /// directly, so the metrics describe that node's own link; &gt; 0 = the metrics describe the last relay→us
     /// hop, not the node itself; null = the sender's initial hop budget wasn't reported, so distance is
-    /// unknown). When is the device receive time (epoch seconds) of that packet.</summary>
-    public (int Rssi, float Snr, int? Hops, long When)? GetSignal(uint nodeNum) =>
-        _signalCache.TryGetValue(nodeNum, out var s) ? s : ((int, float, int?, long)?)null;
+    /// unknown). When is the device receive time (epoch seconds) of that packet. Relay is the LAST BYTE of
+    /// the node that last relayed the packet to us (see <see cref="DescribeRelayNode"/>; 0 = not reported —
+    /// older firmware, or a packet heard directly).</summary>
+    public (int Rssi, float Snr, int? Hops, long When, byte Relay)? GetSignal(uint nodeNum) =>
+        _signalCache.TryGetValue(nodeNum, out var s) ? s : ((int, float, int?, long, byte)?)null;
 
     /// <summary>A human-readable dump of everything known about a node — identity, hardware, role, last-heard,
     /// signal, position and its latest environment telemetry — for the apps' "Show all info" view (which lists
@@ -556,6 +558,10 @@ public sealed class MeshtasticHttpClient : IDisposable
             string sig = $"RSSI {s.Rssi} dBm · SNR {s.Snr:0.#} dB";
             sig = s.Hops switch { 0 => $"{sig} · direct", null => sig, 1 => $"via 1 hop · {sig}", var h => $"via {h} hops · {sig}" };
             lines.Add($"Signal: {sig}");
+            // The last node that rebroadcast the packet to us — only its id's last byte is transmitted, so
+            // this resolves to a name when unique, else lists the known candidates sharing that byte.
+            if (s.Relay != 0 && s.Hops is > 0)
+                lines.Add($"Last relayed to us by: {DescribeRelayNode(s.Relay)}");
         }
         else if (ni != null && ni.Snr != 0)
             lines.Add($"Signal (device-reported): SNR {ni.Snr:0.#} dB");
@@ -625,7 +631,10 @@ public sealed class MeshtasticHttpClient : IDisposable
         int hopStart = (int)ReadVarintField(pkt, 15);   // hop_start (sender's initial budget); 0 when not reported
         int? hops = hopStart > 0 ? Math.Max(0, hopStart - (int)pkt.HopLimit) : (int?)null;
         long when = pkt.RxTime > 0 ? pkt.RxTime : DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        _signalCache[pkt.From] = (pkt.RxRssi, pkt.RxSnr, hops, when);
+        // relay_node (field 19): the LAST BYTE of the node that last relayed this packet to us — set by
+        // recent firmware even on packets we can't decrypt. Only meaningful when the packet was relayed.
+        byte relay = (byte)ReadVarintField(pkt, 19);
+        _signalCache[pkt.From] = (pkt.RxRssi, pkt.RxSnr, hops, when, relay);
     }
 
     // Upserts a node into the device node DB from a live User broadcast (the library's AddFromRadio only adds

@@ -1326,7 +1326,7 @@ public partial class MainWindow : Window
                 _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw,
                     cached.Positions.ToDictionary(kv => kv.Key, kv => (kv.Value.Lat, kv.Value.Lon, kv.Value.LastHeard, kv.Value.PosTime)),
                     cached.NodeShortNames, cached.NodeFavorites, cached.NodeIgnored,
-                    cached.NodeSignals.ToDictionary(kv => kv.Key, kv => (kv.Value.Rssi, (float)kv.Value.Snr, kv.Value.Hops, kv.Value.When)),
+                    cached.NodeSignals.ToDictionary(kv => kv.Key, kv => (kv.Value.Rssi, (float)kv.Value.Snr, kv.Value.Hops, kv.Value.When, kv.Value.Relay)),
                     cached.NodeLastHeard);
 
             // Seed cached position tracks so the map's right-click "recent positions" view works immediately on reconnect.
@@ -5725,12 +5725,15 @@ public partial class MainWindow : Window
                 ? $"{DateTimeOffset.FromUnixTimeSeconds(n.LastHeard).LocalDateTime:yyyy-MM-dd HH:mm} (clock ahead)"
                 : AgoText(n.LastHeard);
 
-        // Compact per-column signal text; the row tooltip carries the full labelled summary.
+        // Compact per-column signal text; the row tooltip carries the full labelled summary. For a relayed
+        // packet the firmware reports the last relayer's id byte — shown as "via <node>" (resolved to a name
+        // when unique; several known nodes sharing that byte are listed as "one of" candidates).
         string SignalCell(MeshNode n)
         {
             if (n.IsSelf || _mesh!.GetSignal(n.Num) is not { } s) return "";
             string hops = s.Hops switch { 0 => " · direct", null => "", 1 => " · 1 hop", var h => $" · {h} hops" };
-            return $"{s.Rssi} dBm · {s.Snr:0.#} dB{hops}";
+            string via = s.Relay != 0 && s.Hops is > 0 ? $" · via {_mesh!.DescribeRelayNode(s.Relay)}" : "";
+            return $"{s.Rssi} dBm · {s.Snr:0.#} dB{hops}{via}";
         }
 
         string EnvCell(MeshNode n) =>
@@ -5754,16 +5757,18 @@ public partial class MainWindow : Window
         }
 
         // Formats a node's latest radio metrics. RSSI/SNR only describe the node's own link when we heard it
-        // directly (0 hops); for a relayed packet they're the last-hop relay's signal, so it's labelled as such.
-        static string SignalSummary((int Rssi, float Snr, int? Hops, long When) s)
+        // directly (0 hops); for a relayed packet they're the last-hop relay's signal, so it's labelled as
+        // such — including WHICH node last rebroadcast it to us, when the firmware reported its id byte.
+        string SignalSummary((int Rssi, float Snr, int? Hops, long When, byte Relay) s)
         {
             string sig = $"RSSI {s.Rssi} dBm · SNR {s.Snr:0.#} dB";
+            string relay = s.Relay != 0 && s.Hops is > 0 ? $" · last relayed to us by {_mesh!.DescribeRelayNode(s.Relay)}" : "";
             return s.Hops switch
             {
                 0      => $"{sig} · direct",
                 null   => sig,                                  // hop count unknown
-                1      => $"via 1 hop · last-hop {sig}",
-                var h  => $"via {h} hops · last-hop {sig}",
+                1      => $"via 1 hop · last-hop {sig}{relay}",
+                var h  => $"via {h} hops · last-hop {sig}{relay}",
             };
         }
 

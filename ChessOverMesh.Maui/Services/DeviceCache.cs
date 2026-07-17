@@ -69,6 +69,7 @@ internal static class DeviceCache
         public double Snr { get; set; }   // dB
         public int? Hops { get; set; }    // hops the packet travelled (0 = direct); null = unknown
         public long When { get; set; }    // epoch seconds of the packet this reading came from
+        public byte Relay { get; set; }   // last byte of the node that last relayed the packet (0 = none reported)
     }
 
     public sealed class Entry
@@ -281,7 +282,7 @@ internal static class DeviceCache
                             IReadOnlyDictionary<uint, string>? nodeShortNames = null,
                             IReadOnlyDictionary<uint, bool>? nodeFavorites = null,
                             IReadOnlyDictionary<uint, bool>? nodeIgnored = null,
-                            IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When)>? nodeSignals = null,
+                            IReadOnlyDictionary<uint, (int Rssi, float Snr, int? Hops, long When, byte Relay)>? nodeSignals = null,
                             IReadOnlyDictionary<uint, long>? nodeLastHeard = null)
     {
         try
@@ -306,7 +307,7 @@ internal static class DeviceCache
                     : existing?.NodeIgnored ?? new Dictionary<uint, bool>(),
                 NodeSignals = nodeSignals != null
                     ? nodeSignals.ToDictionary(kv => kv.Key,
-                        kv => new CachedSignal { Rssi = kv.Value.Rssi, Snr = kv.Value.Snr, Hops = kv.Value.Hops, When = kv.Value.When })
+                        kv => new CachedSignal { Rssi = kv.Value.Rssi, Snr = kv.Value.Snr, Hops = kv.Value.Hops, When = kv.Value.When, Relay = kv.Value.Relay })
                     : existing?.NodeSignals ?? new Dictionary<uint, CachedSignal>(),
                 NodeLastHeard = nodeLastHeard != null
                     ? new Dictionary<uint, long>(nodeLastHeard)

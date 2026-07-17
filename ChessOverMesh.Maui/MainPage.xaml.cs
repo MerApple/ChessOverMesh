@@ -879,7 +879,7 @@ public partial class MainPage : ContentPage
             var cached = DeviceCache.Get(host);
             if (cached != null) _mesh.SeedNodes(cached.NodeNames, cached.NodeRoles, cached.NodeHw, nodeShortNames: cached.NodeShortNames,
                 nodeFavorites: cached.NodeFavorites, nodeIgnored: cached.NodeIgnored,
-                nodeSignals: cached.NodeSignals.ToDictionary(kv => kv.Key, kv => (kv.Value.Rssi, (float)kv.Value.Snr, kv.Value.Hops, kv.Value.When)),
+                nodeSignals: cached.NodeSignals.ToDictionary(kv => kv.Key, kv => (kv.Value.Rssi, (float)kv.Value.Snr, kv.Value.Hops, kv.Value.When, kv.Value.Relay)),
                 nodeLastHeard: cached.NodeLastHeard);
 
             // Seed cached node positions so the map / "open in Google Maps" works immediately on reconnect, before
@@ -2805,12 +2805,14 @@ public partial class MainPage : ContentPage
         catch { /* best-effort — time sync never blocks the connection */ }
     }
 
-    /// <summary>A short signal summary for a node ("RSSI … · SNR …", with hop context), or null if none heard.</summary>
+    /// <summary>A short signal summary for a node ("RSSI … · SNR …", with hop context and — for a relayed
+    /// packet — the node that last rebroadcast it to us), or null if none heard.</summary>
     public string? NodeSignal(uint num)
     {
         if (_mesh?.GetSignal(num) is not { } s) return null;
         string sig = $"RSSI {s.Rssi} dBm · SNR {s.Snr:0.#} dB";
-        return s.Hops switch { 0 => $"{sig} · direct", null => sig, 1 => $"via 1 hop · {sig}", var h => $"via {h} hops · {sig}" };
+        string relay = s.Relay != 0 && s.Hops is > 0 ? $" · relayed by {_mesh!.DescribeRelayNode(s.Relay)}" : "";
+        return s.Hops switch { 0 => $"{sig} · direct", null => sig, 1 => $"via 1 hop · {sig}{relay}", var h => $"via {h} hops · {sig}{relay}" };
     }
 
     /// <summary>A sort key for a node's link quality (higher is better): fewer hops dominate, then stronger RSSI;
@@ -2821,13 +2823,14 @@ public partial class MainPage : ContentPage
     /// <summary>True when the node has reported environment telemetry this session (for the "Environment" sort).</summary>
     public bool NodeHasEnvironment(uint num) => _mesh?.GetEnvironment(num) != null;
 
-    /// <summary>Compact signal text for the Nodes table's Signal column ("-100 dBm · -14,3 dB · 1 hop"),
+    /// <summary>Compact signal text for the Nodes table's Signal column ("-100 dBm · -14,3 dB · 1 hop · via X"),
     /// or null if the node has never been heard. The full labelled summary stays in "Show all info".</summary>
     public string? NodeSignalCell(uint num)
     {
         if (_mesh?.GetSignal(num) is not { } s) return null;
         string hops = s.Hops switch { 0 => " · direct", null => "", 1 => " · 1 hop", var h => $" · {h} hops" };
-        return $"{s.Rssi} dBm · {s.Snr:0.#} dB{hops}";
+        string via = s.Relay != 0 && s.Hops is > 0 ? $" · via {_mesh!.DescribeRelayNode(s.Relay)}" : "";
+        return $"{s.Rssi} dBm · {s.Snr:0.#} dB{hops}{via}";
     }
 
     /// <summary>The node's latest environment reading for the Nodes table ("21,5°C · 45%RH · @ 09:30:12"),
