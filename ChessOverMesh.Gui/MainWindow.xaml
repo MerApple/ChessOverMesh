@@ -174,7 +174,8 @@
                 <ListBox x:Name="SystemList" Grid.Row="2" Background="#FF1E1E1E" Foreground="#FFE0E0E0"
                          BorderThickness="0" FontFamily="Consolas" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
-                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown">
+                         SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown"
+                         PreviewMouseRightButtonDown="List_PreviewMouseRightButtonDown">
                     <ListBox.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Request node info" Click="RequestSystemNodeInfo_Click"/>
@@ -252,7 +253,8 @@
                          BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.CanContentScroll="False"
                          SelectionMode="Extended" PreviewKeyDown="List_PreviewKeyDown"
-                         PreviewMouseDown="ChatList_PreviewMouseDown">
+                         PreviewMouseDown="ChatList_PreviewMouseDown"
+                         PreviewMouseRightButtonDown="List_PreviewMouseRightButtonDown">
                     <ListBox.ContextMenu>
                         <!-- FontSize follows the app UI text size via the ContextMenu class handler in App.xaml.cs -->
                         <ContextMenu>

@@ -4781,6 +4781,18 @@ public partial class MainWindow : Window
         try { Clipboard.SetText(text); } catch { /* clipboard can be momentarily unavailable */ }
     }
 
+    // Right-click doesn't move a WPF ListBox's selection by itself, so the context menu could act on a row
+    // other than the one under the cursor — e.g. "Request node info" silently targeting an older selected
+    // row and complaining it isn't tied to a node. Select the clicked row first; a right-click INSIDE an
+    // existing multi-selection keeps it (so selecting several rows and right-click → Copy still works).
+    private void List_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ListBox list || e.OriginalSource is not DependencyObject d) return;
+        if (ItemsControl.ContainerFromElement(list, d) is not ListBoxItem item || item.IsSelected) return;
+        list.SelectedItems.Clear();
+        item.IsSelected = true;
+    }
+
     private void List_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.C && (Keyboard.Modifiers & ModifierKeys.Control) != 0 && sender is ListBox lb)
